@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPV Teren - Lokator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; text-align: center; }
+        .posoda { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+        input, select, button { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #d32f2f; color: white; font-weight: bold; border: none; cursor: pointer; }
+        button.oddaja { background: #388e3c; }
+        .status { font-weight: bold; margin-top: 15px; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="posoda">
+    <h2>EPV Terenska Prijava</h2>
+    
+    <label for="imeEnote">Ime enote (npr. Slb 1, Vodja 2):</label>
+    <input type="text" id="imeEnote" placeholder="Vpiši oznako...">
+
+    <label for="tipEnote">Tip enote:</label>
+    <select id="tipEnote">
+        <option value="gasilec">Gasilec (Rdeča)</option>
+        <option value="vozilo">Vozilo (Modra)</option>
+        <option value="vodja">Vodstvo / Štab / EPV (Rumena)</option>
+        <option value="resevalec">Reševalec / NMP (Zelena)</option>
+    </select>
+
+    <label for="stClanov">Število članov v enoti:</label>
+    <input type="number" id="stClanov" value="1" min="1">
+
+    <button id="gumbOddaja" onclick="preklopiOddajanje()">ZAČNI ODDAJANJE LOKACIJE</button>
+    <div class="status" id="statusPolje">Status: Pripravljen</div>
+</div>
+
+<script>
+    // Vstavljen tvoj URL naslov spletne aplikacije
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNdPEQjxMFttBgz1_h87RP6SEBjvaELdFth-28Q2HkEPBO08BWsFKQtMyav0SIhaq16w/exec";
+    
+    let watchId = null;
+    let prejsnjiCas = 0;
+
+    // Avtomatsko branje nastavitev iz QR kode ob zagonu
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tip = urlParams.get('tip');
+        const clanov = urlParams.get('clanov');
+        
+        if (tip) document.getElementById('tipEnote').value = tip;
+        if (clanov) document.getElementById('stClanov').value = clanov;
+    };
+
+    function preklopiOddajanje() {
+        const gumb = document.getElementById('gumbOddaja');
+        const status = document.getElementById('statusPolje');
+        const ime = document.getElementById('imeEnote').value.trim();
+
+        if (!ime) {
+            alert("Prosimo, vpiši ime enote!");
+            return;
+        }
+
+        if (watchId === null) {
+            if (!navigator.geolocation) {
+                status.innerText = "GPS ni podprt na tej napravi.";
+                return;
+            }
+
+            gumb.innerText = "USTAVI ODDAJANJE";
+            gumb.classList.add('oddaja');
+            status.innerText = "Iščem GPS signal...";
+
+            watchId = navigator.geolocation.watchPosition(posljiLokacijo, 
+                (err) => { status.innerText = "Napaka GPS: " + err.message; }, 
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        } else {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+            gumb.innerText = "ZAČNI ODDAJANJE LOKACIJE";
+            gumb.classList.remove('oddaja');
+            status.innerText = "Status: Oddajanje ustavljeno.";
+        }
+    }
+
+    async function posljiLokacijo(position) {
+        const trenutniCas = new Date().getTime();
+        if (trenutniCas - prejsnjiCas < 4000) return;
+        prejsnjiCas = trenutniCas;
+
+        const ime = document.getElementById('imeEnote').value.trim();
+        const tip = document.getElementById('tipEnote').value;
+        const clanov = document.getElementById('stClanov').value;
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const acc = Math.round(position.coords.accuracy);
+
+        document.getElementById('statusPolje').innerText = `Pošiljam... Natančnost: ${acc}m`;
+
+        const celotnoIme = `${tip.toUpperCase()}:${ime}:${clanov}`;
+
+        try {
+            await fetch(`${SCRIPT_URL}?ime=${encodeURIComponent(celotnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}`, { method: 'GET', mode: 'no-cors' });
+            document.getElementById('statusPolje').innerText = `Poslano! Zadnji vpis ob ${new Date().toLocaleTimeString()}`;
+        } catch (e) {
+            document.getElementById('statusPolje').innerText = "Napaka pri povezavi.";
+        }
+    }
+</script>
+</body>
+</html>
