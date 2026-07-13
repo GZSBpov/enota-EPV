@@ -37,7 +37,7 @@
 </div>
 
 <script>
-    // Vstavljen tvoj URL naslov spletne aplikacije
+    // Posodobljen URL naslov spletne aplikacije Google Apps Script
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNdPEQjxMFttBgz1_h87RP6SEBjvaELdFth-28Q2HkEPBO08BWsFKQtMyav0SIhaq16w/exec";
      
     let watchId = null;
@@ -87,9 +87,9 @@
     }
 
     async function posljiLokacijo(position) {
-        const trenutniCas = new Date().getTime();
-        if (trenutniCas - prejsnjiCas < 4000) return;
-        prejsnjiCas = trenutniCas;
+        const trenchesCas = new Date().getTime();
+        if (trenchesCas - prejsnjiCas < 4000) return;
+        prejsnjiCas = trenchesCas;
 
         const ime = document.getElementById('imeEnote').value.trim();
         const tip = document.getElementById('tipEnote').value;
