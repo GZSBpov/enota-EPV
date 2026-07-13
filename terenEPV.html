@@ -17,7 +17,7 @@
 
 <div class="posoda">
     <h2>EPV Terenska Prijava</h2>
-    
+     
     <label for="imeEnote">Ime enote (npr. Slb 1, Vodja 2):</label>
     <input type="text" id="imeEnote" placeholder="Vpiši oznako...">
 
@@ -39,7 +39,7 @@
 <script>
     // Vstavljen tvoj URL naslov spletne aplikacije
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNdPEQjxMFttBgz1_h87RP6SEBjvaELdFth-28Q2HkEPBO08BWsFKQtMyav0SIhaq16w/exec";
-    
+     
     let watchId = null;
     let prejsnjiCas = 0;
 
@@ -48,7 +48,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const tip = urlParams.get('tip');
         const clanov = urlParams.get('clanov');
-        
+         
         if (tip) document.getElementById('tipEnote').value = tip;
         if (clanov) document.getElementById('stClanov').value = clanov;
     };
@@ -100,10 +100,23 @@
 
         document.getElementById('statusPolje').innerText = `Pošiljam... Natančnost: ${acc}m`;
 
-        const celotnoIme = `${tip.toUpperCase()}:${ime}:${clanov}`;
+        const podatkiZaPoslat = {
+            ime: `${tip.toUpperCase()}:${ime}:${clanov}`,
+            lat: lat,
+            lon: lon,
+            natancnost: acc
+        };
 
         try {
-            await fetch(`${SCRIPT_URL}?ime=${encodeURIComponent(celotnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}`, { method: 'GET', mode: 'no-cors' });
+            await fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: JSON.stringify(podatkiZaPoslat)
+            });
+
             document.getElementById('statusPolje').innerText = `Poslano! Zadnji vpis ob ${new Date().toLocaleTimeString()}`;
         } catch (e) {
             document.getElementById('statusPolje').innerText = "Napaka pri povezavi.";
