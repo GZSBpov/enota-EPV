@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPV Štabni Zemljevid & Sledenje</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Leaflet.draw CSS za risalna orodja -->
+    <!-- NOVO: Leaflet.draw CSS za risalna orodja -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <!-- Knjižnica za generiranje QR kod na strani -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -32,8 +32,10 @@
         .filter-posoda { padding: 10px 15px; background: #1b1b1b; flex: 1; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
         .filter-posoda label { font-size: 12px; font-weight: bold; color: #ff9800; }
         .filter-vrstica { display: flex; gap: 10px; align-items: center; }
-        .filter-posoda select, .filter-posoda input[type="number"] { padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
+        .filter-posoda select, .filter-posoda input[type="number"], .filter-posoda input[type="text"] { padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
         .filter-posoda input[type="number"] { width: 60px; }
+        .gumb-intervencija { background: #ff9800; color: black; font-weight: bold; padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; text-transform: uppercase; }
+        .gumb-intervencija:hover { background: #e68a00; }
         
         /* Seznam enot */
         .seznam-enot-okno { flex: 1; overflow-y: auto; background: #252525; padding: 6px; border-radius: 4px; border: 1px solid #444; margin-top: 2px; }
@@ -60,7 +62,7 @@
         }
         .gumb-povecaj:hover { background: rgb(0, 0, 0); }
 
-        /* Izbirnik barve za risanje sektorjev (zgoraj levo na mapi) */
+        /* NOVO: Izbirnik barve za risanje sektorjev (zgoraj levo na mapi) */
         .barvni-izbirnik-posoda {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
             background: rgba(0, 0, 0, 0.8); padding: 5px 10px; border-radius: 4px;
@@ -70,7 +72,7 @@
 
         .stalni-napis { background: rgba(0, 0, 0, 0.85); color: white; border: 1px solid #fff; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 12px; white-space: nowrap; }
         
-        /* Gumb za kopiranje znotraj oblačka na zemljividu */
+        /* Gumb za kopiranje znotraj oblačka na zemljevidu */
         .gumb-kopiraj-popup {
             background: #ff9800; color: black; border: none; padding: 4px 8px;
             font-weight: bold; font-size: 11px; border-radius: 3px; cursor: pointer;
@@ -88,7 +90,7 @@
     <div class="fullscreen-wrapper" id="map-wrapper">
         <button class="gumb-povecaj" onclick="preklopiCelZaslon('map-wrapper')">Cel zaslon (ESC)</button>
         
-        <!-- Kontrolnik za izbiro trenutne aktivne barve sektorja -->
+        <!-- NOVO: Kontrolnik za izbiro trenutne aktivne barve sektorja -->
         <div class="barvni-izbirnik-posoda">
             <label for="trenutnaBarva">Barva sektorja:</label>
             <select id="trenutnaBarva" onchange="posodobiNastavitveRisanja()">
@@ -110,11 +112,13 @@
             <h3 class="sekcija-naslov">Video Prenos (V ŽIVO)</h3>
             <div class="video-wrapper" id="video-wrapper">
                 <button class="gumb-povecaj" onclick="preklopiCelZaslon('video-wrapper')">Cel zaslon (ESC)</button>
+                <!-- Video prenos iz drona s FIKSNIM ID-jem (ni več vpisovanja) -->
                 <iframe 
                   src="https://vdo.ninja/?view=enota_epv_dron&autoplay=1&mute=1&hd=1&codec=h264" 
+                  style="width: 100%; height: 100%; border: none;" 
                   allow="autoplay; encrypted-media; picture-in-picture" 
                   allowfullscreen>
-                 iframe>
+                </iframe>
             </div>
         </div>
 
@@ -122,6 +126,18 @@
         <div class="tretjina-panela">
             <h3 class="sekcija-naslov">Spremljanje enot na mapi</h3>
             <div class="filter-posoda">
+                
+                <!-- NOVO: Izbira in kreiranje intervencij/dogodkov -->
+                <label>Aktivni dogodek / Intervencija:</label>
+                <div class="filter-vrstica">
+                    <select id="izbiraIntervencije" onchange="zamenjajIntervencijo()" style="flex: 1;"></select>
+                </div>
+                <div class="filter-vrstica">
+                    <input type="text" id="novoImeIntervencije" placeholder="Ime novega dogodka..." style="flex: 1;">
+                    <button class="gumb-intervencija" onclick="ustvariIntervencijo()">Ustvari</button>
+                </div>
+                <hr style="width:100%; border:0; border-top:1px solid #444; margin: 4px 0;">
+
                 <label>Avtomatsko skrivanje starih sledi:</label>
                 <div class="filter-vrstica">
                     <select id="filterTipCas" onchange="spremembaTipaFiltra()">
@@ -166,7 +182,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Leaflet.draw JS knjižnica za risanje in označevanje -->
+<!-- NOVO: Leaflet.draw JS knjižnica za risanje in označevanje -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
@@ -193,15 +209,126 @@
     
     L.control.layers(osnovniSloji, null, { position: 'bottomright' }).addTo(map);
 
-    // Sloj za ročno narisane sektorje
+    /* ========================================================================
+       NOVO: UPRAVLJANJE INTERVENCIJ / DOGODKOV
+       ======================================================================== */
+    let vseIntervencije = ["Splošno"];
+    let trenutnaIntervencija = "Splošno";
+
+    function naloziIntervencije() {
+        const shranjene = localStorage.getItem("epv_intervencije_seznam");
+        const trenutna = localStorage.getItem("epv_intervencije_trenutna");
+        if (shranjene) vseIntervencije = JSON.parse(shranjene);
+        if (trenutna && vseIntervencije.includes(trenutna)) trenutnaIntervencija = trenutna;
+        osveziSpustniSeznamIntervencij();
+    }
+
+    function osveziSpustniSeznamIntervencij() {
+        const select = document.getElementById("izbiraIntervencije");
+        select.innerHTML = "";
+        vseIntervencije.forEach(intervencija => {
+            const opt = document.createElement("option");
+            opt.value = intervencija;
+            opt.innerText = intervencija;
+            if (intervencija === trenutnaIntervencija) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    function ustvariIntervencijo() {
+        const vnos = document.getElementById("novoImeIntervencije");
+        const ime = vnos.value.trim();
+        if (!ime) return;
+        if (vseIntervencije.includes(ime)) {
+            alert("Dogodek s tem imenom že obstaja!");
+            return;
+        }
+        vseIntervencije.push(ime);
+        trenutnaIntervencija = ime;
+        localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
+        localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
+        vnos.value = "";
+        osveziSpustniSeznamIntervencij();
+        izrisiSektorjeZaTrenutnoIntervencijo();
+    }
+
+    function zamenjajIntervencijo() {
+        trenutnaIntervencija = document.getElementById("izbiraIntervencije").value;
+        localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
+        izrisiSektorjeZaTrenutnoIntervencijo();
+    }
+
+    function shraniSektorjeVTekočoIntervencijo() {
+        const podatki = [];
+        narisaniSektorjiSloj.eachLayer(layer => {
+            let geojson = layer.toGeoJSON();
+            geojson.properties = geojson.properties || {};
+            geojson.properties.epvBarva = layer.options.epvBarva || "red";
+            if (layer instanceof L.Circle) {
+                geojson.properties.radius = layer.getRadius();
+                geojson.properties.layerType = 'circle';
+            } else if (layer instanceof L.Marker) {
+                geojson.properties.layerType = 'marker';
+            } else if (layer instanceof L.Rectangle) {
+                geojson.properties.layerType = 'rectangle';
+            } else if (layer instanceof L.Polygon) {
+                geojson.properties.layerType = 'polygon';
+            } else if (layer instanceof L.Polyline) {
+                geojson.properties.layerType = 'polyline';
+            }
+            podatki.push(geojson);
+        });
+        localStorage.setItem("epv_sektorji_" + trenutnaIntervencija, JSON.stringify(podatki));
+    }
+
+    function izrisiSektorjeZaTrenutnoIntervencijo() {
+        narisaniSektorjiSloj.clearLayers();
+        const shranjeno = localStorage.getItem("epv_sektorji_" + trenutnaIntervencija);
+        if (!shranjeno) return;
+        const podatki = JSON.parse(shranjeno);
+        podatki.forEach(geojson => {
+            const tip = geojson.properties.layerType;
+            const barvaKoda = geojson.properties.epvBarva;
+            const stil = pridobiNastavitveStila(barvaKoda);
+            let layer;
+
+            if (tip === 'circle') {
+                const coords = geojson.geometry.coordinates;
+                layer = L.circle([coords[1], coords[0]], { ...stil, radius: geojson.properties.radius });
+            } else {
+                layer = L.geoJSON(geojson, {
+                    style: stil,
+                    pointToLayer: function (geoJsonPoint, latlng) {
+                        return L.marker(latlng);
+                    }
+                }).getLayers()[0];
+            }
+
+            if (layer) {
+                layer.options.epvBarva = barvaKoda;
+                if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                    layer.setStyle({ color: stil.color, weight: 4 });
+                }
+                urediPopupZaSektor(layer, barvaKoda);
+                narisaniSektorjiSloj.addLayer(layer);
+            }
+        });
+    }
+
+    /* ========================================================================
+       NOVO: VKLJUČITEV RISALNIH ORODIJ (SEKTORJI IN KOORDINATE)
+       ======================================================================== */
+    
+    // Sloj, kjer se bodo shranjevali vsi naši ročno narisani sektorji
     const narisaniSektorjiSloj = new L.FeatureGroup();
     map.addLayer(narisaniSektorjiSloj);
 
+    // Prevodi barv za izpis v sporočilu
     const slovarBarv = { "red": "Rdeča", "blue": "Modra", "gold": "Rumena", "green": "Zelena" };
     let drawControl;
 
     function pridobiNastavitveStila(barva) {
-        let hex = "#d32f2f"; 
+        let hex = "#d32f2f"; // Rdeča privzeto
         if(barva === "blue") hex = "#1976d2";
         if(barva === "gold") hex = "#fbc02d";
         if(barva === "green") hex = "#388e3c";
@@ -233,8 +360,10 @@
         map.addControl(drawControl);
     }
     
+    // Sprožimo začetno nastavitev orodij za risanje
     posodobiNastavitveRisanja();
 
+    // Funkcija, ki izračuna sredino ali koordinate narisanega elementa ter pripravi tekst za kopiranje
     function urediPopupZaSektor(layer, barvaKoda) {
         let tipElementa = "Sektor";
         let koordinateBesedilo = "";
@@ -275,6 +404,7 @@
         layer.bindPopup(popupVsebina);
     }
 
+    // Pomožna globalna funkcija za kopiranje koordinat iz popup oken v odložišče
     window.kopirajTekstVMedpomnilnik = function(base64Tekst) {
         let tekst = decodeURIComponent(escape(atob(base64Tekst)));
         navigator.clipboard.writeText(tekst).then(() => {
@@ -284,22 +414,39 @@
         });
     };
 
+    // Dogodek: Ko uporabnik konča z risanjem elementa na mapi
     map.on(L.Draw.Event.CREATED, function (e) {
         const layer = e.layer;
         const izbranaBarva = document.getElementById("trenutnaBarva").value;
         
+        // Elementu dodelimo barvo, da jo vemo prebrati tudi kasneje ob kliku
         layer.options.epvBarva = izbranaBarva;
+        
+        // Pripravimo oblaček s koordinatami in gumbom za kopiranje
         urediPopupZaSektor(layer, izbranaBarva);
+        
         narisaniSektorjiSloj.addLayer(layer);
+        shraniSektorjeVTekočoIntervencijo();
         layer.openPopup();
     });
 
+    // Dogodek: Če se elementi naknadno spreminjajo/urejajo, osvežimo koordinate
     map.on(L.Draw.Event.EDITED, function (e) {
         e.layers.eachLayer(function (layer) {
             let barva = layer.options.epvBarva || "red";
             urediPopupZaSektor(layer, barva);
         });
+        shraniSektorjeVTekočoIntervencijo();
     });
+
+    // Dogodek: Ko izbrišemo elemente
+    map.on(L.Draw.Event.DELETED, function (e) {
+        shraniSektorjeVTekočoIntervencijo();
+    });
+
+    /* ========================================================================
+       KONEC RISALNIH ORODIJ
+       ======================================================================== */
 
     let enoteMarkerji = {};
     let enoteSledi = {}; 
@@ -387,6 +534,8 @@
     }
 
     window.addEventListener('load', () => {
+        naloziIntervencije();
+        izrisiSektorjeZaTrenutnoIntervencijo();
         naloziNastavitev();
         ustvariQrKodo();
     });
