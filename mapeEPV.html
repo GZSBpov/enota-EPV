@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPV Štabni Zemljevid & Sledenje</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- NOVO: Leaflet.draw CSS za risalna orodja -->
+    <!-- Leaflet.draw CSS za risalna orodja -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <!-- Knjižnica za generiranje QR kod na strani -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -60,7 +60,7 @@
         }
         .gumb-povecaj:hover { background: rgb(0, 0, 0); }
 
-        /* NOVO: Izbirnik barve za risanje sektorjev (zgoraj levo na mapi) */
+        /* Izbirnik barve za risanje sektorjev (zgoraj levo na mapi) */
         .barvni-izbirnik-posoda {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
             background: rgba(0, 0, 0, 0.8); padding: 5px 10px; border-radius: 4px;
@@ -70,7 +70,7 @@
 
         .stalni-napis { background: rgba(0, 0, 0, 0.85); color: white; border: 1px solid #fff; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 12px; white-space: nowrap; }
         
-        /* Gumb za kopiranje znotraj oblačka na zemljevidu */
+        /* Gumb za kopiranje znotraj oblačka na zemljividu */
         .gumb-kopiraj-popup {
             background: #ff9800; color: black; border: none; padding: 4px 8px;
             font-weight: bold; font-size: 11px; border-radius: 3px; cursor: pointer;
@@ -88,7 +88,7 @@
     <div class="fullscreen-wrapper" id="map-wrapper">
         <button class="gumb-povecaj" onclick="preklopiCelZaslon('map-wrapper')">Cel zaslon (ESC)</button>
         
-        <!-- NOVO: Kontrolnik za izbiro trenutne aktivne barve sektorja -->
+        <!-- Kontrolnik za izbiro trenutne aktivne barve sektorja -->
         <div class="barvni-izbirnik-posoda">
             <label for="trenutnaBarva">Barva sektorja:</label>
             <select id="trenutnaBarva" onchange="posodobiNastavitveRisanja()">
@@ -110,13 +110,11 @@
             <h3 class="sekcija-naslov">Video Prenos (V ŽIVO)</h3>
             <div class="video-wrapper" id="video-wrapper">
                 <button class="gumb-povecaj" onclick="preklopiCelZaslon('video-wrapper')">Cel zaslon (ESC)</button>
-                <!-- Video prenos iz drona s FIKSNIM ID-jem (ni več vpisovanja) -->
-            <iframe 
-              src="https://vdo.ninja/?view=enota_epv_dron&autoplay=1&mute=1&hd=1&codec=h264" 
-              style="width: 100%; height: 100%; border: none;" 
-              allow="autoplay; encrypted-media; picture-in-picture" 
-              allowfullscreen>
-            </iframe>
+                <iframe 
+                  src="https://vdo.ninja/?view=enota_epv_dron&autoplay=1&mute=1&hd=1&codec=h264" 
+                  allow="autoplay; encrypted-media; picture-in-picture" 
+                  allowfullscreen>
+                 iframe>
             </div>
         </div>
 
@@ -168,7 +166,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- NOVO: Leaflet.draw JS knjižnica za risanje in označevanje -->
+<!-- Leaflet.draw JS knjižnica za risanje in označevanje -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
@@ -195,20 +193,15 @@
     
     L.control.layers(osnovniSloji, null, { position: 'bottomright' }).addTo(map);
 
-    /* ========================================================================
-       NOVO: VKLJUČITEV RISALNIH ORODIJ (SEKTORJI IN KOORDINATE)
-       ======================================================================== */
-    
-    // Sloj, kjer se bodo shranjevali vsi naši ročno narisani sektorji
+    // Sloj za ročno narisane sektorje
     const narisaniSektorjiSloj = new L.FeatureGroup();
     map.addLayer(narisaniSektorjiSloj);
 
-    // Prevodi barv za izpis v sporočilu
     const slovarBarv = { "red": "Rdeča", "blue": "Modra", "gold": "Rumena", "green": "Zelena" };
     let drawControl;
 
     function pridobiNastavitveStila(barva) {
-        let hex = "#d32f2f"; // Rdeča privzeto
+        let hex = "#d32f2f"; 
         if(barva === "blue") hex = "#1976d2";
         if(barva === "gold") hex = "#fbc02d";
         if(barva === "green") hex = "#388e3c";
@@ -240,10 +233,8 @@
         map.addControl(drawControl);
     }
     
-    // Sprožimo začetno nastavitev orodij za risanje
     posodobiNastavitveRisanja();
 
-    // Funkcija, ki izračuna sredino ali koordinate narisanega elementa ter pripravi tekst za kopiranje
     function urediPopupZaSektor(layer, barvaKoda) {
         let tipElementa = "Sektor";
         let koordinateBesedilo = "";
@@ -284,7 +275,6 @@
         layer.bindPopup(popupVsebina);
     }
 
-    // Pomožna globalna funkcija za kopiranje koordinat iz popup oken v odložišče
     window.kopirajTekstVMedpomnilnik = function(base64Tekst) {
         let tekst = decodeURIComponent(escape(atob(base64Tekst)));
         navigator.clipboard.writeText(tekst).then(() => {
@@ -294,32 +284,22 @@
         });
     };
 
-    // Dogodek: Ko uporabnik konča z risanjem elementa na mapi
     map.on(L.Draw.Event.CREATED, function (e) {
         const layer = e.layer;
         const izbranaBarva = document.getElementById("trenutnaBarva").value;
         
-        // Elementu dodelimo barvo, da jo vemo prebrati tudi kasneje ob kliku
         layer.options.epvBarva = izbranaBarva;
-        
-        // Pripravimo oblaček s koordinatami in gumbom za kopiranje
         urediPopupZaSektor(layer, izbranaBarva);
-        
         narisaniSektorjiSloj.addLayer(layer);
         layer.openPopup();
     });
 
-    // Dogodek: Če se elementi naknadno spreminjajo/urejajo, osvežimo koordinate
     map.on(L.Draw.Event.EDITED, function (e) {
         e.layers.eachLayer(function (layer) {
             let barva = layer.options.epvBarva || "red";
             urediPopupZaSektor(layer, barva);
         });
     });
-
-    /* ========================================================================
-       KONEC RISALNIH ORODIJ
-       ======================================================================== */
 
     let enoteMarkerji = {};
     let enoteSledi = {}; 
