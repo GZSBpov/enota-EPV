@@ -73,9 +73,23 @@
             gumb.classList.add('oddaja');
             status.innerText = "Iščem GPS signal...";
 
+            // Konfiguracija za iPhone (omogoča natančen GPS in preprečuje predpomnjenje stare lokacije)
+            const gpsOpcije = { 
+                enableHighAccuracy: true, 
+                timeout: 15000, 
+                maximumAge: 0 
+            };
+
             watchId = navigator.geolocation.watchPosition(posljiLokacijo, 
-                (err) => { status.innerText = "Napaka GPS: " + err.message; }, 
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                (err) => { 
+                    let sporocilo = err.message;
+                    if (err.code === 1) {
+                        sporocilo = "Dovoljenje zavrnjeno! V nastavitvah iPhona odobrite lokacijo za Safari.";
+                        alert("Prosimo, v nastavitvah iPhona dovolite uporabo lokacije za vaš brskalnik.");
+                    }
+                    status.innerText = "Napaka GPS: " + sporocilo; 
+                }, 
+                gpsOpcije
             );
         } else {
             navigator.geolocation.clearWatch(watchId);
@@ -87,9 +101,10 @@
     }
 
     async function posljiLokacijo(position) {
-        const trenchesCas = new Date().getTime();
-        if (trenchesCas - prejsnjiCas < 4000) return;
-        prejsnjiCas = trenchesCas;
+        const trenutenCas = new Date().getTime();
+        // Varovalka: pošlji podatke največ na vsakih 5 sekund
+        if (trenutenCas - prejsnjiCas < 5000) return;
+        prejsnjiCas = trenutenCas;
 
         const ime = document.getElementById('imeEnote').value.trim();
         const tip = document.getElementById('tipEnote').value;
@@ -100,21 +115,17 @@
 
         document.getElementById('statusPolje').innerText = `Pošiljam... Natančnost: ${acc}m`;
 
-        const podatkiZaPoslat = {
-            ime: `${tip.toUpperCase()}:${ime}:${clanov}`,
-            lat: lat,
-            lon: lon,
-            natancnost: acc
-        };
+        const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}`;
+
+        // POPRAVEK ZA iOS (GET metoda + no-cors):
+        // Namesto POST zahteve, ki jo iPhone pogosto blokira zaradi CORS zaščite, 
+        // pošljemo GET zahtevo s parametrom 'mode: no-cors', kar iPhone vedno dovoli.
+        const urlZParametri = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}`;
 
         try {
-            await fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain'
-                },
-                body: JSON.stringify(podatkiZaPoslat)
+            await fetch(urlZParametri, {
+                method: 'GET',
+                mode: 'no-cors'
             });
 
             document.getElementById('statusPolje').innerText = `Poslano! Zadnji vpis ob ${new Date().toLocaleTimeString()}`;
