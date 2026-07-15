@@ -11,17 +11,28 @@
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: Arial, sans-serif; overflow: hidden; background: #222; }
         
+        /* Zakleni zaslon za geslo */
+        #zaklep-zaslona {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; z-index: 99999; display: flex; align-items: center; justify-content: center;
+        }
+        .geslo-posoda { background: #222; padding: 30px; border-radius: 8px; border: 2px solid #ff9800; text-align: center; max-width: 350px; width: 90%; color: white; }
+        .geslo-posoda h2 { margin-top: 0; color: #ff9800; font-size: 20px; text-transform: uppercase; }
+        .geslo-posoda input { width: 100%; padding: 12px; margin: 15px 0; background: #333; color: white; border: 1px solid #555; border-radius: 4px; text-align: center; font-size: 16px; }
+        .geslo-posoda button { background: #ff9800; color: black; font-weight: bold; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-size: 14px; text-transform: uppercase; }
+        .geslo-posoda button:hover { background: #e68a00; }
+        .napaka-tekst { color: #e53935; font-size: 13px; margin-top: 10px; display: none; }
+
+        /* Glavna aplikacija */
         .glavna-posoda { display: flex; width: 100%; height: 100%; }
-        
-        /* Popravek višine za wrapper in zemljevid */
         .fullscreen-wrapper { position: relative; flex: 2; height: 100%; min-height: 100%; }
         #zemljevid { width: 100%; height: 100%; min-height: 100%; background: #111; }
         
         #desni-panel { flex: 1; height: 100%; background: #222; display: flex; flex-direction: column; border-left: 3px solid #444; color: white; }
-        .tretjina-panela { height: 33.33vh; display: flex; flex-direction: column; overflow: hidden; border-bottom: 2px solid #444; }
+        .tretjina-panela { position: relative; height: 33.33vh; display: flex; flex-direction: column; overflow: hidden; border-bottom: 2px solid #444; background: #222; }
         .tretjina-panela:last-child { border-bottom: none; }
         
-        .sekcija-naslov { color: white; background: #111; padding: 8px; margin: 0; text-align: center; font-size: 14px; border-bottom: 1px solid #444; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sekcija-naslov { color: white; background: #111; padding: 8px; margin: 0; text-align: center; font-size: 14px; border-bottom: 1px solid #444; text-transform: uppercase; letter-spacing: 0.5px; padding-right: 110px; }
         
         .video-wrapper { position: relative; width: 100%; flex: 1; background: #000; }
         iframe { width: 100%; height: 100%; border: none; }
@@ -48,13 +59,15 @@
         #qr-izhod img { width: 110px !important; height: 110px !important; }
         #qr-url-tekst { font-size: 10px; color: #aaa; text-align: center; word-break: break-all; margin-top: 2px; padding: 0 5px; }
 
+        /* Univerzalni gumb za povečavo (zdaj uporabljen povsod) */
         .gumb-povecaj {
-            position: absolute; top: 10px; right: 10px; z-index: 1000;
-            background: rgba(0, 0, 0, 0.7); color: white; border: 1px solid #fff;
-            padding: 6px 10px; font-size: 11px; font-weight: bold; border-radius: 4px;
+            position: absolute; top: 5px; right: 10px; z-index: 1001;
+            background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #ff9800;
+            padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px;
             cursor: pointer; text-transform: uppercase;
         }
-        .gumb-povecaj:hover { background: rgb(0, 0, 0); }
+        .gumb-povecaj:hover { background: #ff9800; color: black; }
+        .fullscreen-wrapper .gumb-povecaj { top: 10px; right: 10px; }
 
         .barvni-izbirnik-posoda {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
@@ -72,14 +85,30 @@
         }
         .gumb-kopiraj-popup:hover { background: #e68a00; }
 
-        :fullscreen .gumb-povecaj { background: rgba(229, 57, 53, 0.9); }
+        /* Stil za elemente, ko so v celozaslonskem načinu */
+        :-webkit-full-screen { width: 100% !important; height: 100% !important; }
+        :fullscreen { width: 100% !important; height: 100% !important; }
+        :fullscreen .gumb-povecaj { background: rgba(229, 57, 53, 0.9); border-color: #fff; }
+        :fullscreen .sekcija-naslov { padding: 15px; font-size: 18px; }
+        :fullscreen .video-wrapper { height: calc(100% - 40px); }
     </style>
 </head>
 <body>
 
+<!-- OKNO ZA PREVERJANJE GESLA -->
+<div id="zaklep-zaslona">
+    <div class="geslo-posoda">
+        <h2>EPV Štab - Prijava</h2>
+        <p style="font-size: 13px; color: #aaa; margin: 0;">Za dostop do sistema vpišite operativno geslo.</p>
+        <input type="password" id="vnosno-geslo" placeholder="Vnesite geslo..." onkeydown="if(event.key === 'Enter') preveriGeslo()">
+        <button onclick="preveriGeslo()">Potrdi prijava</button>
+        <div class="napaka-tekst" id="napaka-geslo">Napačno geslo! Poskusite ponovno.</div>
+    </div>
+</div>
+
 <div class="glavna-posoda">
     <div class="fullscreen-wrapper" id="map-wrapper">
-        <button class="gumb-povecaj" onclick="preklopiCelZaslon('map-wrapper')">Cel zaslon (ESC)</button>
+        <button class="gumb-povecaj" onclick="preklopiCelZaslon('map-wrapper')">Cel zaslon</button>
         
         <div class="barvni-izbirnik-posoda">
             <label for="trenutnaBarva">Barva sektorja:</label>
@@ -95,11 +124,11 @@
     </div>
     
     <div id="desni-panel">
-        <!-- 1. ZGORNJA TRETJINA -->
-        <div class="tretjina-panela">
+        <!-- 1. VIDEO PRENOS -->
+        <div class="tretjina-panela" id="panel-video">
+            <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-video')">Cel zaslon</button>
             <h3 class="sekcija-naslov">Video Prenos (V ŽIVO)</h3>
-            <div class="video-wrapper" id="video-wrapper">
-                <button class="gumb-povecaj" onclick="preklopiCelZaslon('video-wrapper')">Cel zaslon (ESC)</button>
+            <div class="video-wrapper">
                 <iframe 
                   src="https://vdo.ninja/?view=enota_epv_dron&autoplay=1&mute=1&hd=1&codec=h264" 
                   style="width: 100%; height: 100%; border: none;" 
@@ -109,8 +138,9 @@
             </div>
         </div>
 
-        <!-- 2. SREDNJA TRETJINA -->
-        <div class="tretjina-panela">
+        <!-- 2. SPREMLJANJE ENOT -->
+        <div class="tretjina-panela" id="panel-enote">
+            <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-enote')">Cel zaslon</button>
             <h3 class="sekcija-naslov">Spremljanje enot na mapi</h3>
             <div class="filter-posoda">
                 <label>Aktivni dogodek / Intervencija:</label>
@@ -139,8 +169,9 @@
             </div>
         </div>
 
-        <!-- 3. SPODNJA TRETJINA -->
-        <div class="tretjina-panela">
+        <!-- 3. GENERATOR QR KOD -->
+        <div class="tretjina-panela" id="panel-qr">
+            <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-qr')">Cel zaslon</button>
             <h3 class="sekcija-naslov">Generator QR kod za prijavu</h3>
             <div class="qr-generator-posoda">
                 <label for="qrTip">Tip enote na terenu:</label>
@@ -169,6 +200,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
+    // --- FUNKCIJA ZA GESLO ---
+    const PRAVILNO_GESLO = "EPV2026"; // Tukaj spremenite geslo za Štabni zemljevid
+
+    function preveriGeslo() {
+        const vnos = document.getElementById("vnosno-geslo").value;
+        const napaka = document.getElementById("napaka-geslo");
+        if (vnos === PRAVILNO_GESLO) {
+            document.getElementById("zaklep-zaslona").style.display = "none";
+            // Zaženemo nalaganje zemljevida šele po uspešni prijavi
+            setTimeout(() => { map.invalidateSize(); }, 200);
+        } else {
+            napaka.style.display = "block";
+            document.getElementById("vnosno-geslo").value = "";
+        }
+    }
+
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrw5XrmEQjjcGmY4E6hGKTNgg7migQDFKS62d_sC5ZhOL_Jw7zTiFdWyziau4D5GRLbg/exec";
 
     const navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
@@ -198,6 +245,7 @@
 
     function osveziSpustniSeznamIntervencij() {
         const select = document.getElementById("izbiraIntervencije");
+        if(!select) return;
         select.innerHTML = "";
         vseIntervencije.forEach(intervencija => {
             const opt = document.createElement("option");
@@ -391,6 +439,7 @@
     let enoteSledi = {}; 
     let ročnoSkriteEnote = {};
 
+    // --- UNIVERZALNA FUNKCIJA ZA CEL ZASLON ---
     function preklopiCelZaslon(idElementa) {
         const element = document.getElementById(idElementa);
         if (!document.fullscreenElement) {
@@ -403,7 +452,7 @@
 
     function urediNapiseGumbov() {
         if (!document.fullscreenElement) {
-            document.querySelectorAll('.gumb-povecaj').forEach(gumb => gumb.innerText = "Cel zaslon (ESC)");
+            document.querySelectorAll('.gumb-povecaj').forEach(gumb => gumb.innerText = "Cel zaslon");
         }
         setTimeout(() => { map.invalidateSize(); }, 200);
     }
@@ -464,8 +513,6 @@
         izrisiSektorjeZaTrenutnoIntervencijo();
         naloziNastavitev();
         ustvariQrKodo();
-        // Varnostni popravek: prisilna osvežitev velikosti Leaflet elementov ob štartu
-        setTimeout(() => { map.invalidateSize(); }, 300);
     });
 
     function pretvoriVCas(suroviCas) {
@@ -538,17 +585,19 @@
             }
 
             const seznamPanel = document.getElementById("seznamEnotGumbi");
-            let seznamHtml = "";
-            Array.from(naborVsehEnot).sort().forEach(imeE => {
-                const jeVidna = !ročnoSkriteEnote[imeE];
-                seznamHtml += `
-                    <div class="enota-stikalo">
-                        <span>${imeE}</span>
-                        <input type="checkbox" ${jeVidna ? 'checked' : ''} onchange="preklopiEnoto('${imeE}', this.checked)">
-                    </div>
-                `;
-            });
-            if(seznamHtml !== "") seznamPanel.innerHTML = seznamHtml;
+            if(seznamPanel) {
+                let seznamHtml = "";
+                Array.from(naborVsehEnot).sort().forEach(imeE => {
+                    const jeVidna = !ročnoSkriteEnote[imeE];
+                    seznamHtml += `
+                        <div class="enota-stikalo">
+                            <span>${imeE}</span>
+                            <input type="checkbox" ${jeVidna ? 'checked' : ''} onchange="preklopiEnoto('${imeE}', this.checked)">
+                        </div>
+                    `;
+                });
+                if(seznamHtml !== "") seznamPanel.innerHTML = seznamHtml;
+            }
 
             for (const ime in enoteSledi) {
                 if (!zgodovinaPoti[ime]) { map.removeLayer(enoteSledi[ime]); delete enoteSledi[ime]; }
