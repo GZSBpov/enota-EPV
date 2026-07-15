@@ -59,7 +59,7 @@
         #qr-izhod img { width: 110px !important; height: 110px !important; }
         #qr-url-tekst { font-size: 10px; color: #aaa; text-align: center; word-break: break-all; margin-top: 2px; padding: 0 5px; }
 
-        /* Univerzalni gumb za povečavo (zdaj uporabljen povsod) */
+        /* Univerzalni gumb za povečavo */
         .gumb-povecaj {
             position: absolute; top: 5px; right: 10px; z-index: 1001;
             background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #ff9800;
@@ -200,9 +200,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    // --- SKRITO IN VARNO PREVERJANJE GESLA (SHA-256) ---
-    // Zgoščena vrednost (hash) za geslo "EPV2026"
+    // --- SKRITO PREVERJANJE GESLA IN SHRANJEVANJE ZGOŠČENE VREDNOSTI (HASH) ---
     const PRAVILNO_GESLO_HASH = "0f6e52292f7b1df241cb02796fa0fbccb249b6579cc5bc84bf5b7fb5364bb245";
+    let shranjenoPreverjenoGesloHash = "";
 
     async function sha256(message) {
         const msgBuffer = new TextEncoder().encode(message);
@@ -217,8 +217,11 @@
         const vnosHash = await sha256(vnos);
 
         if (vnosHash === PRAVILNO_GESLO_HASH) {
+            shranjenoPreverjenoGesloHash = vnosHash; // Shranimo za poizvedbe na Apps Script
             document.getElementById("zaklep-zaslona").style.display = "none";
-            // Zaženemo nalaganje zemljevida šele po uspešni prijavi
+            
+            // Sprožimo takojšnje nalaganje podatkov po uspešni prijavi
+            osveziZemljevid();
             setTimeout(() => { map.invalidateSize(); }, 200);
         } else {
             napaka.style.display = "block";
@@ -449,7 +452,6 @@
     let enoteSledi = {}; 
     let ročnoSkriteEnote = {};
 
-    // --- UNIVERZALNA FUNKCIJA ZA CEL ZASLON ---
     function preklopiCelZaslon(idElementa) {
         const element = document.getElementById(idElementa);
         if (!document.fullscreenElement) {
@@ -540,11 +542,20 @@
         return new Date(0);
     }
 
+    // --- POSODOBLJENA FUNKCIJA OSVEŽEVANJA, KI POŠILJA ZGOŠČENO GESLO ---
     async function osveziZemljevid() {
+        if (!shranjenoPreverjenoGesloHash) return; // Ne poizvedujemo, če nismo prijavljeni
+        
         try {
-            const response = await fetch(SCRIPT_URL);
+            // Tukaj URL-ju varno dodamo parameter 'geslo' z zgoščeno vrednostjo
+            const prenosUrl = `${SCRIPT_URL}?geslo=${shranjenoPreverjenoGesloHash}`;
+            const response = await fetch(prenosUrl);
             const matriksaPodatkov = await response.json();
-            if (matriksaPodatkov.status === "error") return;
+            
+            if (matriksaPodatkov.status === "error") {
+                console.error("Napaka iz Apps Scripta:", matriksaPodatkov.message);
+                return;
+            }
 
             let zgodovinaPoti = {};
             let zadnjeLokacije = {};
@@ -652,7 +663,7 @@
         } catch (error) { console.error("Napaka na mapi:", error); }
     }
 
-    osveziZemljevid();
+    // Interval osveževanja (vsakih 5 sekund)
     setInterval(osveziZemljevid, 5000);
 </script>
 </body>
