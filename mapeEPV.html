@@ -543,12 +543,14 @@
         try {
             const prenosUrl = `${SCRIPT_URL}?geslo=${shranjenoPreverjenoGesloHash}`;
             const response = await fetch(prenosUrl);
-            const matriksaPodatkov = await response.json();
-            
-            if (matriksaPodatkov.status === "error") {
-                console.error("Napaka:", matriksaPodatkov.message);
-                return;
-            }
+        const odgovorJson = await response.json();
+        
+        if (odgovorJson.status === "error") {
+            console.error("Napaka:", odgovorJson.message);
+            return;
+        }
+        
+        const matriksaPodatkov = odgovorJson.data || [];
 
             let zgodovinaPoti = {};
             let zadnjeLokacije = {};
@@ -558,8 +560,8 @@
             const filterMinut = parseInt(document.getElementById("filterMinute").value) || 15;
             const trenutniCasMs = new Date().getTime();
 
-            for (let i = 1; i < matriksaPodatkov.length; i++) {
-                const vrstica = matriksaPodatkov[i];
+            for (let i = 0; i < matriksaPodatkov.length; i++) {
+            const vrstica = matriksaPodatkov[i];
                 if (vrstica.length < 5) continue;
 
                 const cas = vrstica[0];
