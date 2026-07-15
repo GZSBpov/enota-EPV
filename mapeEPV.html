@@ -202,27 +202,27 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    const PRAVILNO_GESLO_HASH = "0a0fa2e89668f4f91ef14a3821045da02c7b55f190bc1f3020626359046fffc7";
-    let shranjenoPreverjenoGesloHash = "";
+   const PRAVILNO_GESLO_HASH = "0a0fa2e89668f4f91ef14a3821045da02c7b55f190bc1f3020626359046fffc7";
+       let shranjenoPreverjenoGesloHash = "";
 
-    function preveriGeslo() {
-        const vnos = document.getElementById("vnosno-geslo").value.trim();
-        const napaka = document.getElementById("napaka-geslo");
-        
-        // CryptoJS vedno zanesljivo izračuna SHA-256 hash
-        const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex);
-
-        if (vnosHash === PRAVILNO_GESLO_HASH) {
-            shranjenoPreverjenoGesloHash = vnosHash;
-            document.getElementById("zaklep-zaslona").style.display = "none";
+       function preveriGeslo() {
+           const vnos = document.getElementById("vnosno-geslo").value.trim();
+           const napaka = document.getElementById("napaka-geslo");
             
-            osveziZemljevid();
-            setTimeout(() => { map.invalidateSize(); }, 200);
-        } else {
-            napaka.style.display = "block";
-            document.getElementById("vnosno-geslo").value = "";
-        }
-    }
+           // CryptoJS generira hash, ki ga tukaj z .toLowerCase() pretvorimo v male črke
+           const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
+
+           if (vnosHash === PRAVILNO_GESLO_HASH) {
+               shranjenoPreverjenoGesloHash = vnosHash;
+               document.getElementById("zaklep-zaslona").style.display = "none";
+                
+               osveziZemljevid();
+               setTimeout(() => { map.invalidateSize(); }, 200);
+           } else {
+               napaka.style.display = "block";
+               document.getElementById("vnosno-geslo").value = "";
+           }
+       }
 
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec";
 
@@ -659,38 +659,5 @@
     setInterval(osveziZemljevid, 5000);
 </script>
 
-<script>
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function preveriGeslo() {
-    const vpisanoGeslo = document.getElementById("vnosno-geslo").value;
-    const PRAVILNO_GESLO_HASH = "0a0fa2e89668f4f91ef14a3821045da02c7b55f190bc1f3020626359046fffc7";
-    const vpisanoHash = await sha256(vpisanoGeslo);
-
-    if (vpisanoHash === PRAVILNO_GESLO_HASH) {
-        document.getElementById("zaklep-zaslona").style.display = "none";
-        sessionStorage.setItem("prijavljenEPV", "true");
-    } else {
-        document.getElementById("napaka-geslo").style.display = "block";
-    }
-}
-
-// Omogoči potrditev s tipko Enter
-document.getElementById("vnosno-geslo").addEventListener("keydown", function(event) {
-    if (event.key === "Enter") {
-        preveriGeslo();
-    }
-});
-
-// Če je že prijavljen, odkleni
-if (sessionStorage.getItem("prijavljenEPV") === "true") {
-    document.getElementById("zaklep-zaslona").style.display = "none";
-}
-</script>
 </body>
 </html>
