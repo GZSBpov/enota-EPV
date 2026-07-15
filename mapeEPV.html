@@ -660,3 +660,37 @@
 </script>
 </body>
 </html>
+
+<script>
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function preveriGeslo() {
+    const vpisanoGeslo = document.getElementById("vnosno-geslo").value;
+    const PRAVILNO_GESLO_HASH = "0a0fa2e89668f4f91ef14a3821045da02c7b55f190bc1f3020626359046fffc7";
+    const vpisanoHash = await sha256(vpisanoGeslo);
+
+    if (vpisanoHash === PRAVILNO_GESLO_HASH) {
+        document.getElementById("zaklep-zaslona").style.display = "none";
+        sessionStorage.setItem("prijavljenEPV", "true");
+    } else {
+        document.getElementById("napaka-geslo").style.display = "block";
+    }
+}
+
+// Omogoči potrditev s tipko Enter
+document.getElementById("vnosno-geslo").addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        preveriGeslo();
+    }
+});
+
+// Če je že prijavljen, odkleni
+if (sessionStorage.getItem("prijavljenEPV") === "true") {
+    document.getElementById("zaklep-zaslona").style.display = "none";
+}
+</script>
