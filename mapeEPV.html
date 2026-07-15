@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Dodana uradna in zanesljiva knjižnica za šifriranje -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: Arial, sans-serif; overflow: hidden; background: #222; }
@@ -85,7 +87,7 @@
         }
         .gumb-kopiraj-popup:hover { background: #e68a00; }
 
-        /* Stil za elemente, ko so v celozaslonskem načinu */
+        /* Celozaslonski način */
         :-webkit-full-screen { width: 100% !important; height: 100% !important; }
         :fullscreen { width: 100% !important; height: 100% !important; }
         :fullscreen .gumb-povecaj { background: rgba(229, 57, 53, 0.9); border-color: #fff; }
@@ -200,27 +202,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    // --- SKRITO PREVERJANJE GESLA IN SHRANJEVANJE ZGOŠČENE VREDNOSTI (HASH) ---
     const PRAVILNO_GESLO_HASH = "0f6e52292f7b1df241cb02796fa0fbccb249b6579cc5bc84bf5b7fb5364bb245";
     let shranjenoPreverjenoGesloHash = "";
 
-    async function sha256(message) {
-        const msgBuffer = new TextEncoder().encode(message);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    async function preveriGeslo() {
-        const vnos = document.getElementById("vnosno-geslo").value;
+    function preveriGeslo() {
+        const vnos = document.getElementById("vnosno-geslo").value.trim();
         const napaka = document.getElementById("napaka-geslo");
-        const vnosHash = await sha256(vnos);
+        
+        // CryptoJS vedno zanesljivo izračuna SHA-256 hash
+        const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex);
 
         if (vnosHash === PRAVILNO_GESLO_HASH) {
-            shranjenoPreverjenoGesloHash = vnosHash; // Shranimo za poizvedbe na Apps Script
+            shranjenoPreverjenoGesloHash = vnosHash;
             document.getElementById("zaklep-zaslona").style.display = "none";
             
-            // Sprožimo takojšnje nalaganje podatkov po uspešni prijavi
             osveziZemljevid();
             setTimeout(() => { map.invalidateSize(); }, 200);
         } else {
@@ -542,18 +537,16 @@
         return new Date(0);
     }
 
-    // --- POSODOBLJENA FUNKCIJA OSVEŽEVANJA, KI POŠILJA ZGOŠČENO GESLO ---
     async function osveziZemljevid() {
-        if (!shranjenoPreverjenoGesloHash) return; // Ne poizvedujemo, če nismo prijavljeni
+        if (!shranjenoPreverjenoGesloHash) return; 
         
         try {
-            // Tukaj URL-ju varno dodamo parameter 'geslo' z zgoščeno vrednostjo
             const prenosUrl = `${SCRIPT_URL}?geslo=${shranjenoPreverjenoGesloHash}`;
             const response = await fetch(prenosUrl);
             const matriksaPodatkov = await response.json();
             
             if (matriksaPodatkov.status === "error") {
-                console.error("Napaka iz Apps Scripta:", matriksaPodatkov.message);
+                console.error("Napaka:", matriksaPodatkov.message);
                 return;
             }
 
@@ -663,7 +656,6 @@
         } catch (error) { console.error("Napaka na mapi:", error); }
     }
 
-    // Interval osveževanja (vsakih 5 sekund)
     setInterval(osveziZemljevid, 5000);
 </script>
 </body>
