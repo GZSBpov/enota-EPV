@@ -59,7 +59,7 @@
         #qr-izhod img { width: 110px !important; height: 110px !important; }
         #qr-url-tekst { font-size: 10px; color: #aaa; text-align: center; word-break: break-all; margin-top: 2px; padding: 0 5px; }
 
-        /* Univerzalni gumb za povečavo */
+        /* Univerzalni gumb za povečavo (zdaj uporabljen povsod) */
         .gumb-povecaj {
             position: absolute; top: 5px; right: 10px; z-index: 1001;
             background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #ff9800;
@@ -200,45 +200,33 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec";
+    // --- SKRITO IN VARNO PREVERJANJE GESLA (SHA-256) ---
+    // Zgoščena vrednost (hash) za geslo "EPV2026"
+    const PRAVILNO_GESLO_HASH = "0f6e52292f7b1df241cb02796fa0fbccb249b6579cc5bc84bf5b7fb5364bb245";
 
-    // --- FUNKCIJA ZA PRIJAVO PREKO APPS SCRIPTA ---
+    async function sha256(message) {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     async function preveriGeslo() {
-        const vnosnoGeslo = document.getElementById("vnosno-geslo").value;
-        const napakaOpozorilo = document.getElementById("napaka-geslo");
-        
-        if (!vnosnoGeslo) {
-            alert("Prosimo, vnesite geslo.");
-            return;
-        }
+        const vnos = document.getElementById("vnosno-geslo").value;
+        const napaka = document.getElementById("napaka-geslo");
+        const vnosHash = await sha256(vnos);
 
-        napakaOpozorilo.style.display = "none";
-
-        try {
-            // Pošljemo testno poizvedbo za validacijo gesla
-            const response = await fetch(`${SCRIPT_URL}?geslo=${encodeURIComponent(vnosnoGeslo)}`);
-            const podatki = await response.json();
-
-            if (podatki.status === "error") {
-                napakaOpozorilo.style.display = "block";
-                document.getElementById("vnosno-geslo").value = "";
-                return;
-            }
-
-            // Uspešna prijava
+        if (vnosHash === PRAVILNO_GESLO_HASH) {
             document.getElementById("zaklep-zaslona").style.display = "none";
-            
-            // Zaženemo nalaganje zemljevida in interval osveževanja (vsakih 5 sekund)
+            // Zaženemo nalaganje zemljevida šele po uspešni prijavi
             setTimeout(() => { map.invalidateSize(); }, 200);
-            osveziZemljevid();
-            setInterval(osveziZemljevid, 5000);
-
-        } catch (error) {
-            console.error("Napaka pri avtentikaciji:", error);
-            napakaOpozorilo.innerText = "Napaka pri povezavi z bazo.";
-            napakaOpozorilo.style.display = "block";
+        } else {
+            napaka.style.display = "block";
+            document.getElementById("vnosno-geslo").value = "";
         }
     }
+
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrw5XrmEQjjcGmY4E6hGKTNgg7migQDFKS62d_sC5ZhOL_Jw7zTiFdWyziau4D5GRLbg/exec";
 
     const navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
     const satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -553,12 +541,8 @@
     }
 
     async function osveziZemljevid() {
-        const vnosnoGeslo = document.getElementById("vnosno-geslo").value;
-        if (!vnosnoGeslo) return;
-
         try {
-            // Geslo ob vsakem osveževanju pošljemo v Google Apps Script
-            const response = await fetch(`${SCRIPT_URL}?geslo=${encodeURIComponent(vnosnoGeslo)}`);
+            const response = await fetch(SCRIPT_URL);
             const matriksaPodatkov = await response.json();
             if (matriksaPodatkov.status === "error") return;
 
@@ -661,14 +645,15 @@
                     enoteMarkerji[ime].setTooltipContent(prikazniNapis);
                 } else {
                     let noviMarker = L.marker([lok.lat, lok.lon], { icon: ustvariIkono(barvaMarkerja) }).addTo(map).bindPopup(podrobnostiTekst);
-                    noviMarker.bindTooltip(prikazniNapis, { permanent: true, direction: 'top', offset: [0, -25], className: 'stalni-napis' }).openTooltip();
+                    noviMarker.bindTooltip(prikazniNapis, { permanent: true, direction: 'top', offset: [0, -40], className: 'stalni-napis' }).openTooltip();
                     enoteMarkerji[ime] = noviMarker;
                 }
             }
-        } catch (error) { 
-            console.error("Napaka pri osveževanju zemljevida:", error); 
-        }
+        } catch (error) { console.error("Napaka na mapi:", error); }
     }
+
+    osveziZemljevid();
+    setInterval(osveziZemljevid, 5000);
 </script>
 </body>
 </html>
