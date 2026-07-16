@@ -679,28 +679,54 @@
 
     // 1. Pridobivanje seznama dogodkov za spustni meni
     function osveziSeznamDogodkov() {
+        // Najprej takoj naložimo lokalno shranjene dogodke iz računalnika
+        const shranjene = localStorage.getItem("epv_intervencije_seznam");
+        if (shranjene) {
+            vseIntervencije = JSON.parse(shranjene);
+        }
+        izrisiSpustniSeznamZgodovine();
+
+        // Nato poskusimo posodobiti seznam še iz Google Drive-a
         const url = `${SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=${GESLO}`;
         
         fetch(url)
             .then(r => r.json())
             .then(odgovor => {
                 if (odgovor.status === "success" && odgovor.data) {
-                    const select = document.getElementById("izbiraIntervencije");
-                    select.innerHTML = '<option value="">-- Brez aktivnega dogodka --</option>';
-                    
-                    odgovor.data.forEach(dogodek => {
-                        const opt = document.createElement("option");
-                        opt.value = dogodek;
-                        opt.textContent = dogodek;
-                        select.appendChild(opt);
-                    });
-                    
-                    if (izbranDogodekId) {
-                        select.value = izbranDogodekId;
-                    }
+                    // Združimo lokalne in prejete dogodke, da ne izgubimo ničesar
+                    vseIntervencije = [...new Set([...vseIntervencije, ...odgovor.data])];
+                    localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
+                    izrisiSpustniSeznamZgodovine();
                 }
             })
-            .catch(err => console.error("Napaka pri nalaganju seznama dogodkov:", err));
+            .catch(err => {
+                console.warn("Google Drive ni dosegljiv (NetworkError). Uporabljam lokalno shranjene dogodke.", err);
+            });
+    }
+
+    // Pomožna funkcija za izris elementov v spustni meni (preprečuje duplikate)
+    function izrisiSpustniSeznamZgodovine() {
+        const select = document.getElementById("izbiraIntervencije");
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">-- Brez aktivnega dogodka --</option>';
+        
+        const unikatneIntervencije = [...new Set(vseIntervencije)];
+        
+        unikatneIntervencije.forEach(dogodek => {
+            if (!dogodek) return;
+            const opt = document.createElement("option");
+            opt.value = dogodek;
+            opt.textContent = dogodek;
+            if (dogodek === trenutnaIntervencija || dogodek === izbranDogodekId) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+
+        if (izbranDogodekId) {
+            select.value = izbranDogodekId;
+        }
     }
 
     // 2. Ustvarjanje novega dogodka iz vnosnega polja
@@ -719,22 +745,17 @@
         izbranDogodekId = varnoIme;
         trenutnaIntervencija = varnoIme;
         
-        // Dodaj v lokalno shrambo intervencij
+        // Dodamo v lokalno tabelo in shranimo v localStorage
         if (!vseIntervencije.includes(varnoIme)) {
             vseIntervencije.push(varnoIme);
             localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
         }
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
 
-        const select = document.getElementById("izbiraIntervencije");
-        const opt = document.createElement("option");
-        opt.value = varnoIme;
-        opt.textContent = varnoIme;
-        select.appendChild(opt);
-        select.value = varnoIme;
+        // Ponovno izrišemo meni, da se nov dogodek takoj pojavi
+        izrisiSpustniSeznamZgodovine();
 
         vnosnoPolje.value = ""; 
-        
         narisaniSektorjiSloj.clearLayers();
         
         alert(`Ustvarjen dogodek "${varnoIme}". Sedaj lahko narišete oznake/sektorje in kliknete 'Shrani trenutno risbo'.`);
