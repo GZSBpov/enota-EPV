@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- Dodana uradna in zanesljiva knjižnica za šifriranje -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -146,19 +145,18 @@
             <h3 class="sekcija-naslov">Spremljanje enot na mapi</h3>
             <div class="filter-posoda">
                 <label>Aktivni dogodek / Intervencija:</label>
-                   <div class="filter-vrstica">
-                     <!-- Uporabimo vaš obstoječi ID, le funkcijo preusmerimo na novo logiko -->
-                     <select id="izbiraIntervencije" onchange="naloziElementeDogodka(this.value)" style="width: 100%;">
-                       <option value="">-- Brez aktivnega dogodka --</option>
-                     </select>                    
-                    </div>
-                    <div class="filter-vrstica" style="margin-top: 5px;">                   
+                <div class="filter-vrstica">
+                    <select id="izbiraIntervencije" onchange="zamenjajIntervencijo(this.value)" style="width: 100%;">
+                        <option value="">-- Brez aktivnega dogodka --</option>
+                    </select>                    
+                </div>
+                <div class="filter-vrstica" style="margin-top: 5px;">                   
                     <input type="text" id="novoImeIntervencije" placeholder="Ime novega dogodka..." style="flex: 1;">
-                  <button class="gumb-intervencija" onclick="ustvariNovDogodek()">Ustvari</button>
+                    <button class="gumb-intervencija" onclick="ustvariNovDogodek()">Ustvari</button>
                 </div>
                 <div class="filter-vrstica" style="margin-top: 5px;">
-                  <button id="gumbShraniSloje" class="gumb-intervencija" onclick="shraniSektorjeInMarkerje()" style="width: 100%; background-color: #4CAF50; color: white; border: none; font-weight: bold;">Shrani trenutno risbo</button>
-                 </div>
+                    <button id="gumbShraniSloje" class="gumb-intervencija" onclick="shraniSektorjeInMarkerje()" style="width: 100%; background-color: #4CAF50; color: white; border: none; font-weight: bold;">Shrani trenutno risbo</button>
+                </div>
                 <hr style="width:100%; border:0; border-top:1px solid #444; margin: 4px 0;">
 
                 <label>Avtomatsko skrivanje starih sledi:</label>
@@ -208,27 +206,29 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-   const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
-       let shranjenoPreverjenoGesloHash = "";
+    const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
+    let shranjenoPreverjenoGesloHash = "";
 
-       function preveriGeslo() {
-           const vnos = document.getElementById("vnosno-geslo").value.trim();
-           const napaka = document.getElementById("napaka-geslo");
+    function preveriGeslo() {
+        const vnos = document.getElementById("vnosno-geslo").value.trim();
+        const napakaElement = document.getElementById("napaka-geslo");
+        
+        // CryptoJS generira hash, ki ga pretvorimo v male črke za zanesljivo primerjavo
+        const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
+
+        if (vnosHash === PRAVILNO_GESLO_HASH) {
+            shranjenoPreverjenoGesloHash = vnosHash;
+            document.getElementById("zaklep-zaslona").style.display = "none";
+            if (napakaElement) napakaElement.style.display = "none";
             
-           // CryptoJS generira hash, ki ga tukaj z .toLowerCase() pretvorimo v male črke
-           const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
-
-           if (vnosHash === PRAVILNO_GESLO_HASH) {
-               shranjenoPreverjenoGesloHash = vnosHash;
-               document.getElementById("zaklep-zaslona").style.display = "none";
-                
-               osveziZemljevid();
-               setTimeout(() => { map.invalidateSize(); }, 200);
-           } else {
-               napaka.style.display = "block";
-               document.getElementById("vnosno-geslo").value = "";
-           }
-       }
+            localStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
+            osveziZemljevid();
+            setTimeout(() => { map.invalidateSize(); }, 200);
+        } else {
+            if (napakaElement) napakaElement.style.display = "block";
+            document.getElementById("vnosno-geslo").value = "";
+        }
+    }
 
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec";
 
@@ -248,12 +248,22 @@
 
     let vseIntervencije = ["Splošno"];
     let trenutnaIntervencija = "Splošno";
+    let izbranDogodekId = "Splošno";
+
+    const narisaniSektorjiSloj = new L.FeatureGroup();
+    map.addLayer(narisaniSektorjiSloj);
+    
+    // Ustvarimo alias, da koda, ki se sklicuje na drawnItems, ne javlja napak
+    const drawnItems = narisaniSektorjiSloj;
 
     function naloziIntervencije() {
         const shranjene = localStorage.getItem("epv_intervencije_seznam");
         const trenutna = localStorage.getItem("epv_intervencije_trenutna");
         if (shranjene) vseIntervencije = JSON.parse(shranjene);
-        if (trenutna && vseIntervencije.includes(trenutna)) trenutnaIntervencija = trenutna;
+        if (trenutna && vseIntervencije.includes(trenutna)) {
+            trenutnaIntervencija = trenutna;
+            izbranDogodekId = trenutna;
+        }
         osveziSpustniSeznamIntervencij();
     }
 
@@ -261,6 +271,7 @@
         const select = document.getElementById("izbiraIntervencije");
         if(!select) return;
         select.innerHTML = "";
+        
         vseIntervencije.forEach(intervencija => {
             const opt = document.createElement("option");
             opt.value = intervencija;
@@ -270,31 +281,17 @@
         });
     }
 
-    function ustvariIntervencijo() {
-        const vnos = document.getElementById("novoImeIntervencije");
-        const ime = vnos.value.trim();
-        if (!ime) return;
-        if (vseIntervencije.includes(ime)) {
-            alert("Dogodek s tem imenom že obstaja!");
-            return;
-        }
-        vseIntervencije.push(ime);
-        trenutnaIntervencija = ime;
-        localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
+    function zamenjajIntervencijo(dogodekId) {
+        trenutnaIntervencija = dogodekId;
+        izbranDogodekId = dogodekId;
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
-        vnos.value = "";
-        osveziSpustniSeznamIntervencij();
+        
+        // 1. Izriši iz lokalnega spomina
         izrisiSektorjeZaTrenutnoIntervencijo();
+        
+        // 2. Naloži iz Google Driva
+        naloziElementeDogodka(dogodekId);
     }
-
-    function zamenjajIntervencijo() {
-        trenutnaIntervencija = document.getElementById("izbiraIntervencije").value;
-        localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
-        izrisiSektorjeZaTrenutnoIntervencijo();
-    }
-
-    const narisaniSektorjiSloj = new L.FeatureGroup();
-    map.addLayer(narisaniSektorjiSloj);
 
     function shraniSektorjeVTekočoIntervencijo() {
         const podatki = [];
@@ -549,14 +546,14 @@
         try {
             const prenosUrl = `${SCRIPT_URL}?geslo=${shranjenoPreverjenoGesloHash}`;
             const response = await fetch(prenosUrl);
-        const odgovorJson = await response.json();
-        
-        if (odgovorJson.status === "error") {
-            console.error("Napaka:", odgovorJson.message);
-            return;
-        }
-        
-        const matriksaPodatkov = odgovorJson.data || [];
+            const odgovorJson = await response.json();
+            
+            if (odgovorJson.status === "error") {
+                console.error("Napaka:", odgovorJson.message);
+                return;
+            }
+            
+            const matriksaPodatkov = odgovorJson.data || [];
 
             let zgodovinaPoti = {};
             let zadnjeLokacije = {};
@@ -567,7 +564,7 @@
             const trenutniCasMs = new Date().getTime();
 
             for (let i = 0; i < matriksaPodatkov.length; i++) {
-            const vrstica = matriksaPodatkov[i];
+                const vrstica = matriksaPodatkov[i];
                 if (vrstica.length < 5) continue;
 
                 const cas = vrstica[0];
@@ -665,199 +662,176 @@
     }
 
     setInterval(osveziZemljevid, 5000);
-const GESLO = PRAVILNO_GESLO_HASH;
-let izbranDogodekId = "";
-    
-// Samodejni zagon ob nalaganju strani
-document.addEventListener("DOMContentLoaded", function() {
-  // Samodejno odklepanje z lokalno shranjenim hashem gesla
-  const shranjenHash = localStorage.getItem("shranjenoPreverjenoGesloHash");
-  if (shranjenHash && (shranjenHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase())) {
-    const zaklep = document.getElementById("zaklep-zaslona");
-    if (zaklep) zaklep.style.display = "none";
-  }
+    const GESLO = PRAVILNO_GESLO_HASH;
 
-  osveziSeznamDogodkov();
-});
+    // Samodejni zagon ob nalaganju strani
+    document.addEventListener("DOMContentLoaded", function() {
+        const shranjenHash = localStorage.getItem("shranjenoPreverjenoGesloHash");
+        if (shranjenHash && (shranjenHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase())) {
+            shranjenoPreverjenoGesloHash = shranjenHash;
+            const zaklep = document.getElementById("zaklep-zaslona");
+            if (zaklep) zaklep.style.display = "none";
+            osveziZemljevid();
+            setTimeout(() => { map.invalidateSize(); }, 200);
+        }
+        osveziSeznamDogodkov();
+    });
 
-// Funkcija za preverjanje gesla ob ročni prijavi
-function preveriGeslo() {
-  const vnos = document.getElementById("vnosno-geslo").value;
-  const napakaElement = document.getElementById("napaka-geslo");
-  
-  // Izračunamo SHA-256 hash vnosa z uporabo Crypto-JS
-  const vnosHash = CryptoJS.SHA256(vnos).toString();
-  
-  // Preverimo hash ali navadno geslo
-  if (vnosHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase()) {
-    
-    // Skrijemo prijavno okno
-    const zaklepZaslona = document.getElementById("zaklep-zaslona");
-    if (zaklepZaslona) {
-      zaklepZaslona.style.display = "none";
+    // 1. Pridobivanje seznama dogodkov za spustni meni
+    function osveziSeznamDogodkov() {
+        const url = `${SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=${GESLO}`;
+        
+        fetch(url)
+            .then(r => r.json())
+            .then(odgovor => {
+                if (odgovor.status === "success" && odgovor.data) {
+                    const select = document.getElementById("izbiraIntervencije");
+                    select.innerHTML = '<option value="">-- Brez aktivnega dogodka --</option>';
+                    
+                    odgovor.data.forEach(dogodek => {
+                        const opt = document.createElement("option");
+                        opt.value = dogodek;
+                        opt.textContent = dogodek;
+                        select.appendChild(opt);
+                    });
+                    
+                    if (izbranDogodekId) {
+                        select.value = izbranDogodekId;
+                    }
+                }
+            })
+            .catch(err => console.error("Napaka pri nalaganju seznama dogodkov:", err));
     }
-    
-    // Skrijemo tekst za napako
-    if (napakaElement) {
-      napakaElement.style.display = "none";
-    }
-    
-    // Shranimo v brskalnik za naslednjič
-    localStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
-    
-  } else {
-    // Prikažemo opozorilo
-    if (napakaElement) {
-      napakaElement.style.display = "block";
-    }
-  }
-}
 
-// 1. Pridobivanje seznama dogodkov za spustni meni
-function osveziSeznamDogodkov() {
-  const url = `${SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=${GESLO}`;
-  
-  fetch(url)
-    .then(r => r.json())
-    .then(odgovor => {
-      if (odgovor.status === "success" && odgovor.data) {
+    // 2. Ustvarjanje novega dogodka iz vnosnega polja
+    function ustvariNovDogodek() {
+        const vnosnoPolje = document.getElementById("novoImeIntervencije");
+        const ime = vnosnoPolje.value;
+        
+        if (!ime) {
+            alert("Prosimo, vnesite ime dogodka v polje!");
+            return;
+        }
+        
+        const varnoIme = ime.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
+        if (!varnoIme) return;
+
+        izbranDogodekId = varnoIme;
+        trenutnaIntervencija = varnoIme;
+        
+        // Dodaj v lokalno shrambo intervencij
+        if (!vseIntervencije.includes(varnoIme)) {
+            vseIntervencije.push(varnoIme);
+            localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
+        }
+        localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
+
         const select = document.getElementById("izbiraIntervencije");
-        select.innerHTML = '<option value="">-- Brez aktivnega dogodka --</option>';
+        const opt = document.createElement("option");
+        opt.value = varnoIme;
+        opt.textContent = varnoIme;
+        select.appendChild(opt);
+        select.value = varnoIme;
+
+        vnosnoPolje.value = ""; 
         
-        odgovor.data.forEach(dogodek => {
-          const opt = document.createElement("option");
-          opt.value = dogodek;
-          opt.textContent = dogodek;
-          select.appendChild(opt);
-        });
+        narisaniSektorjiSloj.clearLayers();
         
-        if (izbranDogodekId) {
-          select.value = izbranDogodekId;
-        }
-      }
-    })
-    .catch(err => console.error("Napaka pri nalaganju seznama dogodkov:", err));
-}
-
-// 2. Ustvarjanje novega dogodka iz vnosnega polja
-function ustvariNovDogodek() {
-  const vnosnoPolje = document.getElementById("novoImeIntervencije");
-  const ime = vnosnoPolje.value;
-  
-  if (!ime) {
-    alert("Prosimo, vnesite ime dogodka v polje!");
-    return;
-  }
-  
-  const varnoIme = ime.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
-  if (!varnoIme) return;
-
-  izbranDogodekId = varnoIme;
-  
-  const select = document.getElementById("izbiraIntervencije");
-  const opt = document.createElement("option");
-  opt.value = varnoIme;
-  opt.textContent = varnoIme;
-  select.appendChild(opt);
-  select.value = varnoIme;
-
-  vnosnoPolje.value = ""; // Počistimo polje
-  
-  if (typeof drawnItems !== 'undefined') {
-    drawnItems.clearLayers();
-  }
-  alert(`Ustvarjen dogodek "${varnoIme}". Sedaj lahko narišete oznake/sektorje in kliknete 'Shrani trenutno risbo'.`);
-}
-
-// 3. Shranjevanje elementov (markerji, poligoni) na Google Drive (POST)
-function shraniSektorjeInMarkerje() {
-  if (!izbranDogodekId) {
-    alert("Prosimo, najprej izberite ali ustvarite aktivno intervencijo!");
-    return;
-  }
-
-  if (typeof drawnItems === 'undefined') {
-    alert("Napaka: Skupina grafičnih elementov (drawnItems) na mapi ni definirana.");
-    return;
-  }
-
-  const sektorjiZaVnos = [];
-
-  drawnItems.eachLayer(function(layer) {
-    let tip = "";
-    if (layer instanceof L.Marker) tip = "marker";
-    else if (layer instanceof L.Polygon) tip = "polygon";
-    else if (layer instanceof L.Polyline) tip = "polyline";
-
-    if (tip) {
-      sektorjiZaVnos.push({
-        tip: tip,
-        geojson: layer.toGeoJSON()
-      });
+        alert(`Ustvarjen dogodek "${varnoIme}". Sedaj lahko narišete oznake/sektorje in kliknete 'Shrani trenutno risbo'.`);
     }
-  });
 
-  const gumb = document.getElementById("gumbShraniSloje");
-  gumb.disabled = true;
-  gumb.textContent = "Shranjevanje...";
-
-  const podatki = {
-    geslo: GESLO,
-    akcija: "shraniSektorje",
-    dogodek: izbranDogodekId,
-    sektorji: sektorjiZaVnos
-  };
-
-  fetch(SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(podatki)
-  })
-  .then(() => {
-    alert(`Uspešno shranjeno na Google Drive pod dogodek: ${izbranDogodekId}`);
-    gumb.disabled = false;
-    gumb.textContent = "Shrani trenutno risbo";
-    osveziSeznamDogodkov();
-  })
-  .catch(err => {
-    console.error("Napaka pri pošiljanju:", err);
-    alert("Napaka pri shranjevanju.");
-    gumb.disabled = false;
-    gumb.textContent = "Shrani trenutno risbo";
-  });
-}
-
-// 4. Nalaganje elementov izbranega dogodka iz Drive-a ob menjavi v seznamu
-function naloziElementeDogodka(dogodekId) {
-  izbranDogodekId = dogodekId;
-  
-  if (typeof drawnItems === 'undefined') return;
-  drawnItems.clearLayers(); 
-
-  if (!dogodekId) return; // Če je izbrana prazna opcija
-
-  const url = `${SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(dogodekId)}&geslo=${GESLO}`;
-  
-  fetch(url)
-    .then(r => r.json())
-    .then(odgovor => {
-      if (odgovor.status === "success" && odgovor.data) {
-        odgovor.data.forEach(element => {
-          L.geoJSON(element.podatki, {
-            onEachFeature: function(feature, layer) {
-              drawnItems.addLayer(layer);
-            }
-          });
-        });
-        
-        if (drawnItems.getLayers().length > 0) {
-          map.fitBounds(drawnItems.getBounds());
+    // 3. Shranjevanje elementov (markerji, poligoni) na Google Drive (POST)
+    function shraniSektorjeInMarkerje() {
+        if (!izbranDogodekId || izbranDogodekId === "Splošno") {
+            alert("Prosimo, najprej izberite ali ustvarite aktivno intervencijo!");
+            return;
         }
-      }
-    })
-    .catch(err => console.error("Napaka pri nalaganju elementov dogodka:", err));
-}
+
+        // Shranimo tudi lokalno, za vsak primer
+        shraniSektorjeVTekočoIntervencijo();
+
+        const sektorjiZaVnos = [];
+        narisaniSektorjiSloj.eachLayer(function(layer) {
+            let tip = "";
+            if (layer instanceof L.Marker) tip = "marker";
+            else if (layer instanceof L.Polygon) tip = "polygon";
+            else if (layer instanceof L.Polyline) tip = "polyline";
+            else if (layer instanceof L.Circle) tip = "circle";
+
+            if (tip) {
+                sektorjiZaVnos.push({
+                    tip: tip,
+                    geojson: layer.toGeoJSON()
+                });
+            }
+        });
+
+        const gumb = document.getElementById("gumbShraniSloje");
+        gumb.disabled = true;
+        gumb.textContent = "Shranjevanje...";
+
+        const podatki = {
+            geslo: GESLO,
+            akcija: "shraniSektorje",
+            dogodek: izbranDogodekId,
+            sektorji: sektorjiZaVnos
+        };
+
+        fetch(SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(podatki)
+        })
+        .then(() => {
+            alert(`Uspešno shranjeno na Google Drive pod dogodek: ${izbranDogodekId}`);
+            gumb.disabled = false;
+            gumb.textContent = "Shrani trenutno risbo";
+            osveziSeznamDogodkov();
+        })
+        .catch(err => {
+            console.error("Napaka pri pošiljanju:", err);
+            alert("Napaka pri shranjevanju.");
+            gumb.disabled = false;
+            gumb.textContent = "Shrani trenutno risbo";
+        });
+    }
+
+    // 4. Nalaganje elementov izbranega dogodka iz Drive-a ob menjavi v seznamu
+    function naloziElementeDogodka(dogodekId) {
+        izbranDogodekId = dogodekId;
+        narisaniSektorjiSloj.clearLayers(); 
+
+        if (!dogodekId) return; 
+
+        const url = `${SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(dogodekId)}&geslo=${GESLO}`;
+        
+        fetch(url)
+            .then(r => r.json())
+            .then(odgovor => {
+                if (odgovor.status === "success" && odgovor.data) {
+                    odgovor.data.forEach(element => {
+                        L.geoJSON(element.podatki, {
+                            onEachFeature: function(feature, layer) {
+                                // Dodaj naloženo barvo, če obstaja
+                                if (feature.properties && feature.properties.epvBarva) {
+                                    layer.options.epvBarva = feature.properties.epvBarva;
+                                    const stil = pridobiNastavitveStila(feature.properties.epvBarva);
+                                    layer.setStyle(stil);
+                                    urediPopupZaSektor(layer, feature.properties.epvBarva);
+                                }
+                                narisaniSektorjiSloj.addLayer(layer);
+                            }
+                        });
+                    });
+                    
+                    if (narisaniSektorjiSloj.getLayers().length > 0) {
+                        map.fitBounds(narisaniSektorjiSloj.getBounds());
+                    }
+                }
+            })
+            .catch(err => console.error("Napaka pri nalaganju elementov dogodka:", err));
+    }
 </script>
 
 </body>
