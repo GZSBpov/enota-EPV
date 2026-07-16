@@ -92,6 +92,55 @@
         :fullscreen .gumb-povecaj { background: rgba(229, 57, 53, 0.9); border-color: #fff; }
         :fullscreen .sekcija-naslov { padding: 15px; font-size: 18px; }
         :fullscreen .video-wrapper { height: calc(100% - 40px); }
+        <head>
+    
+        /* SEM PRILEPITE CSS ZA TISKANJE: */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-obmocje, #print-obmocje * {
+                visibility: visible;
+            }
+            #print-obmocje {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                display: block !important;
+            }
+            #map {
+                width: 100% !important;
+                height: 60vh !important;
+                border: 1px solid #000;
+                visibility: visible !important;
+            }
+            .leaflet-control-container {
+                display: none !important;
+            }
+        }
+        #print-obmocje {
+            display: none;
+        }
+        .print-info-tabela {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        .print-info-tabela td {
+            padding: 10px;
+            vertical-align: top;
+        }
+        .print-qr-container {
+            text-align: right;
+            width: 200px;
+        }
+        .print-qr-container img {
+            width: 150px;
+            height: 150px;
+        }
+    </style>
+</head>
     </style>
 </head>
 <body>
@@ -197,10 +246,35 @@
                     <div id="qr-izhod"></div>
                     <div id="qr-url-tekst"></div>
                 </div>
+                <button onclick="natisniDogodek()" style="width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">
+                🖨️ Natisni mapo in QR kodo
+                </button>
             </div>
         </div>
-    </div>
+    </div> <!-- Zapre desni-panel -->
+</div> <!-- Zapre glavna-posoda -->
+
+<!-- Tiskalna predloga je samostojna in je na samem dnu body-ja -->
+<div id="print-obmocje">
+    <h1 id="print-naslov" style="font-family: Arial, sans-serif; margin-bottom: 10px;">Intervencija: ---</h1>
+    <div id="map-print-placeholder"></div>
+    <table class="print-info-tabela" style="font-family: Arial, sans-serif;">
+        <tr>
+            <td>
+                <h3>PODATKI O DOGODKU:</h3>
+                <p><strong>Operativna enota:</strong> Gasilska enota</p>
+                <p><strong>Datum tiskanja:</strong> <span id="print-datum"></span></p>
+                <p style="font-size: 12px; color: #555;">Sektorji in oznake so izrisani neposredno iz operativnega zemljevida.</p>
+            </td>
+            <td class="print-qr-container">
+                <h3>QR KODA ZA DOSTOP:</h3>
+                <div id="print-qr-slika"></div>
+            </td>
+        </tr>
+    </table>
 </div>
+
+</body>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
