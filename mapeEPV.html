@@ -213,15 +213,15 @@
         const vnos = document.getElementById("vnosno-geslo").value.trim();
         const napakaElement = document.getElementById("napaka-geslo");
         
-        // CryptoJS generira hash, ki ga pretvorimo v male črke za zanesljivo primerjavo
         const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
-
+    
         if (vnosHash === PRAVILNO_GESLO_HASH) {
             shranjenoPreverjenoGesloHash = vnosHash;
             document.getElementById("zaklep-zaslona").style.display = "none";
             if (napakaElement) napakaElement.style.display = "none";
             
-            localStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
+            // Shranimo v sessionStorage (začasni spomin seje), da se geslo ob zaprtju zavihka izbriše
+            sessionStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
             osveziZemljevid();
             setTimeout(() => { map.invalidateSize(); }, 200);
         } else {
