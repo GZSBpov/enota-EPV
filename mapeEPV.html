@@ -665,7 +665,9 @@
     }
 
     setInterval(osveziZemljevid, 5000);
- 
+const GESLO = PRAVILNO_GESLO_HASH;
+let izbranDogodekId = "";
+    
 // Samodejni zagon ob nalaganju strani
 document.addEventListener("DOMContentLoaded", function() {
   // Samodejno odklepanje z lokalno shranjenim hashem gesla
@@ -687,7 +689,7 @@ function preveriGeslo() {
   const vnosHash = CryptoJS.SHA256(vnos).toString();
   
   // Preverimo hash ali navadno geslo
-  if (vnosHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase() || vnos === NAVADNO_GESLO) {
+  if (vnosHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase()) {
     
     // Skrijemo prijavno okno
     const zaklepZaslona = document.getElementById("zaklep-zaslona");
