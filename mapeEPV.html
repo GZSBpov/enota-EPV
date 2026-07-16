@@ -146,13 +146,19 @@
             <h3 class="sekcija-naslov">Spremljanje enot na mapi</h3>
             <div class="filter-posoda">
                 <label>Aktivni dogodek / Intervencija:</label>
-                <div class="filter-vrstica">
-                    <select id="izbiraIntervencije" onchange="zamenjajIntervencijo()" style="width: 100%;"></select>
-                </div>
-                <div class="filter-vrstica">
+                   <div class="filter-vrstica">
+                     <!-- Uporabimo vaš obstoječi ID, le funkcijo preusmerimo na novo logiko -->
+                     <select id="izbiraIntervencije" onchange="naloziElementeDogodka(this.value)" style="width: 100%;">
+                       <option value="">-- Brez aktivnega dogodka --</option>
+                     </select>                    
+                    </div>
+                    <div class="filter-vrstica" style="margin-top: 5px;">                   
                     <input type="text" id="novoImeIntervencije" placeholder="Ime novega dogodka..." style="flex: 1;">
-                    <button class="gumb-intervencija" onclick="ustvariIntervencijo()">Ustvari</button>
+                  <button class="gumb-intervencija" onclick="ustvariNovDogodek()">Ustvari</button>
                 </div>
+                <div class="filter-vrstica" style="margin-top: 5px;">
+                  <button id="gumbShraniSloje" class="gumb-intervencija" onclick="shraniSektorjeInMarkerje()" style="width: 100%; background-color: #4CAF50; color: white; border: none; font-weight: bold;">Shrani trenutno risbo</button>
+                 </div>
                 <hr style="width:100%; border:0; border-top:1px solid #444; margin: 4px 0;">
 
                 <label>Avtomatsko skrivanje starih sledi:</label>
@@ -659,6 +665,161 @@
     }
 
     setInterval(osveziZemljevid, 5000);
+    // --- LOGIKA ZA UPRAVLJANJE INTERVENCIJ IN PRENOS NA GOOGLE DRIVE ---
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec";
+const GESLO = "EPV2026"; 
+let izbranDogodekId = "";
+
+// Samodejni zagon ob nalaganju strani
+document.addEventListener("DOMContentLoaded", function() {
+  osveziSeznamDogodkov();
+});
+
+// 1. Pridobivanje seznama dogodkov za spustni meni
+function osveziSeznamDogodkov() {
+  const url = `${SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=${GESLO}`;
+  
+  fetch(url)
+    .then(r => r.json())
+    .then(odgovor => {
+      if (odgovor.status === "success" && odgovor.data) {
+        const select = document.getElementById("izbiraIntervencije");
+        select.innerHTML = '<option value="">-- Brez aktivnega dogodka --</option>';
+        
+        odgovor.data.forEach(dogodek => {
+          const opt = document.createElement("option");
+          opt.value = dogodek;
+          opt.textContent = dogodek;
+          select.appendChild(opt);
+        });
+        
+        if (izbranDogodekId) {
+          select.value = izbranDogodekId;
+        }
+      }
+    })
+    .catch(err => console.error("Napaka pri nalaganju seznama dogodkov:", err));
+}
+
+// 2. Ustvarjanje novega dogodka iz vnosnega polja
+function ustvariNovDogodek() {
+  const vnosnoPolje = document.getElementById("novoImeIntervencije");
+  const ime = vnosnoPolje.value;
+  
+  if (!ime) {
+    alert("Prosimo, vnesite ime dogodka v polje!");
+    return;
+  }
+  
+  const varnoIme = ime.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
+  if (!varnoIme) return;
+
+  izbranDogodekId = varnoIme;
+  
+  const select = document.getElementById("izbiraIntervencije");
+  const opt = document.createElement("option");
+  opt.value = varnoIme;
+  opt.textContent = varnoIme;
+  select.appendChild(opt);
+  select.value = varnoIme;
+
+  vnosnoPolje.value = ""; // Počistimo polje
+  
+  if (typeof drawnItems !== 'undefined') {
+    drawnItems.clearLayers();
+  }
+  alert(`Ustvarjen dogodek "${varnoIme}". Sedaj lahko narišete oznake/sektorje in kliknete 'Shrani trenutno risbo'.`);
+}
+
+// 3. Shranjevanje elementov (markerji, poligoni) na Google Drive (POST)
+function shraniSektorjeInMarkerje() {
+  if (!izbranDogodekId) {
+    alert("Prosimo, najprej izberite ali ustvarite aktivno intervencijo!");
+    return;
+  }
+
+  if (typeof drawnItems === 'undefined') {
+    alert("Napaka: Skupina grafičnih elementov (drawnItems) na mapi ni definirana.");
+    return;
+  }
+
+  const sektorjiZaVnos = [];
+
+  drawnItems.eachLayer(function(layer) {
+    let tip = "";
+    if (layer instanceof L.Marker) tip = "marker";
+    else if (layer instanceof L.Polygon) tip = "polygon";
+    else if (layer instanceof L.Polyline) tip = "polyline";
+
+    if (tip) {
+      sektorjiZaVnos.push({
+        tip: tip,
+        geojson: layer.toGeoJSON()
+      });
+    }
+  });
+
+  const gumb = document.getElementById("gumbShraniSloje");
+  gumb.disabled = true;
+  gumb.textContent = "Shranjevanje...";
+
+  const podatki = {
+    geslo: GESLO,
+    akcija: "shraniSektorje",
+    dogodek: izbranDogodekId,
+    sektorji: sektorjiZaVnos
+  };
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(podatki)
+  })
+  .then(() => {
+    alert(`Uspešno shranjeno na Google Drive pod dogodek: ${izbranDogodekId}`);
+    gumb.disabled = false;
+    gumb.textContent = "Shrani trenutno risbo";
+    osveziSeznamDogodkov();
+  })
+  .catch(err => {
+    console.error("Napaka pri pošiljanju:", err);
+    alert("Napaka pri shranjevanju.");
+    gumb.disabled = false;
+    gumb.textContent = "Shrani trenutno risbo";
+  });
+}
+
+// 4. Nalaganje elementov izbranega dogodka iz Drive-a ob menjavi v seznamu
+function naloziElementeDogodka(dogodekId) {
+  izbranDogodekId = dogodekId;
+  
+  if (typeof drawnItems === 'undefined') return;
+  drawnItems.clearLayers(); 
+
+  if (!dogodekId) return; // Če je izbrana prazna opcija
+
+  const url = `${SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(dogodekId)}&geslo=${GESLO}`;
+  
+  fetch(url)
+    .then(r => r.json())
+    .then(odgovor => {
+      if (odgovor.status === "success" && odgovor.data) {
+        odgovor.data.forEach(element => {
+          L.geoJSON(element.podatki, {
+            onEachFeature: function(feature, layer) {
+              drawnItems.addLayer(layer);
+            }
+          });
+        });
+        
+        if (drawnItems.getLayers().length > 0) {
+          map.fitBounds(drawnItems.getBounds());
+        }
+      }
+    })
+    .catch(err => console.error("Napaka pri nalaganju elementov dogodka:", err));
+}
 </script>
 
 </body>
