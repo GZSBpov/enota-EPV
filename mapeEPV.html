@@ -672,8 +672,48 @@ let izbranDogodekId = "";
 
 // Samodejni zagon ob nalaganju strani
 document.addEventListener("DOMContentLoaded", function() {
+  // Samodejno odklepanje z lokalno shranjenim hashem gesla
+  const shranjenHash = localStorage.getItem("shranjenoPreverjenoGesloHash");
+  if (shranjenHash && (shranjenHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase())) {
+    const zaklep = document.getElementById("zaklep-zaslona");
+    if (zaklep) zaklep.style.display = "none";
+  }
+
   osveziSeznamDogodkov();
 });
+
+// Funkcija za preverjanje gesla ob ročni prijavi
+function preveriGeslo() {
+  const vnos = document.getElementById("vnosno-geslo").value;
+  const napakaElement = document.getElementById("napaka-geslo");
+  
+  // Izračunamo SHA-256 hash vnosa z uporabo Crypto-JS
+  const vnosHash = CryptoJS.SHA256(vnos).toString();
+  
+  // Preverimo hash ali navadno geslo
+  if (vnosHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase() || vnos === NAVADNO_GESLO) {
+    
+    // Skrijemo prijavno okno
+    const zaklepZaslona = document.getElementById("zaklep-zaslona");
+    if (zaklepZaslona) {
+      zaklepZaslona.style.display = "none";
+    }
+    
+    // Skrijemo tekst za napako
+    if (napakaElement) {
+      napakaElement.style.display = "none";
+    }
+    
+    // Shranimo v brskalnik za naslednjič
+    localStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
+    
+  } else {
+    // Prikažemo opozorilo
+    if (napakaElement) {
+      napakaElement.style.display = "block";
+    }
+  }
+}
 
 // 1. Pridobivanje seznama dogodkov za spustni meni
 function osveziSeznamDogodkov() {
