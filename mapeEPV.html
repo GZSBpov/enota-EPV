@@ -364,10 +364,11 @@
             transparent: true,
             attribution: '&copy; GURS'
         });
+        
+        map.addLayer(narisaniSektorjiSloj);
     }
 
     const narisaniSektorjiSloj = new L.FeatureGroup();
-    map.addLayer(narisaniSektorjiSloj);
     
     // Ustvarimo alias, da koda, ki se sklicuje na drawnItems, ne javlja napak
     const drawnItems = narisaniSektorjiSloj;
