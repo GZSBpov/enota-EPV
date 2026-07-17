@@ -324,7 +324,7 @@
         }
     }
 
-    // Funkcija za preklop katastrskih občin
+    // Funkcija za preklop katastrskih občin (poveži jo z gumbom v HTML: onclick="toggleKataster()")
     function toggleKataster() {
         if (!map) return;
         if (isKatasterVisible) {
@@ -365,56 +365,6 @@
             attribution: '&copy; GURS'
         });
     }
-
-    // Funkcija za preklop katastra (poveži jo z gumbom v HTML: onclick="toggleKataster()")
-    function toggleKataster() {
-        if (!map) return;
-        if (isKatasterVisible) {
-            map.removeLayer(katasterLayer);
-            isKatasterVisible = false;
-        } else {
-            katasterLayer.addTo(map);
-            isKatasterVisible = true;
-        }
-    }
-
-    function preveriGeslo() {
-        const vnos = document.getElementById("vnosno-geslo").value.trim();
-        const napakaElement = document.getElementById("napaka-geslo");
-        const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
-
-        if (vnosHash === PRAVILNO_GESLO_HASH) {
-            shranjenoPreverjenoGesloHash = vnosHash;
-            document.getElementById("zaklep-zaslona").style.display = "none";
-            if (napakaElement) napakaElement.style.display = "none";
-            
-            sessionStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
-            
-            // Ko se skrije zaklepni zaslon, mora Leaflet ponovno preračunati velikost okna
-            setTimeout(() => { map.invalidateSize(); }, 200);
-            
-            // Tukaj spodaj se nadaljuje tvoja funkcija osveziZemljevid(), ki jo že imaš...
-            osveziZemljevid();
-            setTimeout(() => { map.invalidateSize(); }, 200);
-        } else {
-            if (napakaElement) napakaElement.style.display = "block";
-            document.getElementById("vnosno-geslo").value = "";
-        }
-    }
-
-    const navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
-    const satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
-    });
-
-    const map = L.map('zemljevid', {
-        center: [46.3925, 15.5727],
-        zoom: 15,
-        layers: [satelitskaMapa]
-    });
-
-    const osnovniSloji = { "Satelitski posnetek": satelitskaMapa, "Navaden zemljevid": navadnaMapa };
-    L.control.layers(osnovniSloji, null, { position: 'bottomright' }).addTo(map);
 
     let vseIntervencije = ["Splošno"];
     let trenutnaIntervencija = "Splošno";
