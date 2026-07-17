@@ -272,30 +272,91 @@
             </td>
         </tr>
     </table>
-</div>
+</div> <!-- Tukaj se zapre tvoja glavna-posoda ali desni-panel -->
 
-</body>
-
+<!-- Leaflet knjižnice morajo biti naložene TUKAJ, pred tvojo logiko -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
+    const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff050145b50d559577a65be78786067369c9756";
     let shranjenoPreverjenoGesloHash = "";
+
+    // Globalne spremenljivke za zemljevid
+    let map;
+    let navadnaMapa;
+    let satelitskaMapa;
+    let katasterLayer;
+    let isKatasterVisible = false;
+
+    let vseIntervencije = ["Splošno"];
+    let trenutnaIntervencija = "Splošno";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZXpXxZimcAB1hVLngMzHI3msWADQFcE1Tr0D4JnN2TO8Ug5nWzsbeTA1g/exec";
+
+    // Zemljevid inicializiramo šele, ko je celotna stran pripravljena v pomnilniku
+    window.onload = function() {
+        initMap();
+    };
+
+    function initMap() {
+        navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        });
+
+        satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &ndash; Source: Esri, i-cubed, USDA, USGS'
+        });
+
+        map = L.map('zemljevid', {
+            center: [46.3925, 15.5727],
+            zoom: 15,
+            layers: [satelitskaMapa]
+        });
+
+        const osnovniSloji = {
+            "Satelitski posnetek": satelitskaMapa,
+            "Navaden zemljevid": navadnaMapa
+        };
+
+        L.control.layers(osnovniSloji, null, { position: 'bottomright' }).addTo(map);
+
+        // Priprava GURS sloja za katastrske občine
+        katasterLayer = L.tileLayer.wms('https://javni.gurs.gov.si/wms-zk-zgodovina/wms', {
+            layers: 'gurs:KN_KATASTRSKA_OBCINA',
+            format: 'image/png',
+            transparent: true,
+            attribution: '&copy; GURS'
+        });
+    }
+
+    // Funkcija za preklop katastra (poveži jo z gumbom v HTML: onclick="toggleKataster()")
+    function toggleKataster() {
+        if (!map) return;
+        if (isKatasterVisible) {
+            map.removeLayer(katasterLayer);
+            isKatasterVisible = false;
+        } else {
+            katasterLayer.addTo(map);
+            isKatasterVisible = true;
+        }
+    }
 
     function preveriGeslo() {
         const vnos = document.getElementById("vnosno-geslo").value.trim();
         const napakaElement = document.getElementById("napaka-geslo");
-        
         const vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
-    
+
         if (vnosHash === PRAVILNO_GESLO_HASH) {
             shranjenoPreverjenoGesloHash = vnosHash;
             document.getElementById("zaklep-zaslona").style.display = "none";
             if (napakaElement) napakaElement.style.display = "none";
             
-            // Shranimo v sessionStorage (začasni spomin seje), da se geslo ob zaprtju zavihka izbriše
             sessionStorage.setItem("shranjenoPreverjenoGesloHash", vnosHash);
+            
+            // Ko se skrije zaklepni zaslon, mora Leaflet ponovno preračunati velikost okna
+            setTimeout(() => { map.invalidateSize(); }, 200);
+            
+            // Tukaj spodaj se nadaljuje tvoja funkcija osveziZemljevid(), ki jo že imaš...
             osveziZemljevid();
             setTimeout(() => { map.invalidateSize(); }, 200);
         } else {
