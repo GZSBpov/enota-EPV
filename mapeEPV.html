@@ -282,21 +282,43 @@
     }
 
     // Pomožna funkcija za varno CORS/Proxy nalaganje podatkov iz Googla
-    function jsonpFetch(url, params, callbackName, successCallback) {
-        const polniUrl = url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params).toString();
+function jsonpFetch(url, params, callbackName, successCallback) {
+    // Generiramo povsem unikatno ime za vsak klic, da se odgovori ne mešajo
+    const unikatniCallback = "epv_cb_" + Math.floor(Math.random() * 1000000);
+    
+    // Pripravimo parametre in dodamo 'callback' za Google Apps Script redirection
+    params = params || {};
+    params.callback = unikatniCallback;
+    params.prefix = unikatniCallback; // Dodatna varovalka za Google preusmeritve
+    
+    const polniUrl = url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params).toString();
+    
+    // Definiramo globalno funkcijo, ki jo bo izvedel prejeti odgovor
+    window[unikatniCallback] = function(data) {
+        // Takoj ko dobimo podatke, počistimo skripto iz HTML dokumenta
+        const element = document.getElementById(unikatniCallback);
+        if (element) element.remove();
+        delete window[unikatniCallback];
         
-        // Ker Google ne podpira JSONP izvorno, bomo prebrali CORS napako in uporabili javni proxy ALLORIGINS, če direktni fetch spodleti
-        fetch(polniUrl)
-            .then(r => r.json())
-            .then(data => successCallback(data))
-            .catch(() => {
-                // Če brskalnik blokira CORS, pretvorimo zahtevek preko proxy-ja
-                fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(polniUrl)}`)
-                    .then(res => { if (res.ok) return res.json(); throw new Error('Proxy error'); })
-                    .then(wrapper => successCallback(JSON.parse(wrapper.contents)))
-                    .catch(e => console.error("Kritična napaka pri pridobivanju podatkov:", e));
-            });
-    }
+        // Izvedemo uspeh
+        successCallback(data);
+    };
+
+    // Ustvarimo <script> značko, ki jo CORS pravila brskalnika popolnoma ignorirajo
+    const skripta = document.createElement("script");
+    skripta.id = unikatniCallback;
+    skripta.src = polniUrl;
+    
+    // Lovljenje napak pri nalaganju skripte
+    skripta.onerror = function() {
+        console.error("Napaka pri nalaganju podatkov preko skripte za: " + unikatniCallback);
+        const element = document.getElementById(unikatniCallback);
+        if (element) element.remove();
+        delete window[unikatniCallback];
+    };
+
+    document.body.appendChild(skripta);
+}
 
     function osveziZemljevid() {
         if (!shranjenoPreverjenoGesloHash) return;
