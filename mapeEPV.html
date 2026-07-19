@@ -283,35 +283,36 @@
 
     // Pomožna funkcija za varno CORS/Proxy nalaganje podatkov iz Googla
 function jsonpFetch(url, params, callbackName, successCallback) {
-    // Generiramo povsem unikatno ime za vsak klic, da se odgovori ne mešajo
-    const unikatniCallback = "epv_cb_" + Math.floor(Math.random() * 1000000);
-    
-    // Pripravimo parametre in dodamo 'callback' za Google Apps Script redirection
     params = params || {};
-    params.callback = unikatniCallback;
-    params.prefix = unikatniCallback; // Dodatna varovalka za Google preusmeritve
-    
     const polniUrl = url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params).toString();
     
-    // Definiramo globalno funkcijo, ki jo bo izvedel prejeti odgovor
-    window[unikatniCallback] = function(data) {
-        // Takoj ko dobimo podatke, počistimo skripto iz HTML dokumenta
+    // Uporabimo zanesljiv javni proxy, ki reši CORS blokado za Google Scripts
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(polniUrl)}`;
+    
+    // Uporabimo dinamično skripto, prilagojeno za ta proxy
+    const unikatniCallback = "epv_proxy_" + Math.floor(Math.random() * 1000000);
+    
+    window[unikatniCallback] = function(wrapper) {
         const element = document.getElementById(unikatniCallback);
         if (element) element.remove();
         delete window[unikatniCallback];
         
-        // Izvedemo uspeh
-        successCallback(data);
+        try {
+            // Proxy zavije odgovor v objekt .contents kot tekst, ki ga tukaj pretvorimo v JSON
+            const podatki = JSON.parse(wrapper.contents);
+            successCallback(podatki);
+        } catch (e) {
+            console.error("Napaka pri branju podatkov iz proxyja:", e);
+        }
     };
 
-    // Ustvarimo <script> značko, ki jo CORS pravila brskalnika popolnoma ignorirajo
     const skripta = document.createElement("script");
     skripta.id = unikatniCallback;
-    skripta.src = polniUrl;
+    // Proxyju povemo, naj nam vrne podatke zavite v našo callback funkcijo
+    skripta.src = proxyUrl + `&callback=${unikatniCallback}`;
     
-    // Lovljenje napak pri nalaganju skripte
     skripta.onerror = function() {
-        console.error("Napaka pri nalaganju podatkov preko skripte za: " + unikatniCallback);
+        console.error("Proxy strežnik trenutno ni dosegljiv.");
         const element = document.getElementById(unikatniCallback);
         if (element) element.remove();
         delete window[unikatniCallback];
