@@ -70,7 +70,6 @@
         .stalni-napis { background: rgba(0, 0, 0, 0.85); color: white; border: 1px solid #fff; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 12px; }
         .gumb-kopiraj-popup { background: #ff9800; color: black; border: none; padding: 4px 8px; font-weight: bold; font-size: 11px; border-radius: 3px; cursor: pointer; margin-top: 5px; width: 100%; }
 
-        /* Popravek za tiskanje: QR koda uporablja platno (canvas), ki ga brskalnik privzeto ne natisne, če ni eksplicitno viden */
         @media print {
             body * { visibility: hidden; }
             #print-obmocje, #print-obmocje * { visibility: visible; }
@@ -205,6 +204,8 @@
     let izbranDogodekId = "Splošno";
     let vseIntervencije = ["Splošno"];
     let trenutnaIntervencija = "Splošno";
+    
+    // VPISITE VAS NOV GOOGLE SPLETNI URL PO POSODOBITVI!
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZXpXxZImcAB1hVLngMzHI3msWADQFcE1Tr0D4JnN2TO8Ug5nWzsbeTA1g/exec";
 
     let enoteMarkerji = {};
@@ -217,11 +218,10 @@
     window.onload = function() {
         initMap();
         
-        // POPRAVEK: Prisilimo, da se ob vsakem ponovnem zagonu vedno najprej prikaže okno za vnos gesla
+        // Ponastavimo ob zagonu za varen vnos
         localStorage.removeItem("shranjenoPreverjenoGesloHash");
         document.getElementById("zaklep-zaslona").style.display = "flex";
 
-        // Naložimo lokalno shranjene stare intervencije, če obstajajo
         let s = localStorage.getItem("epv_intervencije_seznam");
         if (s) {
             vseIntervencije = JSON.parse(s);
@@ -251,11 +251,9 @@
         naloziNastavitev();
         ustvariQrKodo();
         
-        // Takojšen prvi prevzem podatkov iz Googla
         osveziSeznamDogodkov();
         osveziZemljevid();
         
-        // Avtomatsko osveževanje na vsakih 5 sekund
         setInterval(osveziZemljevid, 5000);
     }
 
@@ -269,31 +267,27 @@
         posodobiNastavitveRisanja();
     }
 
-    // POPRAVEK: Nov, robusten pretvornik preko XMLHttpRequest & AllOrigins proxyja brez uporabe JSONP skript
-    function varnaHttpZahteva(params, uspehCallback) {
+    // POSODOBLJENO: Zdaj ko ima skripta CORS glave, kličemo Google neposredno preko hitrega in čistega fetch() klica
+    function izvediNeposredniKlic(params, uspehCallback) {
         const polniUrl = SCRIPT_URL + "?" + new URLSearchParams(params).toString();
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(polniUrl)}`;
         
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", proxyUrl, true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4 && xhr.status === 200) {
-                try {
-                    const wrapper = JSON.parse(xhr.responseText);
-                    const praviOdgovor = JSON.parse(wrapper.contents);
-                    uspehCallback(praviOdgovor);
-                } catch(e) {
-                    console.error("Napaka pri parsiranju proxy podatkov:", e);
-                }
-            }
-        };
-        xhr.send();
+        fetch(polniUrl)
+            .then(odgovor => {
+                if (!odgovor.ok) throw new Error("Težava s strežnikom: " + odgovor.status);
+                return odgovor.json();
+            })
+            .then(podatki => {
+                uspehCallback(podatki);
+            })
+            .catch(napaka => {
+                console.error("Napaka pri prevzemu podatkov:", napaka);
+            });
     }
 
     function osveziZemljevid() {
         if (!shranjenoPreverjenoGesloHash) return;
         
-        varnaHttpZahteva({ geslo: shranjenoPreverjenoGesloHash }, function(odgovorJson) {
+        izvediNeposredniKlic({ geslo: shranjenoPreverjenoGesloHash }, function(odgovorJson) {
             if (odgovorJson.status === "success" && odgovorJson.data) {
                 procesirajPodatkeZemljevida(odgovorJson.data);
             }
@@ -306,7 +300,6 @@
         const filterMinut = parseInt(document.getElementById("filterMinute").value) || 15;
         const trenutniCasMs = new Date().getTime();
 
-        // Indeks 0 je glava tabele, podatki se začnejo z 1
         for (let i = 1; i < matriksaPodatkov.length; i++) {
             const vrstica = matriksaPodatkov[i];
             if (vrstica.length < 5) continue;
@@ -371,9 +364,8 @@
     }
 
     function osveziSeznamDogodkov() {
-        varnaHttpZahteva({ akcija: "pridobiSeznamDogodkov", geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
+        izvediNeposredniKlic({ akcija: "pridobiSeznamDogodkov", geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
             if (odgovor.status === "success" && odgovor.data) {
-                // Združimo stare shranjene in novo prejete dogodke, da ne izgubimo arhiva
                 vseIntervencije = [...new Set([...vseIntervencije, ...odgovor.data])];
                 localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
                 izrisiSpustniSeznamZgodovine();
@@ -386,7 +378,7 @@
         narisaniSektorjiSloj.clearLayers();
         if (!dogodekId) return;
 
-        varnaHttpZahteva({ akcija: "pridobiDogodke", dogodek: dogodekId, geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
+        izvediNeposredniKlic({ akcija: "pridobiDogodke", dogodek: dogodekId, geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
             if (odgovor.status === "success" && odgovor.data) {
                 odgovor.data.forEach(element => {
                     L.geoJSON(element.podatki, {
@@ -426,7 +418,6 @@
 
         fetch(SCRIPT_URL, {
             method: "POST",
-            mode: "no-cors",
             body: JSON.stringify({ geslo: shranjenoPreverjenoGesloHash, akcija: "shraniSektorje", dogodek: izbranDogodekId, sektorji: sektorjiZaVnos })
         }).then(() => {
             alert("Elementi so uspešno shranjeni!");
@@ -531,16 +522,13 @@
         const url = `https://gzsbpov.github.io/enota-EPV/terenEPV.html?tip=${t}&clanov=${c}`;
         document.getElementById("qr-izhod").innerHTML = ""; document.getElementById("qr-url-tekst").innerText = url;
         
-        // Generiramo osnovno QR kodo na namizju
         new QRCode(document.getElementById("qr-izhod"), { text: url, width: 110, height: 110 });
     }
 
-    // POPRAVEK: Funkcija za prenos QR kode v tiskano območje pred sprožitvijo tiskalnika
     function pripraviInNatisni() {
         document.getElementById("print-naslov").innerText = "Intervencija: " + trenutnaIntervencija;
         document.getElementById("print-datum").innerText = new Date().toLocaleString("sl-SI");
         
-        // Počistimo prejšnjo natisnjeno QR kodo in vanjo prekopiramo sliko iz namiznega generatorja
         const printQrSloj = document.getElementById("print-qr-slika");
         printQrSloj.innerHTML = "";
         
