@@ -92,9 +92,8 @@
         :fullscreen .gumb-povecaj { background: rgba(229, 57, 53, 0.9); border-color: #fff; }
         :fullscreen .sekcija-naslov { padding: 15px; font-size: 18px; }
         :fullscreen .video-wrapper { height: calc(100% - 40px); }
-        <head>
     
-        /* SEM PRILEPITE CSS ZA TISKANJE: */
+        /* CSS ZA TISKANJE */
         @media print {
             body * {
                 visibility: hidden;
@@ -109,7 +108,7 @@
                 width: 100%;
                 display: block !important;
             }
-            #map {
+            #map-print-placeholder {
                 width: 100% !important;
                 height: 60vh !important;
                 border: 1px solid #000;
@@ -139,8 +138,6 @@
             width: 150px;
             height: 150px;
         }
-    </style>
-</head>
     </style>
 </head>
 <body>
@@ -246,15 +243,15 @@
                     <div id="qr-izhod"></div>
                     <div id="qr-url-tekst"></div>
                 </div>
-                <button onclick="natisniDogodek()" style="width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">
+                <button onclick="window.print()" style="width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">
                 🖨️ Natisni mapo in QR kodo
                 </button>
             </div>
         </div>
-    </div> <!-- Zapre desni-panel -->
-</div> <!-- Zapre glavna-posoda -->
+    </div>
+</div>
 
-<!-- Tiskalna predloga je samostojna in je na samem dnu body-ja -->
+<!-- Tiskalna predloga -->
 <div id="print-obmocje">
     <h1 id="print-naslov" style="font-family: Arial, sans-serif; margin-bottom: 10px;">Intervencija: ---</h1>
     <div id="map-print-placeholder"></div>
@@ -272,9 +269,9 @@
             </td>
         </tr>
     </table>
-</div> <!-- Tukaj se zapre tvoja glavna-posoda ali desni-panel -->
+</div>
 
-<!-- Leaflet knjižnice morajo biti naložene TUKAJ, pred tvojo logiko -->
+<!-- Leaflet knjižnice -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
@@ -282,23 +279,21 @@
     const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff050145b50d559577a65be78786067369c9756";
     let shranjenoPreverjenoGesloHash = "";
 
-    // Globalne spremenljivke za zemljevid
     let map;
     let navadnaMapa;
     let satelitskaMapa;
     let katasterLayer;
     let isKatasterVisible = false;
+    let izbranDogodekId = "Splošno";
 
     let vseIntervencije = ["Splošno"];
     let trenutnaIntervencija = "Splošno";
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZXpXxZImcAB1hVLngMzHI3msWADQFcE1Tr0D4JnN2TO8Ug5nWzsbeTA1g/exec";
 
-    // Zemljevid inicializiramo šele, ko je celotna stran pripravljena v pomnilniku
     window.onload = function() {
         initMap();
     };
 
-    // Vrnjen manjkajoči blok za preverjanje gesla, da bo gumb ponovno deloval
     function preveriGeslo() {
         const vnos = document.getElementById("vnosno-geslo").value.trim();
         const napakaElement = document.getElementById("napaka-geslo");
@@ -315,16 +310,13 @@
                 if (map) map.invalidateSize(); 
             }, 200);
             
-            if (typeof osveziZemljevid === "function") {
-                osveziZemljevid();
-            }
+            osveziZemljevid();
         } else {
             if (napakaElement) napakaElement.style.display = "block";
             document.getElementById("vnosno-geslo").value = "";
         }
     }
 
-    // Funkcija za preklop katastrskih občin (poveži jo z gumbom v HTML: onclick="toggleKataster()")
     function toggleKataster() {
         if (!map) return;
         if (isKatasterVisible) {
@@ -335,6 +327,10 @@
             isKatasterVisible = true;
         }
     }
+
+    const narisaniSektorjiSloj = new L.FeatureGroup();
+    const drawnItems = narisaniSektorjiSloj;
+
     function initMap() {
         navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
@@ -357,7 +353,6 @@
 
         L.control.layers(osnovniSloji, null, { position: 'bottomright' }).addTo(map);
 
-        // Priprava GURS sloja za katastrske občine
         katasterLayer = L.tileLayer.wms('https://javni.gurs.gov.si/wms-zk-zgodovina/wms', {
             layers: 'gurs:KN_KATASTRSKA_OBCINA',
             format: 'image/png',
@@ -366,12 +361,8 @@
         });
         
         map.addLayer(narisaniSektorjiSloj);
+        posodobiNastavitveRisanja();
     }
-
-    const narisaniSektorjiSloj = new L.FeatureGroup();
-    
-    // Ustvarimo alias, da koda, ki se sklicuje na drawnItems, ne javlja napak
-    const drawnItems = narisaniSektorjiSloj;
 
     function naloziIntervencije() {
         const shranjene = localStorage.getItem("epv_intervencije_seznam");
@@ -403,10 +394,7 @@
         izbranDogodekId = dogodekId;
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
         
-        // 1. Izriši iz lokalnega spomina
         izrisiSektorjeZaTrenutnoIntervencijo();
-        
-        // 2. Naloži iz Google Driva
         naloziElementeDogodka(dogodekId);
     }
 
@@ -495,8 +483,6 @@
         });
         map.addControl(drawControl);
     }
-    
-    posodobiNastavitveRisanja();
 
     function urediPopupZaSektor(layer, barvaKoda) {
         let tipElementa = "Sektor";
@@ -543,25 +529,27 @@
         navigator.clipboard.writeText(tekst).then(() => { alert("Kopirano:\n" + tekst); });
     };
 
-    map.on(L.Draw.Event.CREATED, function (e) {
-        const layer = e.layer;
-        const izbranaBarva = document.getElementById("trenutnaBarva").value;
-        layer.options.epvBarva = izbranaBarva;
-        urediPopupZaSektor(layer, izbranaBarva);
-        narisaniSektorjiSloj.addLayer(layer);
-        shraniSektorjeVTekočoIntervencijo();
-        layer.openPopup();
-    });
-
-    map.on(L.Draw.Event.EDITED, function (e) {
-        e.layers.eachLayer(function (layer) {
-            let barva = layer.options.epvBarva || "red";
-            urediPopupZaSektor(layer, barva);
+    if (map) {
+        map.on(L.Draw.Event.CREATED, function (e) {
+            const layer = e.layer;
+            const izbranaBarva = document.getElementById("trenutnaBarva").value;
+            layer.options.epvBarva = izbranaBarva;
+            urediPopupZaSektor(layer, izbranaBarva);
+            narisaniSektorjiSloj.addLayer(layer);
+            shraniSektorjeVTekočoIntervencijo();
+            layer.openPopup();
         });
-        shraniSektorjeVTekočoIntervencijo();
-    });
 
-    map.on(L.Draw.Event.DELETED, function () { shraniSektorjeVTekočoIntervencijo(); });
+        map.on(L.Draw.Event.EDITED, function (e) {
+            e.layers.eachLayer(function (layer) {
+                let barva = layer.options.epvBarva || "red";
+                urediPopupZaSektor(layer, barva);
+            });
+            shraniSektorjeVTekočoIntervencijo();
+        });
+
+        map.on(L.Draw.Event.DELETED, function () { shraniSektorjeVTekočoIntervencijo(); });
+    }
 
     let enoteMarkerji = {};
     let enoteSledi = {}; 
@@ -581,7 +569,7 @@
         if (!document.fullscreenElement) {
             document.querySelectorAll('.gumb-povecaj').forEach(gumb => gumb.innerText = "Cel zaslon");
         }
-        setTimeout(() => { map.invalidateSize(); }, 200);
+        setTimeout(() => { if (map) map.invalidateSize(); }, 200);
     }
     document.addEventListener('fullscreenchange', urediNapiseGumbov);
 
@@ -781,7 +769,6 @@
     setInterval(osveziZemljevid, 5000);
     const GESLO = PRAVILNO_GESLO_HASH;
 
-    // Samodejni zagon ob nalaganju strani
     document.addEventListener("DOMContentLoaded", function() {
         const shranjenHash = localStorage.getItem("shranjenoPreverjenoGesloHash");
         if (shranjenHash && (shranjenHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase())) {
@@ -789,28 +776,24 @@
             const zaklep = document.getElementById("zaklep-zaslona");
             if (zaklep) zaklep.style.display = "none";
             osveziZemljevid();
-            setTimeout(() => { map.invalidateSize(); }, 200);
+            setTimeout(() => { if (map) map.invalidateSize(); }, 200);
         }
         osveziSeznamDogodkov();
     });
 
-    // 1. Pridobivanje seznama dogodkov za spustni meni
     function osveziSeznamDogodkov() {
-        // Najprej takoj naložimo lokalno shranjene dogodke iz računalnika
         const shranjene = localStorage.getItem("epv_intervencije_seznam");
         if (shranjene) {
             vseIntervencije = JSON.parse(shranjene);
         }
         izrisiSpustniSeznamZgodovine();
 
-        // Nato poskusimo posodobiti seznam še iz Google Drive-a
         const url = `${SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=${GESLO}`;
         
         fetch(url)
             .then(r => r.json())
             .then(odgovor => {
                 if (odgovor.status === "success" && odgovor.data) {
-                    // Združimo lokalne in prejete dogodke, da ne izgubimo ničesar
                     vseIntervencije = [...new Set([...vseIntervencije, ...odgovor.data])];
                     localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
                     izrisiSpustniSeznamZgodovine();
@@ -821,7 +804,6 @@
             });
     }
 
-    // Pomožna funkcija za izris elementov v spustni meni (preprečuje duplikate)
     function izrisiSpustniSeznamZgodovine() {
         const select = document.getElementById("izbiraIntervencije");
         if (!select) return;
@@ -846,7 +828,6 @@
         }
     }
 
-    // 2. Ustvarjanje novega dogodka iz vnosnega polja
     function ustvariNovDogodek() {
         const vnosnoPolje = document.getElementById("novoImeIntervencije");
         const ime = vnosnoPolje.value;
@@ -862,14 +843,12 @@
         izbranDogodekId = varnoIme;
         trenutnaIntervencija = varnoIme;
         
-        // Dodamo v lokalno tabelo in shranimo v localStorage
         if (!vseIntervencije.includes(varnoIme)) {
             vseIntervencije.push(varnoIme);
             localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
         }
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
 
-        // Ponovno izrišemo meni, da se nov dogodek takoj pojavi
         izrisiSpustniSeznamZgodovine();
 
         vnosnoPolje.value = ""; 
@@ -878,14 +857,12 @@
         alert(`Ustvarjen dogodek "${varnoIme}". Sedaj lahko narišete oznake/sektorje in kliknete 'Shrani trenutno risbo'.`);
     }
 
-    // 3. Shranjevanje elementov (markerji, poligoni) na Google Drive (POST)
     function shraniSektorjeInMarkerje() {
         if (!izbranDogodekId || izbranDogodekId === "Splošno") {
             alert("Prosimo, najprej izberite ali ustvarite aktivno intervencijo!");
             return;
         }
 
-        // Shranimo tudi lokalno, za vsak primer
         shraniSektorjeVTekočoIntervencijo();
 
         const sektorjiZaVnos = [];
@@ -935,7 +912,6 @@
         });
     }
 
-    // 4. Nalaganje elementov izbranega dogodka iz Drive-a ob menjavi v seznamu
     function naloziElementeDogodka(dogodekId) {
         izbranDogodekId = dogodekId;
         narisaniSektorjiSloj.clearLayers(); 
@@ -951,7 +927,6 @@
                     odgovor.data.forEach(element => {
                         L.geoJSON(element.podatki, {
                             onEachFeature: function(feature, layer) {
-                                // Dodaj naloženo barvo, če obstaja
                                 if (feature.properties && feature.properties.epvBarva) {
                                     layer.options.epvBarva = feature.properties.epvBarva;
                                     const stil = pridobiNastavitveStila(feature.properties.epvBarva);
