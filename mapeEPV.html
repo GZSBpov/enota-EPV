@@ -74,13 +74,19 @@
             body * { visibility: hidden; }
             #print-obmocje, #print-obmocje * { visibility: visible; }
             #print-obmocje { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-            #map-print-placeholder { width: 100% !important; height: 500px !important; border: 1px solid #000; }
+            #map-print-placeholder { width: 100% !important; height: 500px !important; border: 1px solid #000; margin-bottom: 20px; }
             #print-qr-slika canvas, #print-qr-slika img { display: inline-block !important; visibility: visible !important; }
+            .tabela-sodelujocih { width: 100%; border-collapse: collapse; margin-top: 20px; font-family: Arial, sans-serif; }
+            .tabela-sodelujocih th, .tabela-sodelujocih td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 12px; }
+            .tabela-sodelujocih th { background-color: #f2f2f2; }
         }
         #print-obmocje { display: none; }
         .print-info-tabela { width: 100%; margin-top: 20px; border-collapse: collapse; }
         .print-info-tabela td { padding: 10px; vertical-align: top; }
         .print-qr-container { text-align: right; width: 200px; }
+        .tabela-sodelujocih { width: 100%; border-collapse: collapse; margin-top: 20px; font-family: Arial, sans-serif; }
+        .tabela-sodelujocih th, .tabela-sodelujocih td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .tabela-sodelujocih th { background-color: #f4f4f4; }
     </style>
 </head>
 <body>
@@ -129,7 +135,7 @@
                         <option value="">-- Brez aktivnega dogodka --</option>
                     </select>                    
                 </div>
-                <div class="filter-vrstica" style="margin-top: 5px;">                   
+                <div class="filter-vrstica" style="margin-top: 5px;">                    
                     <input type="text" id="novoImeIntervencije" placeholder="Ime novega dogodka..." style="flex: 1;">
                     <button class="gumb-intervencija" onclick="ustvariNovDogodek()">Ustvari</button>
                 </div>
@@ -179,6 +185,7 @@
 <div id="print-obmocje">
     <h1 id="print-naslov" style="font-family: Arial, sans-serif; margin-bottom: 10px;">Intervencija: ---</h1>
     <div id="map-print-placeholder"></div>
+    
     <table class="print-info-tabela" style="font-family: Arial, sans-serif;">
         <tr>
             <td>
@@ -190,6 +197,22 @@
                 <div id="print-qr-slika"></div>
             </td>
         </tr>
+    </table>
+
+    <h3 style="font-family: Arial, sans-serif; margin-top: 30px; border-bottom: 2px solid #000; padding-bottom: 5px;">SEZNAM PRIJAVLJENIH SODELUJOČIH ENOT</h3>
+    <table class="tabela-sodelujocih">
+        <thead>
+            <tr>
+                <th>Ime enote</th>
+                <th>Čas prve prijave / zapisa</th>
+                <th>Zadnja zaznana lokacija (Lat, Lon)</th>
+            </tr>
+        </thead>
+        <tbody id="print-tabela-sodelujocih-telo">
+            <tr>
+                <td colspan="3" style="text-align: center; color: #666;">Ni prijavljenih enot za ta dogodek.</td>
+            </tr>
+        </tbody>
     </table>
 </div>
 
@@ -214,6 +237,90 @@
     const narisaniSektorjiSloj = new L.FeatureGroup();
     let drawControl;
     const slovarBarv = { "red": "Rdeča", "blue": "Modra", "gold": "Rumena", "green": "Zelena" };
+
+    function pripraviInNatisni() {
+        const izbranaIntervencija = document.getElementById("izbiraIntervencije").value || "Splošno spremljanje (Brez dogodka)";
+        document.getElementById("print-naslov").innerText = "Intervencija: " + izbranaIntervencija;
+        document.getElementById("print-datum").innerText = new Date().toLocaleString("sl-SI");
+
+        const qrIzvor = document.getElementById("qr-izhod");
+        const qrCilj = document.getElementById("print-qr-slika");
+        qrCilj.innerHTML = qrIzvor.innerHTML;
+
+        const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
+        tabelaTelo.innerHTML = ""; 
+
+        const gumbiEnote = document.querySelectorAll("#seznamEnotGumbi div.enota-stikalo");
+        let dodanoSodelujocih = 0;
+
+        gumbiEnote.forEach(vrstica => {
+            const span = vrstica.querySelector("span");
+            const tekst = span ? span.innerText || span.textContent : "";
+            if (tekst && !tekst.includes("Čakanje na podatke")) {
+                let imeEnote = tekst.trim();
+                let casPrijave = new Date().toLocaleTimeString("sl-SI"); 
+                let lokacijaText = "Zaznano na mapi";
+
+                // Če za to enoto obstaja marker, izvlečemo njene dejanske koordinate in čas
+                if (enoteMarkerji[imeEnote]) {
+                    const lok = enoteMarkerji[imeEnote].getLatLng();
+                    lokacijaText = `${lok.lat.toFixed(5)}, ${lok.lng.toFixed(5)}`;
+                }
+
+                let izpisVrstica = `<tr>
+                    <td><strong>${imeEnote}</strong></td>
+                    <td>${casPrijave}</td>
+                    <td>${lokacijaText}</td>
+                </tr>`;
+                tabelaTelo.innerHTML += izpisVrstica;
+                dodanoSodelujocih++;
+            }
+        });
+
+        if (dodanoSodelujocih === 0) {
+            tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Trenutno ni aktivno zabeleženih enot.</td></tr>`;
+        }
+
+        const starZemljevid = map; 
+        if (starZemljevid) {
+            const center = starZemljevid.getCenter();
+            const trenutniZoom = starZemljevid.getZoom();
+            const tiskovniZoom = trenutniZoom + 1; 
+
+            const placeholder = document.getElementById("map-print-placeholder");
+            placeholder.innerHTML = "";
+
+            const printMap = L.map('map-print-placeholder', {
+                center: center,
+                zoom: tiskovniZoom,
+                zoomControl: false,
+                attributionControl: false
+            });
+
+            starZemljevid.eachLayer(function(layer) {
+                if (layer instanceof L.TileLayer) {
+                    L.tileLayer(layer._url, layer.options).addTo(printMap);
+                }
+                if (layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Marker) {
+                    if (layer instanceof L.Polygon) {
+                        L.polygon(layer.getLatLngs(), layer.options).addTo(printMap);
+                    } else if (layer instanceof L.Polyline) {
+                        L.polyline(layer.getLatLngs(), layer.options).addTo(printMap);
+                    } else if (layer instanceof L.Marker) {
+                        if (layer.options.icon) {
+                            L.marker(layer.getLatLng(), {icon: layer.options.icon}).addTo(printMap);
+                        }
+                    }
+                }
+            });
+
+            setTimeout(() => {
+                window.print();
+            }, 1000);
+        } else {
+            window.print();
+        }
+    }
 
     window.onload = function() {
         initMap();
@@ -481,8 +588,9 @@
         map.on(L.Draw.Event.DELETED, () => shraniSektorjeVTekočoIntervencijo());
     }
 
-    function urediPopupZaSektor(layer, b) {
-        let ll = (layer instanceof L.Marker || layer instanceof L.Circle)? layer.getLatLng() : layer.getBounds().getCenter();
+    // Nadaljevanje vaše funkcije urediPopupZaSektor...
+  function urediPopupZaSektor(layer, b) {
+        let ll = (layer instanceof L.Marker || layer instanceof L.Circle) ? layer.getLatLng() : layer.getBounds().getCenter();
         let ctxt = `${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}`;
         layer.bindPopup(`<div style="font-size:12px;"><b>Sektor (${slovarBarv[b]})</b><br>Koordinate: ${ctxt}<br><button class="gumb-kopiraj-popup" onclick="navigator.clipboard.writeText('${ctxt}'); alert('Kopirano!');">Kopiraj</button></div>`);
     }
@@ -509,12 +617,19 @@
     function pretvoriVCas(suroviCas) {
         let d = new Date(suroviCas); return isNaN(d.getTime()) ? new Date() : d;
     }
+    
     function preklopiEnoto(i, v) { ročnoSkriteEnote[i] = !v; shraniNastavitve(); }
+    
     function spremembaTipaFiltra() { document.getElementById("filterMinute").style.display = (document.getElementById("filterTipCas").value==="ročno")?"block":"none"; shraniNastavitve(); }
+    
     function shraniNastavitve() { localStorage.setItem("epv_filter_tip", document.getElementById("filterTipCas").value); localStorage.setItem("epv_filter_min", document.getElementById("filterMinute").value); localStorage.setItem("epv_skrite_enote", JSON.stringify(ročnoSkriteEnote)); osveziZemljevid(); }
+    
     function naloziNastavitev() { let t=localStorage.getItem("epv_filter_tip"), m=localStorage.getItem("epv_filter_min"), s=localStorage.getItem("epv_skrite_enote"); if(t) document.getElementById("filterTipCas").value=t; if(m) document.getElementById("filterMinute").value=m; if(s) ročnoSkriteEnote=JSON.parse(s); spremembaTipaFiltra(); }
+    
     function preklopiCelZaslon(id) { let e=document.getElementById(id); if(!document.fullscreenElement) e.requestFullscreen(); else document.exitFullscreen(); }
+    
     function ustvariIkono(b) { return L.icon({ iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${b}.png`, shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41] }); }
+    
     function naloziIntervencije() { let s=localStorage.getItem("epv_intervencije_seznam"), t=localStorage.getItem("epv_intervencije_trenutna"); if(s) vseIntervencije=JSON.parse(s); if(t) { trenutnaIntervencija=t; izbranDogodekId=t; } izrisiSpustniSeznamZgodovine(); }
     
     function ustvariQrKodo() {
@@ -526,11 +641,12 @@
     }
 
     function pripraviInNatisni() {
-        document.getElementById("print-naslov").innerText = "Intervencija: " + trenutnaIntervencija;
+        const izbranaIntervencija = document.getElementById("izbiraIntervencije").value || "Splošno spremljanje (Brez dogodka)";
+        document.getElementById("print-naslov").innerText = "Intervencija: " + izbranaIntervencija;
         document.getElementById("print-datum").innerText = new Date().toLocaleString("sl-SI");
-        
-        const printQrSloj = document.getElementById("print-qr-slika");
-        printQrSloj.innerHTML = "";
+
+        const qrCilj = document.getElementById("print-qr-slika");
+        qrCilj.innerHTML = "";
         
         const originalnaQrSlika = document.getElementById("qr-izhod").querySelector("img");
         if(originalnaQrSlika) {
@@ -539,9 +655,85 @@
             novaSlika.style.width = "150px";
             novaSlika.style.height = "150px";
             printQrSloj.appendChild(novaSlika);
+        } else {
+            const urlZapis = document.getElementById("qr-url-tekst").innerText;
+            if(urlZapis) {
+                new QRCode(qrCilj, { text: urlZapis, width: 150, height: 150 });
+            }
         }
-        
-        window.print();
+
+        const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
+        tabelaTelo.innerHTML = ""; 
+
+        const gumbiEnote = document.querySelectorAll("#seznamEnotGumbi div.enota-stikalo");
+        let dodanoSodelujocih = 0;
+
+        gumbiEnote.forEach(vrstica => {
+            const span = vrstica.querySelector("span");
+            const tekst = span ? span.innerText || span.textContent : "";
+            if (tekst && !tekst.includes("Čakanje na podatke")) {
+                let imeEnote = tekst.trim();
+                let casPrijave = new Date().toLocaleTimeString("sl-SI"); 
+                let lokacijaText = "Zaznano na mapi";
+
+                if (enoteMarkerji[imeEnote]) {
+                    const lok = enoteMarkerji[imeEnote].getLatLng();
+                    lokacijaText = `${lok.lat.toFixed(5)}, ${lok.lng.toFixed(5)}`;
+                }
+
+                let izpisVrstica = `<tr>
+                    <td><strong>${imeEnote}</strong></td>
+                    <td>${casPrijave}</td>
+                    <td>${lokacijaText}</td>
+                </tr>`;
+                tabelaTelo.innerHTML += izpisVrstica;
+                dodanoSodelujocih++;
+            }
+        });
+
+        if (dodanoSodelujocih === 0) {
+            tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Trenutno ni aktivno zabeleženih enot.</td></tr>`;
+        }
+
+        const starZemljevid = map; 
+        if (starZemljevid) {
+            const center = starZemljevid.getCenter();
+            const trenutniZoom = starZemljevid.getZoom();
+            const tiskovniZoom = trenutniZoom + 1; 
+
+            const placeholder = document.getElementById("map-print-placeholder");
+            placeholder.innerHTML = "";
+
+            const printMap = L.map('map-print-placeholder', {
+                center: center,
+                zoom: tiskovniZoom,
+                zoomControl: false,
+                attributionControl: false
+            });
+
+            starZemljevid.eachLayer(function(layer) {
+                if (layer instanceof L.TileLayer) {
+                    L.tileLayer(layer._url, layer.options).addTo(printMap);
+                }
+                if (layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Marker) {
+                    if (layer instanceof L.Polygon) {
+                        L.polygon(layer.getLatLngs(), layer.options).addTo(printMap);
+                    } else if (layer instanceof L.Polyline) {
+                        L.polyline(layer.getLatLngs(), layer.options).addTo(printMap);
+                    } else if (layer instanceof L.Marker) {
+                        if (layer.options.icon) {
+                            L.marker(layer.getLatLng(), {icon: layer.options.icon}).addTo(printMap);
+                        }
+                    }
+                }
+            });
+
+            setTimeout(() => {
+                window.print();
+            }, 1000);
+        } else {
+            window.print();
+        }
     }
 </script>
 </body>
