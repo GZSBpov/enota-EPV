@@ -12,7 +12,6 @@
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: Arial, sans-serif; overflow: hidden; background: #222; }
         
-        /* Zakleni zaslon za geslo */
         #zaklep-zaslona {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #111; z-index: 99999; display: flex; align-items: center; justify-content: center;
@@ -24,7 +23,6 @@
         .geslo-posoda button:hover { background: #e68a00; }
         .napaka-tekst { color: #e53935; font-size: 13px; margin-top: 10px; display: none; }
 
-        /* Glavna aplikacija */
         .glavna-posoda { display: flex; width: 100%; height: 100%; }
         .fullscreen-wrapper { position: relative; flex: 2; height: 100%; min-height: 100%; }
         #zemljevid { width: 100%; height: 100%; min-height: 100%; background: #111; }
@@ -49,53 +47,41 @@
         .seznam-enot-okno { flex: 1; min-height: 60px; overflow-y: auto; background: #252525; padding: 6px; border-radius: 4px; border: 1px solid #444; margin-top: 2px; }
         .enota-stikalo { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; font-size: 12px; border-bottom: 1px solid #333; }
         .enota-stikalo:last-child { border-bottom: none; }
-        .enota-stikalo input { cursor: pointer; transform: scale(1.1); }
-
+        
         .qr-generator-posoda { padding: 10px 15px; display: flex; flex-direction: column; gap: 6px; background: #2a2a2a; flex: 1; overflow-y: auto; }
         .qr-generator-posoda label { font-size: 12px; font-weight: bold; color: #ddd; }
         .qr-generator-posoda select, .qr-generator-posoda input { padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
         .gumb-qr { background: #e53935; color: white; font-weight: bold; padding: 8px; border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-size: 12px; }
-        .gumb-qr:hover { background: #b71c1c; }
         #qr-izhod { margin: 5px auto; padding: 6px; background: white; border-radius: 4px; display: inline-block; }
-        #qr-izhod img { width: 110px !important; height: 110px !important; }
-        #qr-url-tekst { font-size: 10px; color: #aaa; text-align: center; word-break: break-all; margin-top: 2px; padding: 0 5px; }
+        #qr-url-tekst { font-size: 10px; color: #aaa; text-align: center; word-break: break-all; margin-top: 2px; }
 
         .gumb-povecaj {
             position: absolute; top: 5px; right: 10px; z-index: 1001;
             background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #ff9800;
-            padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px;
-            cursor: pointer; text-transform: uppercase;
+            padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer;
         }
-        .gumb-povecaj:hover { background: #ff9800; color: black; }
 
         .barvni-izbirnik-posoda {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
             background: rgba(0, 0, 0, 0.8); padding: 5px 10px; border-radius: 4px;
             border: 1px solid #555; display: flex; align-items: center; gap: 8px; color: white; font-size: 11px;
         }
-        .barvni-izbirnik-posoda select { background: #333; color: white; border: 1px solid #666; padding: 3px; font-size: 11px; border-radius: 3px; cursor: pointer; }
+        .barvni-izbirnik-posoda select { background: #333; color: white; border: 1px solid #666; padding: 3px; font-size: 11px; }
+        .stalni-napis { background: rgba(0, 0, 0, 0.85); color: white; border: 1px solid #fff; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 12px; }
+        .gumb-kopiraj-popup { background: #ff9800; color: black; border: none; padding: 4px 8px; font-weight: bold; font-size: 11px; border-radius: 3px; cursor: pointer; margin-top: 5px; width: 100%; }
 
-        .stalni-napis { background: rgba(0, 0, 0, 0.85); color: white; border: 1px solid #fff; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 12px; white-space: nowrap; }
-        
-        .gumb-kopiraj-popup {
-            background: #ff9800; color: black; border: none; padding: 4px 8px;
-            font-weight: bold; font-size: 11px; border-radius: 3px; cursor: pointer;
-            margin-top: 5px; width: 100%; display: block; text-align: center; text-transform: uppercase;
-        }
-        .gumb-kopiraj-popup:hover { background: #e68a00; }
-
+        /* Popravek za tiskanje: QR koda uporablja platno (canvas), ki ga brskalnik privzeto ne natisne, če ni eksplicitno viden */
         @media print {
             body * { visibility: hidden; }
             #print-obmocje, #print-obmocje * { visibility: visible; }
             #print-obmocje { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-            #map-print-placeholder { width: 100% !important; height: 60vh !important; border: 1px solid #000; visibility: visible !important; }
-            .leaflet-control-container { display: none !important; }
+            #map-print-placeholder { width: 100% !important; height: 500px !important; border: 1px solid #000; }
+            #print-qr-slika canvas, #print-qr-slika img { display: inline-block !important; visibility: visible !important; }
         }
         #print-obmocje { display: none; }
         .print-info-tabela { width: 100%; margin-top: 20px; border-collapse: collapse; }
         .print-info-tabela td { padding: 10px; vertical-align: top; }
         .print-qr-container { text-align: right; width: 200px; }
-        .print-qr-container img { width: 150px; height: 150px; }
     </style>
 </head>
 <body>
@@ -113,7 +99,6 @@
 <div class="glavna-posoda">
     <div class="fullscreen-wrapper" id="map-wrapper">
         <button class="gumb-povecaj" onclick="preklopiCelZaslon('map-wrapper')">Cel zaslon</button>
-        
         <div class="barvni-izbirnik-posoda">
             <label for="trenutnaBarva">Barva sektorja:</label>
             <select id="trenutnaBarva" onchange="posodobiNastavitveRisanja()">
@@ -123,7 +108,6 @@
                 <option value="green" style="color:lime; font-weight:bold;">Zelena (Reševalci)</option>
             </select>
         </div>
-
         <div id="zemljevid"></div>
     </div>
     
@@ -175,19 +159,19 @@
             <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-qr')">Cel zaslon</button>
             <h3 class="sekcija-naslov">Generator QR kod za prijavu</h3>
             <div class="qr-generator-posoda">
-                <select id="qrTip">
+                <select id="qrTip" onchange="ustvariQrKodo()">
                     <option value="gasilec">Gasilec / Pešci (Rdeča ikona)</option>
                     <option value="vozilo">Vozilo / GVC / AC (Modra ikona)</option>
                     <option value="vodja">Vodstvo / Štab (Rumena ikona)</option>
                     <option value="resevalec">Drugi / Reševalci (Zelena ikona)</option>
                 </select>
-                <input type="number" id="qrClanov" value="3" min="1">
-                <button class="gumb-qr" onclick="ustvariQrKodo()">Ustvari QR kodo</button>
+                <input type="number" id="qrClanov" value="3" min="1" oninput="ustvariQrKodo()">
+                <button class="gumb-qr" onclick="ustvariQrKodo()">Osveži QR kodo</button>
                 <div style="text-align: center;">
                     <div id="qr-izhod"></div>
                     <div id="qr-url-tekst"></div>
                 </div>
-                <button onclick="window.print()" style="width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">🖨️ Natisni mapo in QR kodo</button>
+                <button onclick="pripraviInNatisni()" style="width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">🖨️ Natisni mapo in QR kodo</button>
             </div>
         </div>
     </div>
@@ -214,16 +198,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-    // USKLAJENO Z VAŠIM APPS SCRIPTOM (Geslo: EPV2026)
     const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
     let shranjenoPreverjenoGesloHash = "";
 
-    let map, navadnaMapa, satelitskaMapa, katasterLayer;
+    let map, navadnaMapa, satelitskaMapa;
     let izbranDogodekId = "Splošno";
     let vseIntervencije = ["Splošno"];
     let trenutnaIntervencija = "Splošno";
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZXpXxZImcAB1hVLngMzHI3msWADQFcE1Tr0D4JnN2TO8Ug5nWzsbeTA1g/exec";
-    const GESLO = PRAVILNO_GESLO_HASH;
 
     let enoteMarkerji = {};
     let enoteSledi = {}; 
@@ -234,25 +216,27 @@
 
     window.onload = function() {
         initMap();
-        const shranjenHash = localStorage.getItem("shranjenoPreverjenoGesloHash");
-        if (shranjenHash && shranjenHash.toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase()) {
-            shranjenoPreverjenoGesloHash = shranjenHash;
-            document.getElementById("zaklep-zaslona").style.display = "none";
-            zagonPoPrijavi();
+        
+        // POPRAVEK: Prisilimo, da se ob vsakem ponovnem zagonu vedno najprej prikaže okno za vnos gesla
+        localStorage.removeItem("shranjenoPreverjenoGesloHash");
+        document.getElementById("zaklep-zaslona").style.display = "flex";
+
+        // Naložimo lokalno shranjene stare intervencije, če obstajajo
+        let s = localStorage.getItem("epv_intervencije_seznam");
+        if (s) {
+            vseIntervencije = JSON.parse(s);
+            izrisiSpustniSeznamZgodovine();
         }
     };
 
     function preveriGeslo() {
         const vnos = document.getElementById("vnosno-geslo").value.trim();
         const napakaElement = document.getElementById("napaka-geslo");
-        
-        // Dovolimo vpis navadnega gesla "EPV2026" ali pravilnega hasha
         let vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
         
         if (vnosHash === PRAVILNO_GESLO_HASH || vnos === "EPV2026") {
             shranjenoPreverjenoGesloHash = PRAVILNO_GESLO_HASH;
             document.getElementById("zaklep-zaslona").style.display = "none";
-            localStorage.setItem("shranjenoPreverjenoGesloHash", PRAVILNO_GESLO_HASH);
             zagonPoPrijavi();
         } else {
             if (napakaElement) napakaElement.style.display = "block";
@@ -266,8 +250,12 @@
         izrisiSektorjeZaTrenutnoIntervencijo();
         naloziNastavitev();
         ustvariQrKodo();
+        
+        // Takojšen prvi prevzem podatkov iz Googla
         osveziSeznamDogodkov();
         osveziZemljevid();
+        
+        // Avtomatsko osveževanje na vsakih 5 sekund
         setInterval(osveziZemljevid, 5000);
     }
 
@@ -281,52 +269,34 @@
         posodobiNastavitveRisanja();
     }
 
-    // Pomožna funkcija za varno CORS/Proxy nalaganje podatkov iz Googla
-function jsonpFetch(url, params, callbackName, successCallback) {
-    params = params || {};
-    const polniUrl = url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params).toString();
-    
-    // Uporabimo zanesljiv javni proxy, ki reši CORS blokado za Google Scripts
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(polniUrl)}`;
-    
-    // Uporabimo dinamično skripto, prilagojeno za ta proxy
-    const unikatniCallback = "epv_proxy_" + Math.floor(Math.random() * 1000000);
-    
-    window[unikatniCallback] = function(wrapper) {
-        const element = document.getElementById(unikatniCallback);
-        if (element) element.remove();
-        delete window[unikatniCallback];
+    // POPRAVEK: Nov, robusten pretvornik preko XMLHttpRequest & AllOrigins proxyja brez uporabe JSONP skript
+    function varnaHttpZahteva(params, uspehCallback) {
+        const polniUrl = SCRIPT_URL + "?" + new URLSearchParams(params).toString();
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(polniUrl)}`;
         
-        try {
-            // Proxy zavije odgovor v objekt .contents kot tekst, ki ga tukaj pretvorimo v JSON
-            const podatki = JSON.parse(wrapper.contents);
-            successCallback(podatki);
-        } catch (e) {
-            console.error("Napaka pri branju podatkov iz proxyja:", e);
-        }
-    };
-
-    const skripta = document.createElement("script");
-    skripta.id = unikatniCallback;
-    // Proxyju povemo, naj nam vrne podatke zavite v našo callback funkcijo
-    skripta.src = proxyUrl + `&callback=${unikatniCallback}`;
-    
-    skripta.onerror = function() {
-        console.error("Proxy strežnik trenutno ni dosegljiv.");
-        const element = document.getElementById(unikatniCallback);
-        if (element) element.remove();
-        delete window[unikatniCallback];
-    };
-
-    document.body.appendChild(skripta);
-}
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", proxyUrl, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                try {
+                    const wrapper = JSON.parse(xhr.responseText);
+                    const praviOdgovor = JSON.parse(wrapper.contents);
+                    uspehCallback(praviOdgovor);
+                } catch(e) {
+                    console.error("Napaka pri parsiranju proxy podatkov:", e);
+                }
+            }
+        };
+        xhr.send();
+    }
 
     function osveziZemljevid() {
         if (!shranjenoPreverjenoGesloHash) return;
         
-        jsonpFetch(SCRIPT_URL, { geslo: shranjenoPreverjenoGesloHash }, 'cb_map', function(odgovorJson) {
-            if (odgovorJson.status === "error") return;
-            procesirajPodatkeZemljevida(odgovorJson.data || []);
+        varnaHttpZahteva({ geslo: shranjenoPreverjenoGesloHash }, function(odgovorJson) {
+            if (odgovorJson.status === "success" && odgovorJson.data) {
+                procesirajPodatkeZemljevida(odgovorJson.data);
+            }
         });
     }
 
@@ -336,6 +306,7 @@ function jsonpFetch(url, params, callbackName, successCallback) {
         const filterMinut = parseInt(document.getElementById("filterMinute").value) || 15;
         const trenutniCasMs = new Date().getTime();
 
+        // Indeks 0 je glava tabele, podatki se začnejo z 1
         for (let i = 1; i < matriksaPodatkov.length; i++) {
             const vrstica = matriksaPodatkov[i];
             if (vrstica.length < 5) continue;
@@ -400,8 +371,9 @@ function jsonpFetch(url, params, callbackName, successCallback) {
     }
 
     function osveziSeznamDogodkov() {
-        jsonpFetch(SCRIPT_URL, { akcija: "pridobiSeznamDogodkov", geslo: GESLO }, 'cb_list', function(odgovor) {
+        varnaHttpZahteva({ akcija: "pridobiSeznamDogodkov", geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
             if (odgovor.status === "success" && odgovor.data) {
+                // Združimo stare shranjene in novo prejete dogodke, da ne izgubimo arhiva
                 vseIntervencije = [...new Set([...vseIntervencije, ...odgovor.data])];
                 localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije));
                 izrisiSpustniSeznamZgodovine();
@@ -414,7 +386,7 @@ function jsonpFetch(url, params, callbackName, successCallback) {
         narisaniSektorjiSloj.clearLayers();
         if (!dogodekId) return;
 
-        jsonpFetch(SCRIPT_URL, { akcija: "pridobiDogodke", dogodek: dogodekId, geslo: GESLO }, 'cb_elem', function(odgovor) {
+        varnaHttpZahteva({ akcija: "pridobiDogodke", dogodek: dogodekId, geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
             if (odgovor.status === "success" && odgovor.data) {
                 odgovor.data.forEach(element => {
                     L.geoJSON(element.podatki, {
@@ -455,7 +427,7 @@ function jsonpFetch(url, params, callbackName, successCallback) {
         fetch(SCRIPT_URL, {
             method: "POST",
             mode: "no-cors",
-            body: JSON.stringify({ geslo: GESLO, akcija: "shraniSektorje", dogodek: izbranDogodekId, sektorji: sektorjiZaVnos })
+            body: JSON.stringify({ geslo: shranjenoPreverjenoGesloHash, akcija: "shraniSektorje", dogodek: izbranDogodekId, sektorji: sektorjiZaVnos })
         }).then(() => {
             alert("Elementi so uspešno shranjeni!");
             gumb.disabled = false; gumb.textContent = "Shrani trenutno risbo";
@@ -553,11 +525,35 @@ function jsonpFetch(url, params, callbackName, successCallback) {
     function preklopiCelZaslon(id) { let e=document.getElementById(id); if(!document.fullscreenElement) e.requestFullscreen(); else document.exitFullscreen(); }
     function ustvariIkono(b) { return L.icon({ iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${b}.png`, shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41] }); }
     function naloziIntervencije() { let s=localStorage.getItem("epv_intervencije_seznam"), t=localStorage.getItem("epv_intervencije_trenutna"); if(s) vseIntervencije=JSON.parse(s); if(t) { trenutnaIntervencija=t; izbranDogodekId=t; } izrisiSpustniSeznamZgodovine(); }
+    
     function ustvariQrKodo() {
         const t = document.getElementById('qrTip').value, c = document.getElementById('qrClanov').value;
         const url = `https://gzsbpov.github.io/enota-EPV/terenEPV.html?tip=${t}&clanov=${c}`;
         document.getElementById("qr-izhod").innerHTML = ""; document.getElementById("qr-url-tekst").innerText = url;
+        
+        // Generiramo osnovno QR kodo na namizju
         new QRCode(document.getElementById("qr-izhod"), { text: url, width: 110, height: 110 });
+    }
+
+    // POPRAVEK: Funkcija za prenos QR kode v tiskano območje pred sprožitvijo tiskalnika
+    function pripraviInNatisni() {
+        document.getElementById("print-naslov").innerText = "Intervencija: " + trenutnaIntervencija;
+        document.getElementById("print-datum").innerText = new Date().toLocaleString("sl-SI");
+        
+        // Počistimo prejšnjo natisnjeno QR kodo in vanjo prekopiramo sliko iz namiznega generatorja
+        const printQrSloj = document.getElementById("print-qr-slika");
+        printQrSloj.innerHTML = "";
+        
+        const originalnaQrSlika = document.getElementById("qr-izhod").querySelector("img");
+        if(originalnaQrSlika) {
+            const novaSlika = document.createElement("img");
+            novaSlika.src = originalnaQrSlika.src;
+            novaSlika.style.width = "150px";
+            novaSlika.style.height = "150px";
+            printQrSloj.appendChild(novaSlika);
+        }
+        
+        window.print();
     }
 </script>
 </body>
