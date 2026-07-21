@@ -197,12 +197,12 @@
             <thead>
                 <tr>
                     <th>Enota / Oznaka</th>
-                    <th>Čas zaznave</th>
+                    <th>Čas zadnje zaznave</th>
                     <th>Zadnja Lokacija (GPS)</th>
                 </tr>
             </thead>
             <tbody id="print-tabela-sodelujocih-telo">
-                <tr><td colspan="3">Ni zabeleženih podatkov.</td></tr>
+                <tr><td colspan="3">Ni zabeleženih podatkov za izbrani dogodek.</td></tr>
             </tbody>
         </table>
     </div>
@@ -222,6 +222,7 @@
     
     let enoteMarkerji = {};
     let enoteSledi = {};
+    let enotePodatki = {}; // Shrani zadnje podatke za posamezno enoto
     let ročnoSkriteEnote = {};
 
     const slovarBarv = { "red": "Rdeča", "blue": "Modra", "gold": "Rumena", "green": "Zelena" };
@@ -332,7 +333,6 @@
         map.addControl(drawControl);
     }
 
-    // Poslušalci za risalne dogodke
     document.addEventListener("DOMContentLoaded", () => {
         setInterval(() => {
             if (map && !map._drawEventsAttached) {
@@ -386,9 +386,6 @@
                         }
                     });
                 });
-                if (narisaniSektorjiSloj.getLayers().length > 0) {
-                    map.fitBounds(narisaniSektorjiSloj.getBounds());
-                }
             }
         });
     }
@@ -464,8 +461,8 @@
     }
 
     function zamenjajIntervencijo(dogodekId) {
-        trenutnaIntervencija = dogodekId; 
-        izbranDogodekId = dogodekId;
+        trenutnaIntervencija = dogodekId || "Splošno"; 
+        izbranDogodekId = trenutnaIntervencija;
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
         
         narisaniSektorjiSloj.clearLayers();
@@ -473,9 +470,11 @@
         for (let ime in enoteSledi) { map.removeLayer(enoteSledi[ime]); }
         enoteMarkerji = {}; 
         enoteSledi = {};
+        enotePodatki = {};
 
         izrisiSektorjeZaTrenutnoIntervencijo();
         naloziElementeDogodka(dogodekId);
+        ustvariQrKodo();
         osveziZemljevid();
     }
 
@@ -491,7 +490,8 @@
         localStorage.setItem("epv_intervencije_trenutna", v);
         izrisiSpustniSeznamZgodovine();
         document.getElementById("novoImeIntervencije").value = "";
-        narisaniSektorjiSloj.clearLayers();
+        
+        zamenjajIntervencijo(v);
     }
 
     function izrisiSpustniSeznamZgodovine() {
@@ -522,7 +522,7 @@
         const filterTip = document.getElementById("filterTipCas").value;
         const filterMinut = parseInt(document.getElementById("filterMinute").value) || 15;
         const trenutniCasMs = new Date().getTime();
-        const MAX_STAROST_MS = 60 * 60 * 1000;
+        const MAX_STAROST_MS = 12 * 60 * 60 * 1000; // Filter 12 ur za trenutne dogodke
 
         for (let i = 1; i < matriksaPodatkov.length; i++) {
             const vrstica = matriksaPodatkov[i];
@@ -533,8 +533,14 @@
             const lat = parseFloat(String(vrstica[2]).replace(',', '.'));
             const lon = parseFloat(String(vrstica[3]).replace(',', '.'));
             const natancnost = vrstica[4] ? String(vrstica[4]).trim() : "";
+            const pripadajociDogodek = vrstica[5] ? String(vrstica[5]).trim() : "";
 
             if (isNaN(lat) || isNaN(lon)) continue;
+
+            // Filtriraj enote po izbranem dogodku (če je dogodek naveden v tabeli ali časovno opredeljen)
+            if (pripadajociDogodek && izbranDogodekId && izbranDogodekId !== "Splošno") {
+                if (pripadajociDogodek !== izbranDogodekId) continue;
+            }
 
             let tip = "gasilec", ime = surovaEnota, clanov = "1";
             if (surovaEnota.includes(":")) {
@@ -558,6 +564,8 @@
             zadnjeLokacije[ime] = { lat, lon, cas, natancnost, tip, clanov };
         }
 
+        enotePodatki = zadnjeLokacije;
+
         const seznamPanel = document.getElementById("seznamEnotGumbi");
         if(seznamPanel) {
             let seznamHtml = "";
@@ -565,6 +573,7 @@
                 seznamHtml += `<div class="enota-stikalo"><span>${imeE}</span><input type="checkbox" ${!ročnoSkriteEnote[imeE]?'checked':''} onchange="preklopiEnoto('${imeE}', this.checked)"></div>`;
             });
             if(seznamHtml) seznamPanel.innerHTML = seznamHtml;
+            else seznamPanel.innerHTML = '<i style="font-size: 11px; color: #888;">Ni zaznanih enot za ta dogodek.</i>';
         }
 
         for (const ime in enoteSledi) { 
@@ -617,16 +626,17 @@
 
     function ustvariQrKodo() {
         const t = document.getElementById('qrTip').value, c = document.getElementById('qrClanov').value;
-        const url = `https://gzsbpov.github.io/enota-EPV/terenEPV.html?tip=${t}&clanov=${c}`;
+        const d = izbranDogodekId ? encodeURIComponent(izbranDogodekId) : "Splosno";
+        const url = `https://gzsbpov.github.io/enota-EPV/terenEPV.html?tip=${t}&clanov=${c}&dogodek=${d}`;
         document.getElementById("qr-izhod").innerHTML = ""; 
         document.getElementById("qr-url-tekst").innerText = url;
         new QRCode(document.getElementById("qr-izhod"), { text: url, width: 110, height: 110 });
     }
 
     function pripraviInNatisni() {
-        const izbranaIntervencija = document.getElementById("izbiraIntervencije").value || "Splošno spremljanje (Brez dogodka)";
+        const izbranaIntervencija = trenutnaIntervencija || "Splošno spremljanje";
         document.getElementById("print-naslov").innerText = "Intervencija: " + izbranaIntervencija;
-        document.getElementById("print-datum").innerText = new Date().toLocaleString("sl-SI");
+        document.getElementById("print-datum").innerText = "Izpisano: " + new Date().toLocaleString("sl-SI");
 
         const qrCilj = document.getElementById("print-qr-slika");
         qrCilj.innerHTML = "";
@@ -635,94 +645,84 @@
         if(originalnaQrSlika) {
             const novaSlika = document.createElement("img");
             novaSlika.src = originalnaQrSlika.src;
-            novaSlika.style.width = "150px";
-            novaSlika.style.height = "150px";
+            novaSlika.style.width = "130px";
+            novaSlika.style.height = "130px";
             qrCilj.appendChild(novaSlika);
-        } else {
-            const urlZapis = document.getElementById("qr-url-tekst").innerText;
-            if(urlZapis) {
-                new QRCode(qrCilj, { text: urlZapis, width: 150, height: 150 });
-            }
         }
 
+        // 1. Zajem samo aktivnih/prikazanih enot v tabelo
         const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
         tabelaTelo.innerHTML = ""; 
 
-        const gumbiEnote = document.querySelectorAll("#seznamEnotGumbi div.enota-stikalo");
         let dodanoSodelujocih = 0;
 
-        gumbiEnote.forEach(vrstica => {
-            const span = vrstica.querySelector("span");
-            const tekst = span ? span.innerText || span.textContent : "";
-            if (tekst && !tekst.includes("Čakanje na podatke")) {
-                let imeEnote = tekst.trim();
-                let casPrijave = new Date().toLocaleTimeString("sl-SI"); 
-                let lokacijaText = "Zaznano na mapi";
+        for (const [imeEnote, d] of Object.entries(enotePodatki)) {
+            if (ročnoSkriteEnote[imeEnote] === true) continue;
 
-                if (enoteMarkerji[imeEnote]) {
-                    const lok = enoteMarkerji[imeEnote].getLatLng();
-                    lokacijaText = `${lok.lat.toFixed(5)}, ${lok.lng.toFixed(5)}`;
-                }
+            let lokacijaText = `${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`;
+            let izpisVrstica = `<tr>
+                <td><strong>${imeEnote}</strong> (${d.clanov} član/ov)</td>
+                <td>${d.cas}</td>
+                <td>${lokacijaText}</td>
+            </tr>`;
+            tabelaTelo.innerHTML += izpisVrstica;
+            dodanoSodelujocih++;
+        }
 
-                let izpisVrstica = `<tr>
-                    <td><strong>${imeEnote}</strong></td>
-                    <td>${casPrijave}</td>
-                    <td>${lokacijaText}</td>
-                </tr>`;
-                tabelaTelo.innerHTML += izpisVrstica;
-                dodanoSodelujocih++;
+        if (dodanoSodelujocih === 0) {
+            tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Ni aktivnih ali vidnih enot za ta dogodek.</td></tr>`;
+        }
+
+        // 2. Kloniranje zemljevida s sektorji in vsemi oznakami za tiskanje
+        if (tiskovniZemljevid !== null) {
+            tiskovniZemljevid.remove();
+            tiskovniZemljevid = null;
+        }
+
+        const placeholder = document.getElementById("map-print-placeholder");
+        placeholder.innerHTML = "";
+
+        tiskovniZemljevid = L.map('map-print-placeholder', {
+            zoomControl: false,
+            attributionControl: false
+        });
+
+        // Kopiraj podlogo
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(tiskovniZemljevid);
+
+        // Skupina vseh slojev za prilagoditev povečave (bounds)
+        const tiskovnaSkupina = L.featureGroup().addTo(tiskovniZemljevid);
+
+        // Kopiraj narisane sektorje
+        narisaniSektorjiSloj.eachLayer(l => {
+            if (l instanceof L.Polygon) {
+                L.polygon(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Polyline) {
+                L.polyline(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Circle) {
+                L.circle(l.getLatLng(), l.options).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Marker) {
+                L.marker(l.getLatLng(), l.options).addTo(tiskovnaSkupina);
             }
         });
 
-        if (dodanoSodelujocih === 0) {
-            tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Trenutno ni aktivno zabeleženih enot.</td></tr>`;
+        // Kopiraj markerje terenskih enot
+        for (const [ime, m] of Object.entries(enoteMarkerji)) {
+            let mKopija = L.marker(m.getLatLng(), { icon: m.options.icon }).addTo(tiskovnaSkupina);
+            mKopija.bindTooltip(ime, { permanent: true, direction: 'top', className: 'stalni-napis' });
         }
 
-        const starZemljevid = map; 
-        if (starZemljevid) {
-            const center = starZemljevid.getCenter();
-            const trenutniZoom = starZemljevid.getZoom();
-            const tiskovniZoom = trenutniZoom + 1; 
-
-            if (tiskovniZemljevid !== null) {
-                tiskovniZemljevid.remove();
-                tiskovniZemljevid = null;
-            }
-
-            const placeholder = document.getElementById("map-print-placeholder");
-            placeholder.innerHTML = "";
-
-            tiskovniZemljevid = L.map('map-print-placeholder', {
-                center: center,
-                zoom: tiskovniZoom,
-                zoomControl: false,
-                attributionControl: false
-            });
-
-            starZemljevid.eachLayer(function(layer) {
-                if (layer instanceof L.TileLayer) {
-                    L.tileLayer(layer._url, layer.options).addTo(tiskovniZemljevid);
-                }
-                if (layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Marker) {
-                    if (layer instanceof L.Polygon) {
-                        L.polygon(layer.getLatLngs(), layer.options).addTo(tiskovniZemljevid);
-                    } else if (layer instanceof L.Polyline) {
-                        L.polyline(layer.getLatLngs(), layer.options).addTo(tiskovniZemljevid);
-                    } else if (layer instanceof L.Marker) {
-                        if (layer.options.icon) {
-                            L.marker(layer.getLatLng(), {icon: layer.options.icon}).addTo(tiskovniZemljevid);
-                        }
-                    }
-                }
-            });
-
-            setTimeout(() => {
-                tiskovniZemljevid.invalidateSize();
-                window.print();
-            }, 500);
+        // Nastavi pogled zemljevida glede na vsebino ali privzeto lokacijo
+        if (tiskovnaSkupina.getLayers().length > 0) {
+            tiskovniZemljevid.fitBounds(tiskovnaSkupina.getBounds(), { padding: [20, 20] });
         } else {
-            window.print();
+            tiskovniZemljevid.setView(map.getCenter(), map.getZoom());
         }
+
+        setTimeout(() => {
+            tiskovniZemljevid.invalidateSize();
+            window.print();
+        }, 600);
     }
 </script>
 </body>
