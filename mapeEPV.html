@@ -60,12 +60,17 @@
         /* Tiskanje - hidden na zaslonu */
         #print-obmocje { display: none; }
 
-        @media print {
-            body * { visibility: hidden; }
-            #print-obmocje, #print-obmocje * { visibility: visible; }
-            #print-obmocje {
-                display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: 100%;
-                background: white; padding: 20px; box-sizing: border-box;
+       @media print {
+  /* Prisilno tiskanje barv in ozadij (slik zemljevida) */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Skrij elemente, ki niso del poročila (npr. dron okno, meniji) */
+  #drone-stream-container, .no-print {
+    display: none !important;
+  }
             }
             #map-print-placeholder { width: 100%; height: 500px; border: 1px solid #000; margin-bottom: 20px; }
             .print-tabela { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -155,6 +160,26 @@
                 </div>
             </div>
 
+            <div id="drone-stream-container" style="position: relative; width: 400px; height: 225px; border: 1px solid #ccc;">
+              <!-- Primer za HLS / WebRTC ali iframe prenos -->
+              <iframe id="drone-video" src="URL_PRENOSA_DRONA" style="width: 100%; height: 100%; border: none;" allowfullscreen></iframe>
+  
+              <button onclick="toggleFullScreen()" style="position: absolute; bottom: 10px; right: 10px; z-index: 1000;">
+                Celozaslonski prikaz
+              </button>
+            </div>
+
+<script>
+function toggleFullScreen() {
+  const elem = document.getElementById("drone-stream-container");
+  if (!document.fullscreenElement) {
+    if (elem.requestFullscreen) elem.requestFullscreen();
+    else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(); // Safari
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
+}
+            
             <!-- Akcijski gumbi -->
             <div style="margin-top: auto;">
                 <button onclick="pripraviInNatisni()" style="background-color: #2e7d32;">TISKAJ MAPO IN POROČILO</button>
@@ -249,16 +274,32 @@
     }
 
     function initMap() {
-        map = L.map('map').setView([46.1512, 14.9955], 9); // Center Slovenije
+// Osnovni sloj (OpenStreetMap)
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap'
+});
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+// Satelitski sloj (Esri World Imagery)
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri'
+});
 
-        narisaniSektorjiSloj = new L.FeatureGroup();
-        map.addLayer(narisaniSektorjiSloj);
+// Inicializacija zemljevida
+const map = L.map('map', {
+  center: [46.397, 15.550],
+  zoom: 15,
+  layers: [osmLayer] // Privzeti sloj
+});
 
+// Kontrolnik za preklop slojev
+const baseMaps = {
+  "Navadni zemljevid": osmLayer,
+  "Satelitska slika": satelliteLayer
+};
+
+L.control.layers(baseMaps).addTo(map);
+        
         posodobiNastavitveRisanja();
     }
 
