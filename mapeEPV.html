@@ -591,6 +591,22 @@ L.control.layers(baseMaps).addTo(map);
         new QRCode(document.getElementById("qr-izhod"), { text: url, width: 110, height: 110 });
     }
 
+    function natisniIzbraniDogodek(izbraniDogodekId) {
+  // 1. Filtriraj markerje - prikaži le tiste z izbranim dogodkom
+  markerji.forEach(marker => {
+    if (marker.dogodekId === izbraniDogodekId) {
+      marker.addTo(map);
+    } else {
+      map.removeLayer(marker); // Odstrani ostale markerje z zemljevida
+    }
+  });
+
+  // 2. Počakaj kratko sekundo, da se mapa osveži, nato natisni
+  setTimeout(() => {
+    window.print();
+  }, 500);
+}
+    
     // TISKANJE MAPO IN POROČILA - Z odpravljeno napako "Map container is already initialized"
     function pripraviInNatisni() {
         const izbranaIntervencija = document.getElementById("izbiraIntervencije").value || "Splošno spremljanje (Brez dogodka)";
