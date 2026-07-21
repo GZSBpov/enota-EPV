@@ -267,7 +267,7 @@
     function izvediNeposredniKlic(parametri, callback) {
         const urlParams = new URLSearchParams(parametri).toString();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         fetch(`${SCRIPT_URL}?${urlParams}`, { signal: controller.signal })
             .then(res => res.json())
@@ -640,9 +640,9 @@
 
         const qrCilj = document.getElementById("print-qr-slika");
         qrCilj.innerHTML = "";
-        
+    
         const originalnaQrSlika = document.getElementById("qr-izhod").querySelector("img");
-        if(originalnaQrSlika) {
+        if (originalnaQrSlika) {
             const novaSlika = document.createElement("img");
             novaSlika.src = originalnaQrSlika.src;
             novaSlika.style.width = "130px";
@@ -650,7 +650,7 @@
             qrCilj.appendChild(novaSlika);
         }
 
-        // 1. Zajem samo aktivnih/prikazanih enot v tabelo
+        // 1. Zajem aktivnih enot v tabelo
         const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
         tabelaTelo.innerHTML = ""; 
 
@@ -673,7 +673,7 @@
             tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Ni aktivnih ali vidnih enot za ta dogodek.</td></tr>`;
         }
 
-        // 2. Kloniranje zemljevida s sektorji in vsemi oznakami za tiskanje
+        // 2. Kloniranje zemljevida s sektorji za tiskanje
         if (tiskovniZemljevid !== null) {
             tiskovniZemljevid.remove();
             tiskovniZemljevid = null;
@@ -687,20 +687,18 @@
             attributionControl: false
         });
 
-        // Kopiraj podlogo
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(tiskovniZemljevid);
 
-        // Skupina vseh slojev za prilagoditev povečave (bounds)
         const tiskovnaSkupina = L.featureGroup().addTo(tiskovniZemljevid);
 
-        // Kopiraj narisane sektorje
+        // Pravilno kopiranje slojev (vključno z radijem krogov)
         narisaniSektorjiSloj.eachLayer(l => {
-            if (l instanceof L.Polygon) {
+            if (l instanceof L.Circle) {
+                L.circle(l.getLatLng(), { radius: l.getRadius(), ...l.options }).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Polygon) {
                 L.polygon(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
             } else if (l instanceof L.Polyline) {
                 L.polyline(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
-            } else if (l instanceof L.Circle) {
-                L.circle(l.getLatLng(), l.options).addTo(tiskovnaSkupina);
             } else if (l instanceof L.Marker) {
                 L.marker(l.getLatLng(), l.options).addTo(tiskovnaSkupina);
             }
@@ -708,21 +706,25 @@
 
         // Kopiraj markerje terenskih enot
         for (const [ime, m] of Object.entries(enoteMarkerji)) {
-            let mKopija = L.marker(m.getLatLng(), { icon: m.options.icon }).addTo(tiskovnaSkupina);
-            mKopija.bindTooltip(ime, { permanent: true, direction: 'top', className: 'stalni-napis' });
+            if (m && m.getLatLng) {
+                let mKopija = L.marker(m.getLatLng(), { icon: m.options.icon }).addTo(tiskovnaSkupina);
+                mKopija.bindTooltip(ime, { permanent: true, direction: 'top', className: 'stalni-napis' });
+            }
         }
 
-        // Nastavi pogled zemljevida glede na vsebino ali privzeto lokacijo
-        if (tiskovnaSkupina.getLayers().length > 0) {
-            tiskovniZemljevid.fitBounds(tiskovnaSkupina.getBounds(), { padding: [20, 20] });
-        } else {
-            tiskovniZemljevid.setView(map.getCenter(), map.getZoom());
-        }
-
+        // Prilagodi pogled
         setTimeout(() => {
             tiskovniZemljevid.invalidateSize();
-            window.print();
-        }, 600);
+            if (tiskovnaSkupina.getLayers().length > 0) {
+                tiskovniZemljevid.fitBounds(tiskovnaSkupina.getBounds(), { padding: [30, 30] });
+            } else {
+                tiskovniZemljevid.setView(map.getCenter(), map.getZoom());
+            }
+        
+            setTimeout(() => {
+                window.print();
+            }, 400);
+        }, 300);
     }
 </script>
 </body>
