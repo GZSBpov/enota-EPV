@@ -11,12 +11,15 @@
         button { background: #d32f2f; color: white; font-weight: bold; border: none; cursor: pointer; }
         button.oddaja { background: #388e3c; }
         .status { font-weight: bold; margin-top: 15px; color: #555; }
+        .zacka-dogodek { background: #e0e0e0; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; color: #333; margin-bottom: 10px; display: inline-block; }
     </style>
 </head>
 <body>
 
 <div class="posoda">
     <h2>EPV Terenska Prijava</h2>
+    
+    <div id="prikazDogodka" class="zacka-dogodek">Dogodek: Splošno</div>
      
     <label for="imeEnote">Ime enote (npr. Slb 1, Vodja 2):</label>
     <input type="text" id="imeEnote" placeholder="Vpiši oznako...">
@@ -42,15 +45,22 @@
      
     let watchId = null;
     let prejsnjiCas = 0;
+    let izbranDogodek = "Splošno";
 
     // Avtomatsko branje nastavitev iz QR kode ob zagonu
     window.onload = function() {
         const urlParams = new URLSearchParams(window.location.search);
         const tip = urlParams.get('tip');
         const clanov = urlParams.get('clanov');
+        const dogodek = urlParams.get('dogodek');
          
         if (tip) document.getElementById('tipEnote').value = tip;
         if (clanov) document.getElementById('stClanov').value = clanov;
+        
+        if (dogodek) {
+            izbranDogodek = decodeURIComponent(dogodek);
+            document.getElementById('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
+        }
     };
 
     function preklopiOddajanje() {
@@ -117,10 +127,8 @@
 
         const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}`;
 
-        // POPRAVEK ZA iOS (GET metoda + no-cors):
-        // Namesto POST zahteve, ki jo iPhone pogosto blokira zaradi CORS zaščite, 
-        // pošljemo GET zahtevo s parametrom 'mode: no-cors', kar iPhone vedno dovoli.
-        const urlZParametri = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}`;
+        // POPRAVEK ZA iOS: Pošiljanje parametrov vključno z dogodkom preko GET zahteve
+        const urlZParametri = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}&dogodek=${encodeURIComponent(izbranDogodek)}`;
 
         try {
             await fetch(urlZParametri, {
