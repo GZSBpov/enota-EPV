@@ -239,27 +239,94 @@
 
         .print-tabela th, .print-tabela td { 
             border: 1px solid #000; 
-            padding: 6px 10px; 
-            font-size: 12px; 
-            text-align: left; 
-        }
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+    }
 
-        .print-tabela th { 
-            background-color: #f0f0f0; 
-        }
+    /* Glavni vsebnik, ki drži vse v vodoravni liniji (flex-direction: row) */
+    .glavni-zabojnik {
+        display: flex !important;
+        flex-direction: row !important;
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+    }
 
-        .print-glava { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 2px solid #000; 
-            padding-bottom: 10px; 
-            margin-bottom: 15px; 
-        }
+    /* Zemljevid - vzame ves preostali prostor na LEVI */
+    #map {
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        min-width: 30vw;
+        z-index: 1;
+    }
 
-        .print-qr { 
-            text-align: right; 
-        }
+    /* Vertikalni delilnik (drsnik) na SREDINI */
+    #delilnik {
+        width: 8px !important;
+        height: 100% !important;
+        background: #ccc;
+        cursor: col-resize;
+        transition: background 0.2s;
+        z-index: 1001;
+        flex-shrink: 0;
+    }
+
+    #delilnik:hover, #delilnik:active {
+        background: #d32f2f;
+    }
+
+    /* Stranska plošča na DESNI */
+    #stranska-plosca {
+        width: 340px;
+        min-width: 250px;
+        max-width: 50vw;
+        height: 100% !important;
+        background: #f8f9fa;
+        border-left: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+        padding: 15px;
+        box-sizing: border-box;
+        z-index: 1000;
+        overflow-y: auto;
+        flex-shrink: 0;
+    }
+
+    /* Modalno okno za geslo */
+    #geslo-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .modal-vsebina {
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        text-align: center;
+        max-width: 320px;
+        width: 100%;
+    }
+
+    /* Tiskanje */
+    #print-obmocje { display: none; }
+    @media print {
+        .glavni-zabojnik, #geslo-modal { display: none !important; }
+        #print-obmocje { display: block !important; }
     }
 </style>
 </head>
@@ -447,23 +514,24 @@
         });
     }
 
-    function izvediNeposredniKlic(parametri, callback) {
-        const urlParams = new URLSearchParams(parametri).toString();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+    function izvediNeposredniKlic(podatki, callback) {
+    const SCRIPT_URL = "TVOJ_GOOGLE_SCRIPT_URL_TUKAJ";
 
-        fetch(`${SCRIPT_URL}?${urlParams}`, { signal: controller.signal })
-            .then(res => res.json())
-            .then(data => {
-                clearTimeout(timeoutId);
-                callback(data);
-            })
-            .catch(err => {
-                clearTimeout(timeoutId);
-                console.warn("Povezava z Google Apps Scriptom ni uspela ali potekla.", err);
-                callback(null);
-            });
-    }
+    fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(podatki)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (callback) callback(data);
+    })
+    .catch(err => {
+        console.warn("Opozorilo pri klicu skripte:", err);
+    });
+}
+
 
     function initMap() {
         if (map !== null) return;
