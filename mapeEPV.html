@@ -25,7 +25,7 @@
         overflow: hidden; 
     }
 
-    /* Glavni prilagodljivi vsebnik za split-screen */
+    /* Glavni prilagodljivi glavni-zabojnik za split-screen */
     .glavni-zabojnik { 
         display: flex; 
         width: 100vw; 
@@ -215,7 +215,7 @@
             print-color-adjust: exact !important;
         }
 
-        .glavni-zabojnik, #vsebnik, #drone-stream-container, .no-print {
+        .glavni-zabojnik, #, #drone-stream-container, .no-print {
             display: none !important;
         }
 
@@ -276,8 +276,8 @@
         </div>
     </div>
 
-    <!-- Glavni operativni vsebnik -->
-    <div id="vsebnik">
+    <!-- Glavni operativni  -->
+    <div id="">
         <div id="map"></div>
 
         <div id="delilnik" class="delilnik-vrstica"></div>
@@ -358,7 +358,7 @@
             <!-- Akcijski gumbi -->
             <div style="margin-top: auto;">
                 <button onclick="pripraviInNatisni()" style="background-color: #2e7d32;">TISKAJ MAPO IN POROČILO</button>
-                <button onclick="preklopiCelZaslon('vsebnik')" class="sekundarni">Celoten zaslon</button>
+                <button onclick="preklopiCelZaslon('glavni-zabojnik')" class="sekundarni">Celoten zaslon</button>
             </div>
         </div>
     </div>
