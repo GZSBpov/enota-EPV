@@ -3,400 +3,269 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPV Štabni Zemljevid & Sledenje</title>
+    <title>Enota EPV - Operativni Štab</title>
+    
+    <!-- Leaflet CSS in JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Draw CSS in JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <!-- QRCode JS Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
     <style>
-        * { box-sizing: border-box; }
-        body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: Arial, sans-serif; overflow: hidden; background: #222; }
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        #vsebnik { display: flex; width: 100%; height: 100%; position: relative; }
+        #map { flex-grow: 1; height: 100%; z-index: 1; }
         
-        #zaklep-zaslona {
+        /* Stranska plošča */
+        #stranska-plosca {
+            width: 340px; background: #f8f9fa; border-left: 2px solid #ccc;
+            display: flex; flex-direction: column; padding: 15px; box-sizing: border-box;
+            z-index: 1000; overflow-y: auto; box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        .sekcija { margin-bottom: 20px; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #ddd; }
+        .sekcija h3 { margin-top: 0; margin-bottom: 10px; font-size: 15px; color: #333; border-bottom: 2px solid #d32f2f; padding-bottom: 5px; }
+        
+        label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-top: 8px; }
+        select, input, button { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        
+        button { background-color: #d32f2f; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        button:hover { background-color: #b71c1c; }
+        button.sekundarni { background-color: #1976d2; }
+        button.sekundarni:hover { background-color: #1565c0; }
+        
+        /* Stil za enote v seznamu */
+        .enota-stikalo { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+        .enota-stikalo input { width: auto; margin: 0; }
+        
+        .stalni-napis { background: rgba(255, 255, 255, 0.9); border: 1px solid #333; font-weight: bold; padding: 2px 5px; border-radius: 3px; font-size: 11px; white-space: nowrap; }
+
+        /* QR Koda okno */
+        #qr-okno { text-align: center; }
+        #qr-izhod { display: flex; justify-content: center; margin-top: 10px; }
+        #qr-url-tekst { font-size: 10px; color: #666; word-break: break-all; margin-top: 5px; }
+
+        /* Modalno okno za geslo */
+        #geslo-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; z-index: 99999; display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;
         }
-        .geslo-posoda { background: #222; padding: 30px; border-radius: 8px; border: 2px solid #ff9800; text-align: center; max-width: 350px; width: 90%; color: white; }
-        .geslo-posoda h2 { margin-top: 0; color: #ff9800; font-size: 20px; text-transform: uppercase; }
-        .geslo-posoda input { width: 100%; padding: 12px; margin: 15px 0; background: #333; color: white; border: 1px solid #555; border-radius: 4px; text-align: center; font-size: 16px; }
-        .geslo-posoda button { background: #ff9800; color: black; font-weight: bold; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-size: 14px; text-transform: uppercase; }
-        .geslo-posoda button:hover { background: #e68a00; }
-        .napaka-tekst { color: #e53935; font-size: 13px; margin-top: 10px; display: none; }
+        .modal-vsebina { background: white; padding: 25px; border-radius: 8px; text-align: center; max-width: 320px; width: 100%; }
 
-        .glavna-posoda { display: flex; width: 100%; height: 100%; }
-        .fullscreen-wrapper { position: relative; flex: 2; height: 100%; min-height: 100%; }
-        #zemljevid { width: 100%; height: 100%; min-height: 100%; background: #111; }
-        
-        #desni-panel { flex: 1; height: 100%; background: #222; display: flex; flex-direction: column; border-left: 3px solid #444; color: white; }
-        .tretjina-panela { position: relative; height: 33.33vh; display: flex; flex-direction: column; overflow: hidden; border-bottom: 2px solid #444; background: #222; }
-        .tretjina-panela:last-child { border-bottom: none; }
-        
-        .sekcija-naslov { color: white; background: #111; padding: 8px; margin: 0; text-align: center; font-size: 14px; border-bottom: 1px solid #444; text-transform: uppercase; letter-spacing: 0.5px; padding-right: 110px; }
-        
-        .video-wrapper { position: relative; width: 100%; flex: 1; background: #000; }
-        iframe { width: 100%; height: 100%; border: none; }
-        
-        .filter-posoda { padding: 10px 15px; background: #1b1b1b; flex: 1; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
-        .filter-posoda label { font-size: 12px; font-weight: bold; color: #ff9800; }
-        .filter-vrstica { display: flex; gap: 10px; align-items: center; }
-        .filter-posoda select, .filter-posoda input[type="number"], .filter-posoda input[type="text"] { padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
-        .filter-posoda input[type="number"] { width: 60px; }
-        .gumb-intervencija { background: #ff9800; color: black; font-weight: bold; padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; text-transform: uppercase; }
-        .gumb-intervencija:hover { background: #e68a00; }
-        
-        .seznam-enot-okno { flex: 1; min-height: 60px; overflow-y: auto; background: #252525; padding: 6px; border-radius: 4px; border: 1px solid #444; margin-top: 2px; }
-        .enota-stikalo { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; font-size: 12px; border-bottom: 1px solid #333; }
-        .enota-stikalo:last-child { border-bottom: none; }
-        
-        .qr-generator-posoda { padding: 10px 15px; display: flex; flex-direction: column; gap: 6px; background: #2a2a2a; flex: 1; overflow-y: auto; }
-        .qr-generator-posoda label { font-size: 12px; font-weight: bold; color: #ddd; }
-        .qr-generator-posoda select, .qr-generator-posoda input { padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
-        .gumb-qr { background: #e53935; color: white; font-weight: bold; padding: 8px; border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-size: 12px; }
-        #qr-izhod { margin: 5px auto; padding: 6px; background: white; border-radius: 4px; display: inline-block; }
-        #qr-url-tekst { font-size: 10px; color: #aaa; text-align: center; word-break: break-all; margin-top: 2px; }
-
-        .gumb-povecaj {
-            position: absolute; top: 5px; right: 10px; z-index: 1001;
-            background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #ff9800;
-            padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer;
-        }
-
-        .barvni-izbirnik-posoda {
-            position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: rgba(0, 0, 0, 0.8); padding: 5px 10px; border-radius: 4px;
-            border: 1px solid #555; display: flex; align-items: center; gap: 8px; color: white; font-size: 11px;
-        }
-        .barvni-izbirnik-posoda select { background: #333; color: white; border: 1px solid #666; padding: 3px; font-size: 11px; }
-        .stalni-napis { background: rgba(0, 0, 0, 0.85); color: white; border: 1px solid #fff; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 12px; }
-        .gumb-kopiraj-popup { background: #ff9800; color: black; border: none; padding: 4px 8px; font-weight: bold; font-size: 11px; border-radius: 3px; cursor: pointer; margin-top: 5px; width: 100%; }
+        /* Tiskanje - hidden na zaslonu */
+        #print-obmocje { display: none; }
 
         @media print {
             body * { visibility: hidden; }
             #print-obmocje, #print-obmocje * { visibility: visible; }
-            #print-obmocje { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-            #map-print-placeholder { width: 100% !important; height: 500px !important; border: 1px solid #000; margin-bottom: 20px; }
-            #print-qr-slika canvas, #print-qr-slika img { display: inline-block !important; visibility: visible !important; }
-            .tabela-sodelujocih { width: 100%; border-collapse: collapse; margin-top: 20px; font-family: Arial, sans-serif; }
-            .tabela-sodelujocih th, .tabela-sodelujocih td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 12px; }
-            .tabela-sodelujocih th { background-color: #f2f2f2; }
+            #print-obmocje {
+                display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+                background: white; padding: 20px; box-sizing: border-box;
+            }
+            #map-print-placeholder { width: 100%; height: 500px; border: 1px solid #000; margin-bottom: 20px; }
+            .print-tabela { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            .print-tabela th, .print-tabela td { border: 1px solid #000; padding: 6px 10px; font-size: 12px; text-align: left; }
+            .print-tabela th { background-color: #f0f0f0; }
+            .print-glava { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+            .print-qr { text-align: right; }
         }
-        #print-obmocje { display: none; }
-        .print-info-tabela { width: 100%; margin-top: 20px; border-collapse: collapse; }
-        .print-info-tabela td { padding: 10px; vertical-align: top; }
-        .print-qr-container { text-align: right; width: 200px; }
-        .tabela-sodelujocih { width: 100%; border-collapse: collapse; margin-top: 20px; font-family: Arial, sans-serif; }
-        .tabela-sodelujocih th, .tabela-sodelujocih td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .tabela-sodelujocih th { background-color: #f4f4f4; }
     </style>
 </head>
 <body>
 
-<div id="zaklep-zaslona">
-    <div class="geslo-posoda">
-        <h2>EPV Štab - Prijava</h2>
-        <p style="font-size: 13px; color: #aaa; margin: 0;">Za dostop do sistema vpišite operativno geslo.</p>
-        <input type="password" id="vnosno-geslo" placeholder="Vnesite geslo..." onkeydown="if(event.key === 'Enter') preveriGeslo()">
-        <button onclick="preveriGeslo()">Potrdi prijava</button>
-        <div class="napaka-tekst" id="napaka-geslo">Napačno geslo! Poskusite ponovno.</div>
+    <!-- Modalno okno za vnos gesla -->
+    <div id="geslo-modal">
+        <div class="modal-vsebina">
+            <h3>Dostop do Štaba EPV</h3>
+            <p style="font-size: 12px; color: #666;">Vnesite geslo za dostop do operativnega zemljevida:</p>
+            <input type="password" id="gesloVnos" placeholder="Geslo..." onkeypress="preveriGesloTipka(event)">
+            <button onclick="preveriGeslo()">Potrdi</button>
+            <p id="gesloNapaka" style="color: red; font-size: 12px; display: none; margin-top: 8px;">Napačno geslo!</p>
+        </div>
     </div>
-</div>
 
-<div class="glavna-posoda">
-    <div class="fullscreen-wrapper" id="map-wrapper">
-        <button class="gumb-povecaj" onclick="preklopiCelZaslon('map-wrapper')">Cel zaslon</button>
-        <div class="barvni-izbirnik-posoda">
-            <label for="trenutnaBarva">Barva sektorja:</label>
-            <select id="trenutnaBarva" onchange="posodobiNastavitveRisanja()">
-                <option value="red" style="color:red; font-weight:bold;">Rdeča (Gasilci)</option>
-                <option value="blue" style="color:cyan; font-weight:bold;">Modra (Vozila)</option>
-                <option value="gold" style="color:yellow; font-weight:bold;">Rumena (Vodstvo)</option>
-                <option value="green" style="color:lime; font-weight:bold;">Zelena (Reševalci)</option>
-            </select>
-        </div>
-        <div id="zemljevid"></div>
-    </div>
-    
-    <div id="desni-panel">
-        <div class="tretjina-panela" id="panel-video">
-            <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-video')">Cel zaslon</button>
-            <h3 class="sekcija-naslov">Video Prenos (V ŽIVO)</h3>
-            <div class="video-wrapper">
-                <iframe src="https://vdo.ninja/?view=enota_epv_dron&autoplay=1&mute=1&hd=1&codec=h264" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-            </div>
-        </div>
+    <!-- Glavni operativni vsebnik -->
+    <div id="vsebnik">
+        <div id="map"></div>
+        
+        <div id="stranska-plosca">
+            <h2 style="margin-top:0; color:#d32f2f; font-size:18px;">ŠTAB EPV</h2>
 
-        <div class="tretjina-panela" id="panel-enote">
-            <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-enote')">Cel zaslon</button>
-            <h3 class="sekcija-naslov">Spremljanje enot na mapi</h3>
-            <div class="filter-posoda">
-                <label>Aktivni dogodek / Intervencija:</label>
-                <div class="filter-vrstica">
-                    <select id="izbiraIntervencije" onchange="zamenjajIntervencijo(this.value)" style="width: 100%;">
-                        <option value="">-- Brez aktivnega dogodka --</option>
-                    </select>                    
-                </div>
-                <div class="filter-vrstica" style="margin-top: 5px;">                    
-                    <input type="text" id="novoImeIntervencije" placeholder="Ime novega dogodka..." style="flex: 1;">
-                    <button class="gumb-intervencija" onclick="ustvariNovDogodek()">Ustvari</button>
-                </div>
-                <div class="filter-vrstica" style="margin-top: 5px;">
-                    <button id="gumbShraniSloje" class="gumb-intervencija" onclick="shraniSektorjeInMarkerje()" style="width: 100%; background-color: #4CAF50; color: white; border: none; font-weight: bold;">Shrani trenutno risbo</button>
-                </div>
-                <hr style="width:100%; border:0; border-top:1px solid #444; margin: 4px 0;">
-
-                <label>Avtomatsko skrivanje starih sledi:</label>
-                <div class="filter-vrstica">
-                    <select id="filterTipCas" onchange="spremembaTipaFiltra()">
-                        <option value="vse">Prikaži vse (Arhiv)</option>
-                        <option value="ročno">Skrij neaktivne po minutah:</option>
-                    </select>
-                    <input type="number" id="filterMinute" value="15" min="1" oninput="shraniNastavitve()" style="display: none;">
-                </div>
-                
-                <label style="margin-top: 3px;">Aktivne enote:</label>
-                <div class="seznam-enot-okno" id="seznamEnotGumbi">
-                    <div style="color: #aaa; font-style: italic; font-size: 11px; padding: 5px;">Čakanje na podatke...</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="tretjina-panela" id="panel-qr">
-            <button class="gumb-povecaj" onclick="preklopiCelZaslon('panel-qr')">Cel zaslon</button>
-            <h3 class="sekcija-naslov">Generator QR kod za prijavu</h3>
-            <div class="qr-generator-posoda">
-                <select id="qrTip" onchange="ustvariQrKodo()">
-                    <option value="gasilec">Gasilec / Pešci (Rdeča ikona)</option>
-                    <option value="vozilo">Vozilo / GVC / AC (Modra ikona)</option>
-                    <option value="vodja">Vodstvo / Štab (Rumena ikona)</option>
-                    <option value="resevalec">Drugi / Reševalci (Zelena ikona)</option>
+            <!-- Sekcija za izbiro / ustvarjanje dogodka -->
+            <div class="sekcija">
+                <h3>1. Aktivni Dogodek / Intervencija</h3>
+                <label>Izberi dogodek:</label>
+                <select id="izbiraIntervencije" onchange="zamenjajIntervencijo(this.value)">
+                    <option value="">-- Brez aktivnega dogodka --</option>
                 </select>
-                <input type="number" id="qrClanov" value="3" min="1" oninput="ustvariQrKodo()">
-                <button class="gumb-qr" onclick="ustvariQrKodo()">Osveži QR kodo</button>
-                <div style="text-align: center;">
-                    <div id="qr-izhod"></div>
-                    <div id="qr-url-tekst"></div>
+
+                <label>Nov dogodek:</label>
+                <input type="text" id="novoImeIntervencije" placeholder="Npr. Pozar-Planina-2025">
+                <button onclick="ustvariNovDogodek()">Ustvari dogodek</button>
+            </div>
+
+            <!-- Sekcija za risanje sektorjev -->
+            <div class="sekcija">
+                <h3>2. Risanje Sektorjev & Oznake</h3>
+                <label>Barva risanja:</label>
+                <select id="trenutnaBarva" onchange="posodobiNastavitveRisanja()">
+                    <option value="red">Rdeča (Gasilci / Sektor A)</option>
+                    <option value="blue">Modra (Vozila / Sektor B)</option>
+                    <option value="gold">Rumena (Vodstvo / Sektor C)</option>
+                    <option value="green">Zelena (Reševalci / Sektor D)</option>
+                </select>
+                <button id="gumbShraniSloje" onclick="shraniSektorjeInMarkerje()" class="sekundarni">Shrani trenutno risbo</button>
+            </div>
+
+            <!-- Sekcija za generiranje QR kode za teren -->
+            <div class="sekcija" id="qr-okno">
+                <h3>3. Prijava Terenske Enote (QR)</h3>
+                <label>Tip enote:</label>
+                <select id="qrTip" onchange="ustvariQrKodo()">
+                    <option value="gasilec">Gasilec / Skupina</option>
+                    <option value="vodja">Vodja / Poveljnik</option>
+                    <option value="vozilo">Vozilo</option>
+                    <option value="resevalec">Reševalec / Civilna zaščita</option>
+                </select>
+                <label>Število članov:</label>
+                <input type="number" id="qrClanov" value="1" min="1" max="20" onchange="ustvariQrKodo()">
+                
+                <div id="qr-izhod"></div>
+                <div id="qr-url-tekst"></div>
+            </div>
+
+            <!-- Sekcija za filtriranje enot -->
+            <div class="sekcija">
+                <h3>4. Filtri Prikaza Enot</h3>
+                <label>Prikaz po času:</label>
+                <select id="filterTipCas" onchange="spremembaTipaFiltra()">
+                    <option value="vse">Prikaži vse aktivne enote</option>
+                    <option value="ročno">Prikaži samo zadnjih X minut</option>
+                </select>
+                <input type="number" id="filterMinute" value="15" style="display:none;" onchange="shraniNastavitve()">
+
+                <label style="margin-top: 12px;">Seznam zaznanih enot:</label>
+                <div id="seznamEnotGumbi" style="max-height: 150px; overflow-y: auto; margin-top: 5px;">
+                    <i style="font-size: 11px; color: #888;">Čakanje na podatke...</i>
                 </div>
-                <button onclick="pripraviInNatisni()" style="width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">🖨️ Natisni mapo in QR kodo</button>
+            </div>
+
+            <!-- Akcijski gumbi -->
+            <div style="margin-top: auto;">
+                <button onclick="pripraviInNatisni()" style="background-color: #2e7d32;">TISKAJ MAPO IN POROČILO</button>
+                <button onclick="preklopiCelZaslon('vsebnik')" class="sekundarni">Celoten zaslon</button>
             </div>
         </div>
     </div>
-</div>
 
-<div id="print-obmocje">
-    <h1 id="print-naslov" style="font-family: Arial, sans-serif; margin-bottom: 10px;">Intervencija: ---</h1>
-    <div id="map-print-placeholder"></div>
-    
-    <table class="print-info-tabela" style="font-family: Arial, sans-serif;">
-        <tr>
-            <td>
-                <h3>PODATKI O DOGODKU:</h3>
-                <p><strong>Datum tiskanja:</strong> <span id="print-datum"></span></p>
-            </td>
-            <td class="print-qr-container">
-                <h3>QR KODA ZA DOSTOP:</h3>
-                <div id="print-qr-slika"></div>
-            </td>
-        </tr>
-    </table>
+    <!-- Območje za tiskanje -->
+    <div id="print-obmocje">
+        <div class="print-glava">
+            <div>
+                <h1 style="margin:0; font-size: 20px;" id="print-naslov">Intervencija: Splošno</h1>
+                <p style="margin: 3px 0 0 0; font-size: 12px;" id="print-datum"></p>
+            </div>
+            <div class="print-qr" id="print-qr-slika"></div>
+        </div>
 
-    <h3 style="font-family: Arial, sans-serif; margin-top: 30px; border-bottom: 2px solid #000; padding-bottom: 5px;">SEZNAM PRIJAVLJENIH SODELUJOČIH ENOT</h3>
-    <table class="tabela-sodelujocih">
-        <thead>
-            <tr>
-                <th>Ime enote</th>
-                <th>Čas prve prijave / zapisa</th>
-                <th>Zadnja zaznana lokacija (Lat, Lon)</th>
-            </tr>
-        </thead>
-        <tbody id="print-tabela-sodelujocih-telo">
-            <tr>
-                <td colspan="3" style="text-align: center; color: #666;">Ni prijavljenih enot za ta dogodek.</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+        <div id="map-print-placeholder"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+        <h3>Seznam Prisotnih Enot</h3>
+        <table class="print-tabela">
+            <thead>
+                <tr>
+                    <th>Enota / Oznaka</th>
+                    <th>Čas zaznave</th>
+                    <th>Zadnja Lokacija (GPS)</th>
+                </tr>
+            </thead>
+            <tbody id="print-tabela-sodelujocih-telo">
+                <tr><td colspan="3">Ni zabeleženih podatkov.</td></tr>
+            </tbody>
+        </table>
+    </div>
 
 <script>
-    const PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
+    // Globalne spremenljivke
+    const SCRIPT_URL = "TU_VSTAVITE_VAS_GOOGLE_APPS_SCRIPT_URL"; 
+    let map = null;
+    let tiskovniZemljevid = null; // Spremenljivka za preprečevanje "already initialized" napake
+    let drawControl = null;
+    let narisaniSektorjiSloj = null;
     let shranjenoPreverjenoGesloHash = "";
-
-    let map, navadnaMapa, satelitskaMapa;
-    let izbranDogodekId = "Splošno";
-    let vseIntervencije = ["Splošno"];
+    let izbranDogodekId = "";
     let trenutnaIntervencija = "Splošno";
-    
-    // VPISITE VAS NOV GOOGLE SPLETNI URL PO POSODOBITVI!
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec";
+    let vseIntervencije = [];
     
     let enoteMarkerji = {};
-    let enoteSledi = {}; 
+    let enoteSledi = {};
     let ročnoSkriteEnote = {};
-    const narisaniSektorjiSloj = new L.FeatureGroup();
-    let drawControl;
+
     const slovarBarv = { "red": "Rdeča", "blue": "Modra", "gold": "Rumena", "green": "Zelena" };
 
-    function pripraviInNatisni() {
-        const izbranaIntervencija = document.getElementById("izbiraIntervencije").value || "Splošno spremljanje (Brez dogodka)";
-        document.getElementById("print-naslov").innerText = "Intervencija: " + izbranaIntervencija;
-        document.getElementById("print-datum").innerText = new Date().toLocaleString("sl-SI");
+    // Funkcija za zgoščevanje gesla (SHA-256)
+    async function izracunajHash(vnos) {
+        const msgBuffer = new TextEncoder().encode(vnos);
+        const hashBuffer = await crypto.subcrypto.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
-        const qrIzvor = document.getElementById("qr-izhod");
-        const qrCilj = document.getElementById("print-qr-slika");
-        qrCilj.innerHTML = qrIzvor.innerHTML;
+    function preveriGesloTipka(e) { if (e.key === 'Enter') preveriGeslo(); }
 
-        const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
-        tabelaTelo.innerHTML = ""; 
+    async function preveriGeslo() {
+        const vnos = document.getElementById("gesloVnos").value;
+        if(!vnos) return;
+        
+        // Geslo se pretvori v SHA-256 ali pošlje direktno na preverjanje
+        shranjenoPreverjenoGesloHash = vnos; 
 
-        const gumbiEnote = document.querySelectorAll("#seznamEnotGumbi div.enota-stikalo");
-        let dodanoSodelujocih = 0;
-
-        gumbiEnote.forEach(vrstica => {
-            const span = vrstica.querySelector("span");
-            const tekst = span ? span.innerText || span.textContent : "";
-            if (tekst && !tekst.includes("Čakanje na podatke")) {
-                let imeEnote = tekst.trim();
-                let casPrijave = new Date().toLocaleTimeString("sl-SI"); 
-                let lokacijaText = "Zaznano na mapi";
-
-                // Če za to enoto obstaja marker, izvlečemo njene dejanske koordinate in čas
-                if (enoteMarkerji[imeEnote]) {
-                    const lok = enoteMarkerji[imeEnote].getLatLng();
-                    lokacijaText = `${lok.lat.toFixed(5)}, ${lok.lng.toFixed(5)}`;
-                }
-
-                let izpisVrstica = `<tr>
-                    <td><strong>${imeEnote}</strong></td>
-                    <td>${casPrijave}</td>
-                    <td>${lokacijaText}</td>
-                </tr>`;
-                tabelaTelo.innerHTML += izpisVrstica;
-                dodanoSodelujocih++;
+        izvediNeposredniKlic({ akcija: "pridobiSeznamDogodkov", geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
+            if (odgovor.status === "success") {
+                document.getElementById("geslo-modal").style.display = "none";
+                initMap();
+                naloziNastavitev();
+                naloziIntervencije();
+                ustvariQrKodo();
+                osveziZemljevid();
+                setInterval(osveziZemljevid, 10000); // Osveževanje vsakih 10s
+            } else {
+                document.getElementById("gesloNapaka").style.display = "block";
             }
         });
-
-        if (dodanoSodelujocih === 0) {
-            tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Trenutno ni aktivno zabeleženih enot.</td></tr>`;
-        }
-
-        const starZemljevid = map; 
-        if (starZemljevid) {
-            const center = starZemljevid.getCenter();
-            const trenutniZoom = starZemljevid.getZoom();
-            const tiskovniZoom = trenutniZoom + 1; 
-
-            const placeholder = document.getElementById("map-print-placeholder");
-            placeholder.innerHTML = "";
-
-            const printMap = L.map('map-print-placeholder', {
-                center: center,
-                zoom: tiskovniZoom,
-                zoomControl: false,
-                attributionControl: false
-            });
-
-            starZemljevid.eachLayer(function(layer) {
-                if (layer instanceof L.TileLayer) {
-                    L.tileLayer(layer._url, layer.options).addTo(printMap);
-                }
-                if (layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Marker) {
-                    if (layer instanceof L.Polygon) {
-                        L.polygon(layer.getLatLngs(), layer.options).addTo(printMap);
-                    } else if (layer instanceof L.Polyline) {
-                        L.polyline(layer.getLatLngs(), layer.options).addTo(printMap);
-                    } else if (layer instanceof L.Marker) {
-                        if (layer.options.icon) {
-                            L.marker(layer.getLatLng(), {icon: layer.options.icon}).addTo(printMap);
-                        }
-                    }
-                }
-            });
-
-            setTimeout(() => {
-                window.print();
-            }, 1000);
-        } else {
-            window.print();
-        }
     }
 
-    window.onload = function() {
-        initMap();
-        
-        // Ponastavimo ob zagonu za varen vnos
-        localStorage.removeItem("shranjenoPreverjenoGesloHash");
-        document.getElementById("zaklep-zaslona").style.display = "flex";
-
-        let s = localStorage.getItem("epv_intervencije_seznam");
-        if (s) {
-            vseIntervencije = JSON.parse(s);
-            izrisiSpustniSeznamZgodovine();
-        }
-    };
-
-    function preveriGeslo() {
-        const vnos = document.getElementById("vnosno-geslo").value.trim();
-        const napakaElement = document.getElementById("napaka-geslo");
-        let vnosHash = CryptoJS.SHA256(vnos).toString(CryptoJS.enc.Hex).toLowerCase();
-        
-        if (vnosHash === PRAVILNO_GESLO_HASH || vnos === "EPV2026") {
-            shranjenoPreverjenoGesloHash = PRAVILNO_GESLO_HASH;
-            document.getElementById("zaklep-zaslona").style.display = "none";
-            zagonPoPrijavi();
-        } else {
-            if (napakaElement) napakaElement.style.display = "block";
-            document.getElementById("vnosno-geslo").value = "";
-        }
-    }
-
-    function zagonPoPrijavi() {
-        setTimeout(() => { if (map) map.invalidateSize(); }, 200);
-        naloziIntervencije();
-        izrisiSektorjeZaTrenutnoIntervencijo();
-        naloziNastavitev();
-        ustvariQrKodo();
-        
-        osveziSeznamDogodkov();
-        osveziZemljevid();
-        
-        setInterval(osveziZemljevid, 5000);
+    function izvediNeposredniKlic(parametri, callback) {
+        const urlParams = new URLSearchParams(parametri).toString();
+        fetch(`${SCRIPT_URL}?${urlParams}`)
+            .then(res => res.json())
+            .then(data => callback(data))
+            .catch(err => console.error("Napaka pri komunikaciji:", err));
     }
 
     function initMap() {
-        navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-        satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-        
-        map = L.map('zemljevid', { center: [46.3925, 15.5727], zoom: 15, layers: [satelitskaMapa] });
-        L.control.layers({ "Satelit": satelitskaMapa, "Ceste": navadnaMapa }, null, { position: 'bottomright' }).addTo(map);
+        map = L.map('map').setView([46.1512, 14.9955], 9); // Center Slovenije
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        narisaniSektorjiSloj = new L.FeatureGroup();
         map.addLayer(narisaniSektorjiSloj);
+
         posodobiNastavitveRisanja();
     }
 
-    // POSODOBLJENO: Zdaj ko ima skripta CORS glave, kličemo Google neposredno preko hitrega in čistega fetch() klica
-    function izvediNeposredniKlic(params, uspehCallback) {
-        const polniUrl = SCRIPT_URL + "?" + new URLSearchParams(params).toString();
-        
-        fetch(polniUrl)
-            .then(odgovor => {
-                if (!odgovor.ok) throw new Error("Težava s strežnikom: " + odgovor.status);
-                return odgovor.json();
-            })
-            .then(podatki => {
-                uspehCallback(podatki);
-            })
-            .catch(napaka => {
-                console.error("Napaka pri prevzemu podatkov:", napaka);
-            });
-    }
-
     function osveziZemljevid() {
-        if (!shranjenoPreverjenoGesloHash) return;
-        
-        izvediNeposredniKlic({ geslo: shranjenoPreverjenoGesloHash }, function(odgovorJson) {
-            if (odgovorJson.status === "success" && odgovorJson.data) {
-                procesirajPodatkeZemljevida(odgovorJson.data);
+        izvediNeposredniKlic({ akcija: "pridobiLokacije", geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
+            if (odgovor.status === "success" && odgovor.data) {
+                procesirajPodatkeZemljevida(odgovor.data);
             }
         });
     }
@@ -406,6 +275,7 @@
         const filterTip = document.getElementById("filterTipCas").value;
         const filterMinut = parseInt(document.getElementById("filterMinute").value) || 15;
         const trenutniCasMs = new Date().getTime();
+        const MAX_STAROST_MS = 60 * 60 * 1000; // 1 URA (Inaktivnost)
 
         for (let i = 1; i < matriksaPodatkov.length; i++) {
             const vrstica = matriksaPodatkov[i];
@@ -431,6 +301,7 @@
             naborVsehEnot.add(ime);
             if (ročnoSkriteEnote[ime] === true) continue;
 
+            // Filtriranje po ročno izbranih minutah
             if (filterTip === "ročno") {
                 const starostMinut = (trenutniCasMs - pretvoriVCas(cas).getTime()) / 60000;
                 if (starostMinut > filterMinut) continue;
@@ -441,6 +312,7 @@
             zadnjeLokacije[ime] = { lat, lon, cas, natancnost, tip, clanov };
         }
 
+        // Posodobitev stranskega seznama enot
         const seznamPanel = document.getElementById("seznamEnotGumbi");
         if(seznamPanel) {
             let seznamHtml = "";
@@ -450,17 +322,41 @@
             if(seznamHtml) seznamPanel.innerHTML = seznamHtml;
         }
 
-        for (const ime in enoteSledi) { if (!zgodovinaPoti[ime]) { map.removeLayer(enoteSledi[ime]); delete enoteSledi[ime]; } }
+        // 1. Ostranjevanje sledi neaktivnih enot (brez osvežitve več kot 1 uro ali ročno odstranjenih)
+        for (const ime in enoteSledi) { 
+            if (!zgodovinaPoti[ime]) { 
+                map.removeLayer(enoteSledi[ime]); 
+                delete enoteSledi[ime]; 
+            } 
+        }
+
+        // Izris sledi poti
         for (const [ime, koordinate] of Object.entries(zgodovinaPoti)) {
             let barva = (zadnjeLokacije[ime].tip==="vozilo")?"#1976d2":(zadnjeLokacije[ime].tip==="vodja")?"#fbc02d":(zadnjeLokacije[ime].tip==="resevalec")?"#388e3c":"#d32f2f";
             if (enoteSledi[ime]) enoteSledi[ime].setLatLngs(koordinate);
             else enoteSledi[ime] = L.polyline(koordinate, { color: barva, weight: 3, opacity: 0.6 }).addTo(map);
         }
 
-        for (const ime in enoteMarkerji) { if (!zadnjeLokacije[ime]) { map.removeLayer(enoteMarkerji[ime]); delete enoteMarkerji[ime]; } }
+        // 2. Odstranjevanje in izris markerjev (Z dodano preverbo za samodejno brisanje po 1 uri)
+        for (const ime in enoteMarkerji) { 
+            if (!zadnjeLokacije[ime]) { 
+                map.removeLayer(enoteMarkerji[ime]); 
+                delete enoteMarkerji[ime]; 
+            } 
+        }
+
         for (const [ime, lok] of Object.entries(zadnjeLokacije)) {
+            // SAMODEJNO BRISANJE: Preverimo, ali je zadnja lokacija enote starejša od 1 ure (3600000 ms)
+            const starostMs = trenutniCasMs - pretvoriVCas(lok.cas).getTime();
+            if (starostMs > MAX_STAROST_MS) {
+                if (enoteMarkerji[ime]) { map.removeLayer(enoteMarkerji[ime]); delete enoteMarkerji[ime]; }
+                if (enoteSledi[ime]) { map.removeLayer(enoteSledi[ime]); delete enoteSledi[ime]; }
+                continue; // Preskoči izris za to enoto
+            }
+
             let bMarker = (lok.tip==="vozilo")?"blue":(lok.tip==="vodja")?"gold":(lok.tip==="resevalec")?"green":"red";
             let txt = `<b>${ime}</b><br>Članov: ${lok.clanov}<br>GPS: ${lok.cas}`;
+            
             if (enoteMarkerji[ime]) {
                 enoteMarkerji[ime].setLatLng([lok.lat, lok.lon]).setIcon(ustvariIkono(bMarker)).getPopup().setContent(txt);
             } else {
@@ -536,8 +432,16 @@
     function zamenjajIntervencijo(dogodekId) {
         trenutnaIntervencija = dogodekId; izbranDogodekId = dogodekId;
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
+        
+        // Čiščenje obstoječih slojev ob zamenjavi dogodka
+        narisaniSektorjiSloj.clearLayers();
+        for (let ime in enoteMarkerji) { map.removeLayer(enoteMarkerji[ime]); }
+        for (let ime in enoteSledi) { map.removeLayer(enoteSledi[ime]); }
+        enoteMarkerji = {}; enoteSledi = {};
+
         izrisiSektorjeZaTrenutnoIntervencijo();
         naloziElementeDogodka(dogodekId);
+        osveziZemljevid();
     }
 
     function shraniSektorjeVTekočoIntervencijo() {
@@ -578,18 +482,24 @@
         map.addControl(drawControl);
     }
 
-    if (map) {
-        map.on(L.Draw.Event.CREATED, e => {
-            let l = e.layer; let b = document.getElementById("trenutnaBarva").value;
-            l.options.epvBarva = b; urediPopupZaSektor(l, b); narisaniSektorjiSloj.addLayer(l);
-            shraniSektorjeVTekočoIntervencijo(); l.openPopup();
-        });
-        map.on(L.Draw.Event.EDITED, () => shraniSektorjeVTekočoIntervencijo());
-        map.on(L.Draw.Event.DELETED, () => shraniSektorjeVTekočoIntervencijo());
-    }
+    // Poslušalci dogodkov za risanje po narisanem območju
+    document.addEventListener("DOMContentLoaded", () => {
+        // Vezave poslušalcev, ko je zemljevid pripravljen
+        setInterval(() => {
+            if (map && !map._drawEventsAttached) {
+                map.on(L.Draw.Event.CREATED, e => {
+                    let l = e.layer; let b = document.getElementById("trenutnaBarva").value;
+                    l.options.epvBarva = b; urediPopupZaSektor(l, b); narisaniSektorjiSloj.addLayer(l);
+                    shraniSektorjeVTekočoIntervencijo(); l.openPopup();
+                });
+                map.on(L.Draw.Event.EDITED, () => shraniSektorjeVTekočoIntervencijo());
+                map.on(L.Draw.Event.DELETED, () => shraniSektorjeVTekočoIntervencijo());
+                map._drawEventsAttached = true;
+            }
+        }, 1000);
+    });
 
-    // Nadaljevanje vaše funkcije urediPopupZaSektor...
-  function urediPopupZaSektor(layer, b) {
+    function urediPopupZaSektor(layer, b) {
         let ll = (layer instanceof L.Marker || layer instanceof L.Circle) ? layer.getLatLng() : layer.getBounds().getCenter();
         let ctxt = `${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}`;
         layer.bindPopup(`<div style="font-size:12px;"><b>Sektor (${slovarBarv[b]})</b><br>Koordinate: ${ctxt}<br><button class="gumb-kopiraj-popup" onclick="navigator.clipboard.writeText('${ctxt}'); alert('Kopirano!');">Kopiraj</button></div>`);
@@ -640,6 +550,7 @@
         new QRCode(document.getElementById("qr-izhod"), { text: url, width: 110, height: 110 });
     }
 
+    // TISKANJE MAPO IN POROČILA - Z odpravljeno napako "Map container is already initialized"
     function pripraviInNatisni() {
         const izbranaIntervencija = document.getElementById("izbiraIntervencije").value || "Splošno spremljanje (Brez dogodka)";
         document.getElementById("print-naslov").innerText = "Intervencija: " + izbranaIntervencija;
@@ -701,10 +612,16 @@
             const trenutniZoom = starZemljevid.getZoom();
             const tiskovniZoom = trenutniZoom + 1; 
 
+            // ODPRANJENA NAPAKA: Odstrani obstoječo instanco zemljevida za tiskanje
+            if (tiskovniZemljevid !== null) {
+                tiskovniZemljevid.remove();
+                tiskovniZemljevid = null;
+            }
+
             const placeholder = document.getElementById("map-print-placeholder");
             placeholder.innerHTML = "";
 
-            const printMap = L.map('map-print-placeholder', {
+            tiskovniZemljevid = L.map('map-print-placeholder', {
                 center: center,
                 zoom: tiskovniZoom,
                 zoomControl: false,
@@ -713,24 +630,25 @@
 
             starZemljevid.eachLayer(function(layer) {
                 if (layer instanceof L.TileLayer) {
-                    L.tileLayer(layer._url, layer.options).addTo(printMap);
+                    L.tileLayer(layer._url, layer.options).addTo(tiskovniZemljevid);
                 }
                 if (layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Marker) {
                     if (layer instanceof L.Polygon) {
-                        L.polygon(layer.getLatLngs(), layer.options).addTo(printMap);
+                        L.polygon(layer.getLatLngs(), layer.options).addTo(tiskovniZemljevid);
                     } else if (layer instanceof L.Polyline) {
-                        L.polyline(layer.getLatLngs(), layer.options).addTo(printMap);
+                        L.polyline(layer.getLatLngs(), layer.options).addTo(tiskovniZemljevid);
                     } else if (layer instanceof L.Marker) {
                         if (layer.options.icon) {
-                            L.marker(layer.getLatLng(), {icon: layer.options.icon}).addTo(printMap);
+                            L.marker(layer.getLatLng(), {icon: layer.options.icon}).addTo(tiskovniZemljevid);
                         }
                     }
                 }
             });
 
             setTimeout(() => {
+                tiskovniZemljevid.invalidateSize();
                 window.print();
-            }, 1000);
+            }, 500);
         } else {
             window.print();
         }
