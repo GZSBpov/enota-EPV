@@ -364,9 +364,6 @@
         setInterval(osveziZemljevid, 5000);
     }
 
-// Globalna spremenljivka za shranjevanje sloja z narisanimi sektorji (če je nimaš definirane zgoraj)
-var narisaniSektorjiSloj = new L.FeatureGroup(); 
-
 function initMap() {
     navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
     satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
