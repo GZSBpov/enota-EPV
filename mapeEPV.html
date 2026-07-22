@@ -364,15 +364,58 @@
         setInterval(osveziZemljevid, 5000);
     }
 
-    function initMap() {
-        navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-        satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+// Globalna spremenljivka za shranjevanje sloja z narisanimi sektorji (če je nimaš definirane zgoraj)
+var narisaniSektorjiSloj = new L.FeatureGroup(); 
+
+function initMap() {
+    navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+    
+    map = L.map('zemljevid', { center: [46.3925, 15.5727], zoom: 15, layers: [satelitskaMapa] });
+    L.control.layers({ "Satelit": satelitskaMapa, "Ceste": navadnaMapa }, null, { position: 'bottomright' }).addTo(map);
+    
+    // 1. Dodamo sloj za narisane elemente na mapo
+    map.addLayer(narisaniSektorjiSloj);
+
+    // 2. Dodamo orodna vrstica za risanje (Leaflet Draw Control)
+    var drawControl = new L.Control.Draw({
+        edit: {
+            featureGroup: narisaniSektorjiSloj // Omogoči urejanje narisanih likov
+        },
+        draw: {
+            polygon: true,
+            polyline: true,
+            rectangle: true,
+            circle: false,
+            marker: true,
+            circlemarker: false
+        }
+    });
+    map.addControl(drawControl);
+
+    // 3. Poslušalec dogodka za zajem narisanega objekta
+    map.on(L.Draw.Event.CREATED, function (e) {
+        var layer = e.layer;
         
-        map = L.map('zemljevid', { center: [46.3925, 15.5727], zoom: 15, layers: [satelitskaMapa] });
-        L.control.layers({ "Satelit": satelitskaMapa, "Ceste": navadnaMapa }, null, { position: 'bottomright' }).addTo(map);
-        map.addLayer(narisaniSektorjiSloj);
-        posodobiNastavitveRisanja();
-    }
+        // Dodamo narisani lik na sloj
+        narisaniSektorjiSloj.addLayer(layer);
+
+        // Pridobimo koordinate
+        let koordinate;
+        if (e.layerType === 'marker') {
+            koordinate = layer.getLatLng(); // {lat: ..., lng: ...}
+        } else {
+            koordinate = layer.getLatLngs(); // Polje točk
+        }
+
+        console.log("Narisana vrsta likov:", e.layerType);
+        console.log("Zajete koordinate:", koordinate);
+
+        // Tukaj lahko kasneje pokličeva funkcijo za shranjevanje v Google Sheet ali osvežitev QR kode
+    });
+
+    posodobiNastavitveRisanja();
+}
 
     // POSODOBLJENO: Zdaj ko ima skripta CORS glave, kličemo Google neposredno preko hitrega in čistega fetch() klica
     function izvediNeposredniKlic(params, uspehCallback) {
