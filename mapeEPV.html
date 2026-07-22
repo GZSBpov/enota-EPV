@@ -367,35 +367,67 @@
         setInterval(osveziZemljevid, 5000);
     }
 
-function initMap() {
-    navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-    satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+    function initMap() {
+        navadnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
     
-    map = L.map('zemljevid', { center: [46.3925, 15.5727], zoom: 15, layers: [satelitskaMapa] });
-    L.control.layers({ "Satelit": satelitskaMapa, "Ceste": navadnaMapa }, null, { position: 'bottomright' }).addTo(map);
+        map = L.map('zemljevid', { center: [46.3925, 15.5727], zoom: 15, layers: [satelitskaMapa] });
+        L.control.layers({ "Satelit": satelitskaMapa, "Ceste": navadnaMapa }, null, { position: 'bottomright' }).addTo(map);
     
-    map.addLayer(narisaniSektorjiSloj);
+        map.addLayer(narisaniSektorjiSloj);
 
-    // POSLUŠALEC ZA ZAJEM KOORDINAT (pustimo samo to):
-    map.on(L.Draw.Event.CREATED, function (e) {
-        var layer = e.layer;
-        narisaniSektorjiSloj.addLayer(layer);
+        // POSODOBLLJEN POSLUŠALEC: Zajem koordinat + izračuni dolžine/kvadrature/radija
+        map.on(L.Draw.Event.CREATED, function (e) {
+            var layer = e.layer;
+            var type = e.layerType;
+            narisaniSektorjiSloj.addLayer(layer);
 
-        let koordinate;
-        // Preverimo tip, da ne vrže napake pri krogu ali točki
-        if (typeof layer.getLatLngs === 'function') {
-            koordinate = layer.getLatLngs();
-        } else if (typeof layer.getLatLng === 'function') {
-            koordinate = layer.getLatLng();
-        }
+            let opisPodatka = "";
 
-        console.log("Narisana vrsta likov:", e.layerType);
-        console.log("Zajete koordinate:", koordinate);
-    });
+            // 1. MARKER / TOČKA
+            if (type === 'marker') {
+                let latLng = layer.getLatLng();
+                opisPodatka = `Koordinate: ${latLng.lat.toFixed(5)}, ${latLng.lng.toFixed(5)}`;
+            } 
+            // 2. ČRTA / LINIJA (Dolžina)
+            else if (type === 'polyline') {
+                let latLngs = layer.getLatLngs();
+                let dolzinaMeters = 0;
+                for (let i = 0; i < latLngs.length - 1; i++) {
+                    dolzinaMeters += latLngs[i].distanceTo(latLngs[i + 1]);
+                }
+                opisPodatka = dolzinaMeters > 1000 ? 
+                    `Dolžina: ${(dolzinaMeters / 1000).toFixed(2)} km` : 
+                    `Dolžina: ${Math.round(dolzinaMeters)} m`;
+            } 
+            // 3. POLIGON IN PRAVOKOTNIK (Površina)
+            else if (type === 'polygon' || type === 'rectangle') {
+                let latLngs = layer.getLatLngs()[0];
+                let povrsinaM2 = L.GeometryUtil ? L.GeometryUtil.geodesicArea(latLngs) : 0;
+            
+                opisPodatka = povrsinaM2 > 10000 ? 
+                    `Površina: ${(povrsinaM2 / 10000).toFixed(2)} ha` : 
+                    `Površina: ${Math.round(povrsinaM2)} m²`;
+            } 
+            // 4. KROG (Polmer in središče)
+            else if (type === 'circle') {
+                let radij = Math.round(layer.getRadius());
+                opisPodatka = `Krog (Polmer: ${radij} m)`;
+            }
 
-    // Ta funkcija že ustvari in doda meni za risanje na mapo!
-    posodobiNastavitveRisanja(); 
-}
+           // Dodelimo napis/popup na narisani lik
+            if (opisPodatka) {
+                layer.bindPopup(opisPodatka).openPopup();
+                layer.bindTooltip(opisPodatka, { permanent: true, direction: 'center', className: 'napis-na-liku' });
+            }
+
+            console.log("Narisana vrsta likov:", type);
+            console.log("Opis/Izračun:", opisPodatka);
+        });
+
+        // Ustvari in doda meni za risanje na mapo
+        posodobiNastavitveRisanja(); 
+    }
 
     // POSODOBLJENO: Zdaj ko ima skripta CORS glave, kličemo Google neposredno preko hitrega in čistega fetch() klica
     function izvediNeposredniKlic(params, uspehCallback) {
@@ -657,20 +689,54 @@ function initMap() {
     function ustvariNovDogodek() {
         const v = document.getElementById("novoImeIntervencije").value.trim();
         if (!v) return;
-        izbranDogodekId = v; trenutnaIntervencija = v;
-        if (!vseIntervencije.includes(v)) { vseIntervencije.push(v); localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije)); }
+    
+        izbranDogodekId = v; 
+        trenutnaIntervencija = v;
+
+        if (!vseIntervencije.includes(v)) { 
+            vseIntervencije.push(v); 
+            localStorage.setItem("epv_intervencije_seznam", JSON.stringify(vseIntervencije)); 
+        }
+
+        // --- NOVO: Shranimo točen čas nastanka dogodka ---
+        let datumiDogodkov = JSON.parse(localStorage.getItem("epv_intervencije_datumi")) || {};
+        if (!datumiDogodkov[v]) {
+            datumiDogodkov[v] = new Date().toLocaleString("sl-SI");
+            localStorage.setItem("epv_intervencije_datumi", JSON.stringify(datumiDogodkov));
+        }
+
         localStorage.setItem("epv_intervencije_trenutna", v);
         izrisiSpustniSeznamZgodovine();
+    
+        // Osvežimo izpis na strani in v polju za tisk
+        posodobiPrikazDatumaNastanka(v);
+
         document.getElementById("novoImeIntervencije").value = "";
-        narisaniSektorjiSloj.clearLayers();
+        narisaniSektorjiSloj.clearLayers();    
     }
 
-    function izrisiSpustniSeznamZgodovine() {
+    function posodobiPrikazDatumaNastanka(imeDogodka) {
+        let datumiDogodkov = JSON.parse(localStorage.getItem("epv_intervencije_datumi")) || {};
+        let casNastanka = datumiDogodkov[imeDogodka] || new Date().toLocaleString("sl-SI");
+
+        // Posodobimo polje v tiskovnem območju
+        const elPrint = document.getElementById("print-datum-nastanka");
+        if (elPrint) elPrint.innerText = casNastanka;
+    }
+    posodobiPrikazDatumaNastanka(izbranaIntervencijaIme);
+    
+   function izrisiSpustniSeznamZgodovine() {
         const s = document.getElementById("izbiraIntervencije"); if (!s) return;
         s.innerHTML = '<option value="">-- Brez aktivnega dogodka --</option>';
         [...new Set(vseIntervencije)].forEach(d => {
             if(d) s.innerHTML += `<option value="${d}" ${d===izbranDogodekId?'selected':''}>${d}</option>`;
         });
+
+        // Ob spremembi v padajočem meniju posodobimo datum nastanka
+        s.onchange = function() {
+            izbranDogodekId = this.value;
+            posodobiPrikazDatumaNastanka(this.value);
+        };
     }
 
     function pretvoriVCas(suroviCas) {
