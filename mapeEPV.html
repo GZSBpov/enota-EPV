@@ -371,47 +371,27 @@ function initMap() {
     map = L.map('zemljevid', { center: [46.3925, 15.5727], zoom: 15, layers: [satelitskaMapa] });
     L.control.layers({ "Satelit": satelitskaMapa, "Ceste": navadnaMapa }, null, { position: 'bottomright' }).addTo(map);
     
-    // 1. Dodamo sloj za narisane elemente na mapo
     map.addLayer(narisaniSektorjiSloj);
 
-    // 2. Dodamo orodna vrstica za risanje (Leaflet Draw Control)
-    var drawControl = new L.Control.Draw({
-        edit: {
-            featureGroup: narisaniSektorjiSloj // Omogoči urejanje narisanih likov
-        },
-        draw: {
-            polygon: true,
-            polyline: true,
-            rectangle: true,
-            circle: false,
-            marker: true,
-            circlemarker: false
-        }
-    });
-    map.addControl(drawControl);
-
-    // 3. Poslušalec dogodka za zajem narisanega objekta
+    // POSLUŠALEC ZA ZAJEM KOORDINAT (pustimo samo to):
     map.on(L.Draw.Event.CREATED, function (e) {
         var layer = e.layer;
-        
-        // Dodamo narisani lik na sloj
         narisaniSektorjiSloj.addLayer(layer);
 
-        // Pridobimo koordinate
         let koordinate;
-        if (e.layerType === 'marker') {
-            koordinate = layer.getLatLng(); // {lat: ..., lng: ...}
-        } else {
-            koordinate = layer.getLatLngs(); // Polje točk
+        // Preverimo tip, da ne vrže napake pri krogu ali točki
+        if (typeof layer.getLatLngs === 'function') {
+            koordinate = layer.getLatLngs();
+        } else if (typeof layer.getLatLng === 'function') {
+            koordinate = layer.getLatLng();
         }
 
         console.log("Narisana vrsta likov:", e.layerType);
         console.log("Zajete koordinate:", koordinate);
-
-        // Tukaj lahko kasneje pokličeva funkcijo za shranjevanje v Google Sheet ali osvežitev QR kode
     });
 
-    posodobiNastavitveRisanja();
+    // Ta funkcija že ustvari in doda meni za risanje na mapo!
+    posodobiNastavitveRisanja(); 
 }
 
     // POSODOBLJENO: Zdaj ko ima skripta CORS glave, kličemo Google neposredno preko hitrega in čistega fetch() klica
