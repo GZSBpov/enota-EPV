@@ -263,7 +263,7 @@
     </div>
 
     <!-- Glavni operativni vsebnik -->
-    <div class="glavni-zabojnik">
+    <div id="glavni-zabojnik">
 
         <div id="map"></div>
 
@@ -710,8 +710,8 @@
 
             if (isNaN(lat) || isNaN(lon)) continue;
 
-            if (pripadajociDogodek && izbranDogodekId && izbranDogodekId !== "Splošno") {
-                if (pripadajociDogodek !== izbranDogodekId) continue;
+           if (pripadajociDogodek && izbranDogodekId && izbranDogodekId !== "Splošno" && izbranDogodekId !== "") {
+                 if (pripadajociDogodek !== izbranDogodekId) continue;
             }
 
             let tip = "gasilec", ime = surovaEnota, clanov = "1";
@@ -792,7 +792,7 @@
     function spremembaTipaFiltra() { document.getElementById("filterMinute").style.display = (document.getElementById("filterTipCas").value==="ročno")?"block":"none"; shraniNastavitve(); }
     function shraniNastavitve() { localStorage.setItem("epv_filter_tip", document.getElementById("filterTipCas").value); localStorage.setItem("epv_filter_min", document.getElementById("filterMinute").value); localStorage.setItem("epv_skrite_enote", JSON.stringify(ročnoSkriteEnote)); osveziZemljevid(); }
     function naloziNastavitev() { let t=localStorage.getItem("epv_filter_tip"), m=localStorage.getItem("epv_filter_min"), s=localStorage.getItem("epv_skrite_enote"); if(t) document.getElementById("filterTipCas").value=t; if(m) document.getElementById("filterMinute").value=m; if(s) ročnoSkriteEnote=JSON.parse(s); spremembaTipaFiltra(); }
-    function preklopiCelZaslon(id) { let e=document.getElementById(id); if(!document.fullscreenElement) e.requestFullscreen(); else document.exitFullscreen(); }
+    function preklopiCelZaslon(id) { let e = document.getElementById(id) || document.documentElement; if (!document.fullscreenElement && !document.webkitFullscreenElement) { if (e.requestFullscreen) e.requestFullscreen(); else if (e.webkitRequestFullscreen) e.webkitRequestFullscreen(); } else { if (document.exitFullscreen) document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } }
     function ustvariIkono(b) { return L.icon({ iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${b}.png`, shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41] }); }
     function naloziIntervencije() { let s=localStorage.getItem("epv_intervencije_seznam"), t=localStorage.getItem("epv_intervencije_trenutna"); if(s) vseIntervencije=JSON.parse(s); if(t) { trenutnaIntervencija=t; izbranDogodekId=t; } izrisiSpustniSeznamZgodovine(); }
 
@@ -904,16 +904,19 @@
         }
 
         setTimeout(() => {
-            tiskovniZemljevid.invalidateSize();
-            if (tiskovnaSkupina.getLayers().length > 0) {
-                tiskovniZemljevid.fitBounds(tiskovnaSkupina.getBounds(), { padding: [30, 30] });
-            } else {
-                tiskovniZemljevid.setView(map.getCenter(), map.getZoom());
+            if (tiskovniZemljevid) {
+                tiskovniZemljevid.invalidateSize();
+                if (tiskovnaSkupina.getLayers().length > 0) {
+                    tiskovniZemljevid.fitBounds(tiskovnaSkupina.getBounds(), { padding: [20, 20] });
+                } else {
+                    tiskovniZemljevid.setView(map.getCenter(), map.getZoom());
+                }
             }
-        
+    
+            // Počakamo 500ms, da prehrambene sličice zemljevida naložijo sliko
             setTimeout(() => {
                 window.print();
-            }, 400);
+            }, 500);
         }, 300);
     }
 
