@@ -16,319 +16,238 @@
     <!-- QRCode JS Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-   <style>
-    body { 
-        margin: 0; 
-        padding: 0; 
-        font-family: Arial, sans-serif; 
-        height: 100vh; 
-        overflow: hidden; 
-    }
-
-    /* Glavni prilagodljivi glavni-zabojnik za split-screen */
-    .glavni-zabojnik { 
-        display: flex; 
-        width: 100vw; 
-        height: 100vh; 
-        position: relative; 
-        overflow: hidden; 
-    }
-
-    /* Zemljevid */
-    #map { 
-        flex: 1; 
-        height: 100%; 
-        min-width: 30vw; 
-        z-index: 1; 
-    }
-
-    /* Vertikalna delilna črta za spreminjanje širine okna */
-    #delilnik {
-        width: 8px;
-        background: #ccc;
-        cursor: col-resize;
-        transition: background 0.2s;
-        z-index: 1001;
-        flex-shrink: 0;
-    }
-
-    #delilnik:hover, #delilnik:active {
-        background: #d32f2f; /* Ob prehodu ali vlečenju se obarva rdeče */
-    }
-
-    /* Stranska plošča z dinamično širino */
-    #stranska-plosca {
-        width: 340px; 
-        min-width: 250px;
-        max-width: 50vw; /* Maksimalna širina do 50% ekrana */
-        background: #f8f9fa; 
-        border-left: 1px solid #ccc;
-        display: flex; 
-        flex-direction: column; 
-        padding: 15px; 
-        box-sizing: border-box;
-        z-index: 1000; 
-        overflow-y: auto; 
-        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-        flex-shrink: 0;
-    }
-
-    /* Sekcije v stranski plošči */
-    .sekcija { 
-        margin-bottom: 15px; 
-        background: #fff; 
-        padding: 12px; 
-        border-radius: 8px; 
-        border: 1px solid #ddd; 
-    }
-    
-    .sekcija h3 { 
-        margin-top: 0; 
-        margin-bottom: 10px; 
-        font-size: 15px; 
-        color: #333; 
-        border-bottom: 2px solid #d32f2f; 
-        padding-bottom: 5px; 
-    }
-
-    label { 
-        font-size: 12px; 
-        font-weight: bold; 
-        color: #555; 
-        display: block; 
-        margin-top: 8px; 
-    }
-
-    select, input, button { 
-        width: 100%; 
-        padding: 8px; 
-        margin-top: 4px; 
-        box-sizing: border-box; 
-        border: 1px solid #ccc; 
-        border-radius: 4px; 
-        font-size: 13px; 
-    }
-
-    button { 
-        background-color: #d32f2f; 
-        color: white; 
-        border: none; 
-        font-weight: bold; 
-        cursor: pointer; 
-        margin-top: 10px; 
-        transition: 0.2s; 
-    }
-
-    button:hover { 
-        background-color: #b71c1c; 
-    }
-
-    button.sekundarni { 
-        background-color: #1976d2; 
-    }
-
-    button.sekundarni:hover { 
-        background-color: #1565c0; 
-    }
-
-    .gumb-kopiraj-popup { 
-        padding: 3px 6px; 
-        font-size: 11px; 
-        margin-top: 5px; 
-        background: #555; 
-    }
-
-    /* Stil za enote v seznamu */
-    .enota-stikalo { 
-        display: flex; 
-        align-items: center; 
-        justify-content: space-between; 
-        padding: 4px 0; 
-        border-bottom: 1px solid #eee; 
-        font-size: 13px; 
-    }
-
-    .enota-stikalo input { 
-        width: auto; 
-        margin: 0; 
-    }
-
-    .stalni-napis { 
-        background: rgba(255, 255, 255, 0.9); 
-        border: 1px solid #333; 
-        font-weight: bold; 
-        padding: 2px 5px; 
-        border-radius: 3px; 
-        font-size: 11px; 
-        white-space: nowrap; 
-    }
-
-    /* QR Koda okno */
-    #qr-okno { 
-        text-align: center; 
-    }
-
-    #qr-izhod { 
-        display: flex; 
-        justify-content: center; 
-        margin-top: 10px; 
-    }
-
-    #qr-url-tekst { 
-        font-size: 10px; 
-        color: #666; 
-        word-break: break-all; 
-        margin-top: 5px; 
-    }
-
-    /* Modalno okno za geslo */
-    #geslo-modal {
-        position: fixed; 
-        top: 0; 
-        left: 0; 
-        width: 100%; 
-        height: 100%;
-        background: rgba(0,0,0,0.7); 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        z-index: 9999;
-    }
-
-    .modal-vsebina { 
-        background: white; 
-        padding: 25px; 
-        border-radius: 8px; 
-        text-align: center; 
-        max-width: 320px; 
-        width: 100%; 
-    }
-
-    /* Nastavitve za tiskanje */
-    #print-obmocje { 
-        display: none; 
-    }
-
-    @media print {
-        body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, sans-serif; 
+            height: 100vh; 
+            width: 100vw;
+            overflow: hidden; 
         }
 
-        .glavni-zabojnik, #, #drone-stream-container, .no-print {
-            display: none !important;
+        /* Glavni prilagodljivi glavni-zabojnik za split-screen */
+        .glavni-zabojnik { 
+            display: flex !important; 
+            flex-direction: row !important;
+            width: 100vw; 
+            height: 100vh; 
+            position: relative; 
+            overflow: hidden; 
         }
 
-        #print-obmocje {
-            display: block !important;
-            width: 100%;
+        /* Zemljevid */
+        #map { 
+            flex: 1 1 auto !important; 
+            height: 100% !important; 
+            min-width: 30vw; 
+            z-index: 1; 
         }
 
-        #map-print-placeholder { 
+        /* Vertikalna delilna črta za spreminjanje širine okna */
+        #delilnik {
+            width: 8px !important;
+            height: 100% !important;
+            background: #ccc;
+            cursor: col-resize;
+            transition: background 0.2s;
+            z-index: 1001;
+            flex-shrink: 0;
+        }
+
+        #delilnik:hover, #delilnik:active {
+            background: #d32f2f;
+        }
+
+        /* Stranska plošča z dinamično širino */
+        #stranska-plosca {
+            width: 340px; 
+            min-width: 250px;
+            max-width: 50vw;
+            height: 100% !important;
+            background: #f8f9fa; 
+            border-left: 1px solid #ccc;
+            display: flex; 
+            flex-direction: column; 
+            padding: 15px; 
+            box-sizing: border-box;
+            z-index: 1000; 
+            overflow-y: auto; 
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        /* Sekcije v stranski plošči */
+        .sekcija { 
+            margin-bottom: 15px; 
+            background: #fff; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #ddd; 
+        }
+        
+        .sekcija h3 { 
+            margin-top: 0; 
+            margin-bottom: 10px; 
+            font-size: 15px; 
+            color: #333; 
+            border-bottom: 2px solid #d32f2f; 
+            padding-bottom: 5px; 
+        }
+
+        label { 
+            font-size: 12px; 
+            font-weight: bold; 
+            color: #555; 
+            display: block; 
+            margin-top: 8px; 
+        }
+
+        select, input, button { 
             width: 100%; 
-            height: 500px; 
-            border: 1px solid #000; 
-            margin-bottom: 20px; 
+            padding: 8px; 
+            margin-top: 4px; 
+            box-sizing: border-box; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            font-size: 13px; 
         }
 
-        .print-tabela { 
+        button { 
+            background-color: #d32f2f; 
+            color: white; 
+            border: none; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            transition: 0.2s; 
+        }
+
+        button:hover { 
+            background-color: #b71c1c; 
+        }
+
+        button.sekundarni { 
+            background-color: #1976d2; 
+        }
+
+        button.sekundarni:hover { 
+            background-color: #1565c0; 
+        }
+
+        .gumb-kopiraj-popup { 
+            padding: 3px 6px; 
+            font-size: 11px; 
+            margin-top: 5px; 
+            background: #555; 
+        }
+
+        /* Stil za enote v seznamu */
+        .enota-stikalo { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 4px 0; 
+            border-bottom: 1px solid #eee; 
+            font-size: 13px; 
+        }
+
+        .enota-stikalo input { 
+            width: auto; 
+            margin: 0; 
+        }
+
+        .stalni-napis { 
+            background: rgba(255, 255, 255, 0.9); 
+            border: 1px solid #333; 
+            font-weight: bold; 
+            padding: 2px 5px; 
+            border-radius: 3px; 
+            font-size: 11px; 
+            white-space: nowrap; 
+        }
+
+        /* QR Koda okno */
+        #qr-okno { 
+            text-align: center; 
+        }
+
+        #qr-izhod { 
+            display: flex; 
+            justify-content: center; 
+            margin-top: 10px; 
+        }
+
+        #qr-url-tekst { 
+            font-size: 10px; 
+            color: #666; 
+            word-break: break-all; 
+            margin-top: 5px; 
+        }
+
+        /* Modalno okno za geslo */
+        #geslo-modal {
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh;
+            background: rgba(0,0,0,0.7); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 9999;
+        }
+
+        .modal-vsebina { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 8px; 
+            text-align: center; 
+            max-width: 320px; 
             width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 15px; 
         }
 
-        .print-tabela th, .print-tabela td { 
-            border: 1px solid #000; 
-<style>
-    html, body {
-        margin: 0;
-        padding: 0;
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-    }
+        /* Nastavitve za tiskanje */
+        #print-obmocje { 
+            display: none; 
+        }
 
-    /* Glavni vsebnik, ki drži vse v vodoravni liniji (flex-direction: row) */
-    .glavni-zabojnik {
-        display: flex !important;
-        flex-direction: row !important;
-        width: 100vw;
-        height: 100vh;
-        position: relative;
-        overflow: hidden;
-    }
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
 
-    /* Zemljevid - vzame ves preostali prostor na LEVI */
-    #map {
-        flex: 1 1 auto !important;
-        height: 100% !important;
-        min-width: 30vw;
-        z-index: 1;
-    }
+            .glavni-zabojnik, #geslo-modal, #drone-stream-container, .no-print {
+                display: none !important;
+            }
 
-    /* Vertikalni delilnik (drsnik) na SREDINI */
-    #delilnik {
-        width: 8px !important;
-        height: 100% !important;
-        background: #ccc;
-        cursor: col-resize;
-        transition: background 0.2s;
-        z-index: 1001;
-        flex-shrink: 0;
-    }
+            #print-obmocje {
+                display: block !important;
+                width: 100%;
+            }
 
-    #delilnik:hover, #delilnik:active {
-        background: #d32f2f;
-    }
+            #map-print-placeholder { 
+                width: 100%; 
+                height: 500px; 
+                border: 1px solid #000; 
+                margin-bottom: 20px; 
+            }
 
-    /* Stranska plošča na DESNI */
-    #stranska-plosca {
-        width: 340px;
-        min-width: 250px;
-        max-width: 50vw;
-        height: 100% !important;
-        background: #f8f9fa;
-        border-left: 1px solid #ccc;
-        display: flex;
-        flex-direction: column;
-        padding: 15px;
-        box-sizing: border-box;
-        z-index: 1000;
-        overflow-y: auto;
-        flex-shrink: 0;
-    }
+            .print-tabela { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 15px; 
+            }
 
-    /* Modalno okno za geslo */
-    #geslo-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0,0,0,0.7);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    .modal-vsebina {
-        background: white;
-        padding: 25px;
-        border-radius: 8px;
-        text-align: center;
-        max-width: 320px;
-        width: 100%;
-    }
-
-    /* Tiskanje */
-    #print-obmocje { display: none; }
-    @media print {
-        .glavni-zabojnik, #geslo-modal { display: none !important; }
-        #print-obmocje { display: block !important; }
-    }
-</style>
+            .print-tabela th, .print-tabela td { 
+                border: 1px solid #000; 
+                padding: 6px;
+                text-align: left;
+            }
+        }
+    </style>
 </head>
 <body>
 
@@ -343,7 +262,7 @@
         </div>
     </div>
 
-    <!-- Glavni operativni  -->
+    <!-- Glavni operativni vsebnik -->
     <div class="glavni-zabojnik">
 
         <div id="map"></div>
@@ -459,6 +378,7 @@
     </div>
 
 <script>
+    // Konstanta za povezavo do Google Apps Script
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec"; 
     
     let map = null;
@@ -516,23 +436,20 @@
     }
 
     function izvediNeposredniKlic(podatki, callback) {
-    const SCRIPT_URL = "TVOJ_GOOGLE_SCRIPT_URL_TUKAJ";
-
-    fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(podatki)
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (callback) callback(data);
-    })
-    .catch(err => {
-        console.warn("Opozorilo pri klicu skripte:", err);
-    });
-}
-
+        fetch(SCRIPT_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(podatki)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (callback) callback(data);
+        })
+        .catch(err => {
+            console.warn("Opozorilo pri klicu skripte:", err);
+        });
+    }
 
     function initMap() {
         if (map !== null) return;
@@ -718,16 +635,20 @@
         localStorage.setItem("epv_intervencije_trenutna", trenutnaIntervencija);
         
         narisaniSektorjiSloj.clearLayers();
-        for (let ime in enoteMarkerji) { map.removeLayer(enoteMarkerji[ime]); }
-        for (let ime in enoteSledi) { map.removeLayer(enoteSledi[ime]); }
-        enoteMarkerji = {}; 
-        enoteSledi = {};
+        pobrisiVseMarkerje();
         enotePodatki = {};
 
         izrisiSektorjeZaTrenutnoIntervencijo();
         naloziElementeDogodka(dogodekId);
         ustvariQrKodo();
         osveziZemljevid();
+    }
+
+    function pobrisiVseMarkerje() {
+        for (let ime in enoteMarkerji) { map.removeLayer(enoteMarkerji[ime]); }
+        for (let ime in enoteSledi) { map.removeLayer(enoteSledi[ime]); }
+        enoteMarkerji = {}; 
+        enoteSledi = {};
     }
 
     function ustvariNovDogodek() {
@@ -760,24 +681,6 @@
         return isNaN(d.getTime()) ? new Date() : d;
     }
 
-    function naloziArhivskiDogodek(imeDogodka) {
-        // Klic na Google Apps Script z zahtevo za arhivske podatke
-        izvediNeposredniKlic({ akcija: "pridobiArhiv", dogodek: imeDogodka }, function(odgovor) {
-            if (!odgovor || !odgovor.podatki) return;
-
-            // Očisti trenutne markerje na zemljevidu
-            pobrisiVseMarkerje();
-
-            odgovor.podatki.forEach(d => {
-                // d vsebuje: enota, tip, clanov, lat, lon, cas
-                dodajAliPosodobiMarker(d.enota, d.tip, d.lat, d.lon, d.clanov, d.cas);
-            });
-
-            // Prilagodi pogled zemljevida na arhivirane markerje
-            osveziPogledZemljevida();
-        });
-    }
-    
     function osveziZemljevid() {
         if (!shranjenoPreverjenoGesloHash) return;
         izvediNeposredniKlic({ geslo: shranjenoPreverjenoGesloHash }, function(odgovor) {
@@ -792,7 +695,7 @@
         const filterTip = document.getElementById("filterTipCas").value;
         const filterMinut = parseInt(document.getElementById("filterMinute").value) || 15;
         const trenutniCasMs = new Date().getTime();
-        const MAX_STAROST_MS = 12 * 60 * 60 * 1000; // Filter 12 ur za trenutne dogodke
+        const MAX_STAROST_MS = 12 * 60 * 60 * 1000;
 
         for (let i = 1; i < matriksaPodatkov.length; i++) {
             const vrstica = matriksaPodatkov[i];
@@ -807,7 +710,6 @@
 
             if (isNaN(lat) || isNaN(lon)) continue;
 
-            // Filtriraj enote po izbranem dogodku (če je dogodek naveden v tabeli ali časovno opredeljen)
             if (pripadajociDogodek && izbranDogodekId && izbranDogodekId !== "Splošno") {
                 if (pripadajociDogodek !== izbranDogodekId) continue;
             }
@@ -910,7 +812,7 @@
 
         const qrCilj = document.getElementById("print-qr-slika");
         qrCilj.innerHTML = "";
-    
+        
         const originalnaQrSlika = document.getElementById("qr-izhod").querySelector("img");
         if (originalnaQrSlika) {
             const novaSlika = document.createElement("img");
@@ -920,67 +822,36 @@
             qrCilj.appendChild(novaSlika);
         }
 
-      // 1. Zajem aktivnih enot v tabelo za tiskanje
-    const tabelaGlava = document.getElementById("print-tabela-sodelujocih-glava");
-    if (tabelaGlava) {
-        tabelaGlava.innerHTML = `<tr>
-            <th>Enota / Oznaka</th>
-            <th>Vrsta enote</th>
-            <th>Čas zadnje zaznave</th>
-            <th>Zadnja Lokacija (GPS)</th>
-        </tr>`;
-    }
+        const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
+        tabelaTelo.innerHTML = ""; 
 
-    const tabelaTelo = document.getElementById("print-tabela-sodelujocih-telo");
-    tabelaTelo.innerHTML = ""; 
+        let dodanoSodelujocih = 0;
 
-    let dodanoSodelujocih = 0;
-
-    // TUKAJ VSTAVIŠ OBJEKT ZA PRESLIKAVO TIPOV:
-    const imenaTipov = {
-        'GASILEC': 'Gasilec (Rdeča)',
-        'VOZILO': 'Vozilo (Modra)',
-        'VODJA': 'Vodstvo / Štab (Rumena)',
-        'RESEVALEC': 'Reševalec / Drugo (Zelena)',
-        'DRUGO': 'Reševalec / Drugo (Zelena)'
-    };
-
-    for (const [imeEnote, d] of Object.entries(enotePodatki)) {
-        if (ročnoSkriteEnote[imeEnote] === true) continue;
-
-        // Razčlenitev imena (če vsebuje npr. "GASILEC:Slb 1:5")
-        let deli = imeEnote.split(":");
-        let tipKoda = deli.length > 1 ? deli[0].toUpperCase() : (d.tip ? d.tip.toUpperCase() : "GASILEC");
-        let cistoIme = deli.length > 1 ? deli[1] : imeEnote;
-        let stClanov = deli.length > 2 ? deli[2] : (d.clanov || "1");
-
-        let vrstEnoteBesedilo = imenaTipov[tipKoda] || tipKoda;
-        let lokacijaText = `${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`;
-        
-        let izpisVrstica = `<tr>
-            <td><strong>${cistoIme}</strong> (${stClanov} član/ov)</td>
-            <td>${vrstEnoteBesedilo}</td>
-            <td>${d.cas}</td>
-            <td>${lokacijaText}</td>
-        </tr>`;
-        
-        tabelaTelo.innerHTML += izpisVrstica;
-        dodanoSodelujocih++;
-    }
-
-    if (dodanoSodelujocih === 0) {
-        tabelaTelo.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #666;">Ni aktivnih ali vidnih enot za ta dogodek.</td></tr>`;
-    }
+        const imenaTipov = {
+            'GASILEC': 'Gasilec (Rdeča)',
+            'VOZILO': 'Vozilo (Modra)',
+            'VODJA': 'Vodstvo / Štab (Rumena)',
+            'RESEVALEC': 'Reševalec / Drugo (Zelena)',
+            'DRUGO': 'Reševalec / Drugo (Zelena)'
+        };
 
         for (const [imeEnote, d] of Object.entries(enotePodatki)) {
             if (ročnoSkriteEnote[imeEnote] === true) continue;
 
+            let deli = imeEnote.split(":");
+            let tipKoda = deli.length > 1 ? deli[0].toUpperCase() : (d.tip ? d.tip.toUpperCase() : "GASILEC");
+            let cistoIme = deli.length > 1 ? deli[1] : imeEnote;
+            let stClanov = deli.length > 2 ? deli[2] : (d.clanov || "1");
+
+            let vrstEnoteBesedilo = imenaTipov[tipKoda] || tipKoda;
             let lokacijaText = `${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`;
+            
             let izpisVrstica = `<tr>
-                <td><strong>${imeEnote}</strong> (${d.clanov} član/ov)</td>
+                <td><strong>${cistoIme}</strong> (${stClanov} član/ov)</td>
                 <td>${d.cas}</td>
                 <td>${lokacijaText}</td>
             </tr>`;
+            
             tabelaTelo.innerHTML += izpisVrstica;
             dodanoSodelujocih++;
         }
@@ -989,7 +860,7 @@
             tabelaTelo.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #666;">Ni aktivnih ali vidnih enot za ta dogodek.</td></tr>`;
         }
 
-        // 2. Kloniranje zemljevida s sektorji za tiskanje
+        // Kloniranje zemljevida za tiskanje
         if (tiskovniZemljevid !== null) {
             tiskovniZemljevid.remove();
             tiskovniZemljevid = null;
@@ -1007,27 +878,24 @@
 
         const tiskovnaSkupina = L.featureGroup().addTo(tiskovniZemljevid);
 
-       // Natančno kopiranje geografskih območij, krogov in oznak na tiskovni zemljevid
-      narisaniSektorjiSloj.eachLayer(l => {
-          if (l instanceof L.Circle || (l.getRadius && typeof l.getRadius === 'function')) {
-              // Izrecno prenesemo center, polmer (radij) in vse barvne nastavitve
-              L.circle(l.getLatLng(), {
-                  radius: l.getRadius(),
-                  color: l.options.color || '#d32f2f',
-                  fillColor: l.options.fillColor || l.options.color || '#d32f2f',
-                  fillOpacity: l.options.fillOpacity || 0.35,
-                  weight: l.options.weight || 3
-              }).addTo(tiskovnaSkupina);
-          } else if (l instanceof L.Polygon) {
-              L.polygon(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
-          } else if (l instanceof L.Polyline) {
-              L.polyline(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
-          } else if (l instanceof L.Marker) {
-              L.marker(l.getLatLng(), l.options).addTo(tiskovnaSkupina);
-          }
-      });
+        narisaniSektorjiSloj.eachLayer(l => {
+            if (l instanceof L.Circle || (l.getRadius && typeof l.getRadius === 'function')) {
+                L.circle(l.getLatLng(), {
+                    radius: l.getRadius(),
+                    color: l.options.color || '#d32f2f',
+                    fillColor: l.options.fillColor || l.options.color || '#d32f2f',
+                    fillOpacity: l.options.fillOpacity || 0.35,
+                    weight: l.options.weight || 3
+                }).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Polygon) {
+                L.polygon(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Polyline) {
+                L.polyline(l.getLatLngs(), l.options).addTo(tiskovnaSkupina);
+            } else if (l instanceof L.Marker) {
+                L.marker(l.getLatLng(), l.options).addTo(tiskovnaSkupina);
+            }
+        });
 
-        // Kopiraj markerje terenskih enot
         for (const [ime, m] of Object.entries(enoteMarkerji)) {
             if (m && m.getLatLng) {
                 let mKopija = L.marker(m.getLatLng(), { icon: m.options.icon }).addTo(tiskovnaSkupina);
@@ -1035,7 +903,6 @@
             }
         }
 
-        // Prilagodi pogled
         setTimeout(() => {
             tiskovniZemljevid.invalidateSize();
             if (tiskovnaSkupina.getLayers().length > 0) {
@@ -1049,48 +916,48 @@
             }, 400);
         }, 300);
     }
-    // --- LOGIKA ZA NASTAVLJIVO ŠIRINO STRANSKEGA OKNA (RESIZABLE SPLIT-SCREEN) ---
+
+    // --- LOGIKA ZA NASTAVLJIVO ŠIRINO STRANSKEGA OKNA ---
     const delilnik = document.getElementById('delilnik');
-    const stranskoOkno = document.getElementById('stransko-okno');
+    const stranskoOkno = document.getElementById('stranska-plosca');
     let jeVleceno = false;
 
     if (delilnik && stranskoOkno) {
         delilnik.addEventListener('mousedown', function(e) {
             jeVleceno = true;
             document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none'; // Prepreči izbiranje besedila med vlečenjem
+            document.body.style.userSelect = 'none';
         });
 
         document.addEventListener('mousemove', function(e) {
             if (!jeVleceno) return;
         
-        // Izračun nove širine stranskega okna (od desnega roba proti levi)
-        let novaSirina = window.innerWidth - e.clientX;
-        let maxSirina = window.innerWidth * 0.5; // Največ do 50% ekrana
-        let minSirina = 250; // Najmanj 250px
+            let novaSirina = window.innerWidth - e.clientX;
+            let maxSirina = window.innerWidth * 0.5;
+            let minSirina = 250;
 
-        if (novaSirina >= minSirina && novaSirina <= maxSirina) {
-            stranskoOkno.style.width = novaSirina + 'px';
-            
-            // Prilagoditev Leaflet zemljevida na novo dimenzijo
-            if (typeof map !== 'undefined' && map !== null) {
-                map.invalidateSize();
+            if (novaSirina >= minSirina && novaSirina <= maxSirina) {
+                stranskoOkno.style.width = novaSirina + 'px';
+                
+                if (typeof map !== 'undefined' && map !== null) {
+                    map.invalidateSize();
+                }
             }
-        }
-     });
+        });
 
-    document.addEventListener('mouseup', function() {
-        if (jeVleceno) {
-            jeVleceno = false;
-            document.body.style.cursor = 'default';
-            document.body.style.userSelect = 'auto';
-            
-            if (typeof map !== 'undefined' && map !== null) {
-                map.invalidateSize();
+        document.addEventListener('mouseup', function() {
+            if (jeVleceno) {
+                jeVleceno = false;
+                document.body.style.cursor = 'default';
+                document.body.style.userSelect = 'auto';
+                
+                if (typeof map !== 'undefined' && map !== null) {
+                    map.invalidateSize();
+                }
             }
-        }
-    });
-}
+        });
+    }
 </script>
 </body>
+</html>
 </html>
