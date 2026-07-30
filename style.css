@@ -1,0 +1,203 @@
+/* ==========================================
+   1. OSNOVNE NASTAVITVE IN POSTAVITEV (RESET)
+   ========================================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f4f6f8;
+    color: #333;
+    overflow: hidden; /* Prepreči premikanje celotne strani */
+}
+
+/* Glavni vsebnik (Flexbox postavitev) */
+#app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* ==========================================
+   2. STRANSKA VRSTICA (SIDEBAR)
+   ========================================== */
+#sidebar {
+    width: 320px;
+    height: 100%;
+    background-color: #ffffff;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+}
+
+#sidebar header {
+    padding: 16px;
+    background-color: #1e293b;
+    color: #ffffff;
+}
+
+#sidebar header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Seznam enot in gumbi */
+#seznamEnotGumbi {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.enota-kartica {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.enota-kartica:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.enota-naziv {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #0f172a;
+}
+
+.enota-status {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: #e2e8f0;
+    color: #475569;
+}
+
+/* ==========================================
+   3. ZEMLJEVUD (LEAFLET MAP CONTAINER)
+   ========================================== */
+#map-container {
+    flex: 1;
+    height: 100%;
+    position: relative;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* Popravki za Leaflet Popup in Tooltip */
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.leaflet-popup-content {
+    margin: 8px 12px;
+    line-height: 1.4;
+}
+
+.leaflet-tooltip {
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 3px 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Custom Marker ikone / Sektorji */
+.sektor-popup-naslov {
+    font-weight: bold;
+    color: #1e293b;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+}
+
+/* ==========================================
+   4. ELEMENTI ZA TISK (PRINT SECTION)
+   ========================================== */
+/* Na zaslonu je tiskalni del vedno skrit */
+.print-only {
+    display: none !important;
+}
+
+/* ==========================================
+   5. TISKALNI SLOGI (@media print)
+   ========================================== */
+@media print {
+    /* Skrijemo vse komponente aplikacije */
+    html, body, #app-container, #sidebar, #map-container, .leaflet-control-container {
+        display: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Prikazemo le tiskalni vsebnik */
+    .print-only, #print-section {
+        display: block !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: #ffffff;
+        color: #000000;
+        padding: 10mm;
+    }
+
+    #print-naslov {
+        font-size: 20pt;
+        margin-bottom: 15px;
+        text-align: center;
+        border-bottom: 2px solid #000;
+        padding-bottom: 5px;
+    }
+
+    #print-map {
+        width: 100%;
+        height: 450px;
+        border: 1px solid #000;
+        margin-bottom: 20px;
+        page-break-inside: avoid;
+    }
+
+    /* Tabela prisotnih enot na tiskalnem poročilu */
+    #print-tabela {
+        width: 100%;
+        margin-top: 15px;
+    }
+
+    .tisk-tabela {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10pt;
+    }
+
+    .tisk-tabela th, 
+    .tisk-tabela td {
+        border: 1px solid #666;
+        padding: 6px 8px;
+        text-align: left;
+    }
+
+    .tisk-tabela th {
+        background-color: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
