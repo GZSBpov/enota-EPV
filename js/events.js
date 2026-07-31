@@ -5,6 +5,37 @@
 import { map, narisaniSektorjiSloj, nastaviPopupZaSektor, pridobiGeoJsonSektorjev } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL, STORAGE_KEY_DOGODEK } from './config.js';
 
+/**
+ * Naloži zadnji shranjeni dogodek iz localStorage (ob zagonu)
+ */
+export async function naloziAktivniDogodek() {
+    let podatki = null;
+    const lokalniPodatki = localStorage.getItem(STORAGE_KEY_DOGODEK);
+    
+    if (lokalniPodatki) {
+        try {
+            podatki = JSON.parse(lokalniPodatki);
+        } catch (e) {
+            console.error("Napaka pri branju localStorage:", e);
+        }
+    }
+
+    if (!podatki || !podatki.sektorji) return;
+
+    narisaniSektorjiSloj.clearLayers();
+
+    L.geoJSON(podatki.sektorji, {
+        onEachFeature: (feature, layer) => {
+            const barva = feature.properties?.barvaSektorja || "red";
+            narisaniSektorjiSloj.addLayer(layer);
+            nastaviPopupZaSektor(layer, barva);
+        }
+    });
+}
+
+/**
+ * Shrani trenutno stanje dogodka
+ */
 export async function shraniDogodek() {
     const imeDogodka = document.getElementById('input-ime-dogodka')?.value || "Neimenovana intervencija";
     const geojsonSektorji = pridobiGeoJsonSektorjev();
@@ -16,23 +47,24 @@ export async function shraniDogodek() {
         sektorji: geojsonSektorji
     };
 
-    // 1. Shrani lokalno
     localStorage.setItem(STORAGE_KEY_DOGODEK, JSON.stringify(podatkiDogodka));
 
-    // 2. Shrani na Google Apps Script (Drive)
     try {
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors', // standard za Google Apps Script POST zahteve
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(podatkiDogodka)
         });
-        alert("Dogodek je bil uspešno poslan na strežnik/Drive!");
+        alert("Dogodek je bil uspešno shranjen!");
     } catch (err) {
         console.warn("Strežnik ni dosegljiv, shranjeno le lokalno.", err);
     }
 }
 
+/**
+ * Naloži seznam vseh dogodkov iz Google Apps Script
+ */
 export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
     if (!selectEl) return;
@@ -52,4 +84,11 @@ export async function naloziSeznamDogodkov() {
     } catch (err) {
         console.warn("Ni mogoče naložiti seznama z Google Apps Script:", err);
     }
+}
+
+/**
+ * Pripravi poročilo za tisk
+ */
+export function pripraviInNatisni() {
+    window.print();
 }
