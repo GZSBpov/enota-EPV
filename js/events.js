@@ -3,160 +3,53 @@
 // ==========================================
 
 import { map, narisaniSektorjiSloj, nastaviPopupZaSektor, pridobiGeoJsonSektorjev } from './map.js';
-import { enoteSloj } from './units.js';
-import { STORAGE_KEY_DOGODEK } from './config.js';
+import { GOOGLE_APPS_SCRIPT_URL, STORAGE_KEY_DOGODEK } from './config.js';
 
-/**
- * Shrani trenutno stanje dogodka v localStorage in na strežnik
- */
-export async function shraniDogodek(dogodekId = "aktivni_dogodek") {
+export async function shraniDogodek() {
+    const imeDogodka = document.getElementById('input-ime-dogodka')?.value || "Neimenovana intervencija";
     const geojsonSektorji = pridobiGeoJsonSektorjev();
     
     const podatkiDogodka = {
-        id: dogodekId,
+        akcija: "shraniDogodek",
+        naziv: imeDogodka,
         casShranjevanja: new Date().toISOString(),
         sektorji: geojsonSektorji
     };
 
-    // 1. Shranjevanje v lokalno shrambo (fallback ob izpadu povezave)
-    try {
-        localStorage.setItem(STORAGE_KEY_DOGODEK, JSON.stringify(podatkiDogodka));
-        console.log("Dogodek uspešno shranjen v localStorage.");
-    } catch (e) {
-        console.error("Napaka pri shranjevanju v localStorage:", e);
-    }
+    // 1. Shrani lokalno
+    localStorage.setItem(STORAGE_KEY_DOGODEK, JSON.stringify(podatkiDogodka));
 
-    // 2. Poskus shranjevanja na backend strežnik
+    // 2. Shrani na Google Apps Script (Drive)
     try {
-        const response = await fetch(`/api/dogodki/${dogodekId}`, {
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
+            mode: 'no-cors', // standard za Google Apps Script POST zahteve
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(podatkiDogodka)
         });
+        alert("Dogodek je bil uspešno poslan na strežnik/Drive!");
+    } catch (err) {
+        console.warn("Strežnik ni dosegljiv, shranjeno le lokalno.", err);
+    }
+}
+
+export async function naloziSeznamDogodkov() {
+    const selectEl = document.getElementById('select-dogodek');
+    if (!selectEl) return;
+
+    try {
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke`);
         if (response.ok) {
-            console.log("Dogodek uspešno sinhroniziran s strežnikom.");
+            const dogodki = await response.json();
+            selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
+            dogodki.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = `${d.naziv} (${new Date(d.datum).toLocaleDateString()})`;
+                selectEl.appendChild(opt);
+            });
         }
     } catch (err) {
-        console.warn("Strežnik ni dosegljiv, podatki so shranjeni lokalno.", err);
+        console.warn("Ni mogoče naložiti seznama z Google Apps Script:", err);
     }
-}
-
-/**
- * Naloži shranjeni dogodek in izriše sektorje na zemljevid
- */
-export async function naloziAktivniDogodek() {
-    let podatki = null;
-
-    // Najprej poskusimo prebrati iz localStorage
-    const lokalniPodatki = localStorage.getItem(STORAGE_KEY_DOGODEK);
-    if (lokalniPodatki) {
-        try {
-            podatki = JSON.parse(lokalniPodatki);
-        } catch (e) {
-            console.error("Napaka pri branju localStorage:", e);
-        }
-    }
-
-    if (!podatki || !podatki.sektorji) return;
-
-    // Počistimo obstoječe sektorje na zemljevidu
-    narisaniSektorjiSloj.clearLayers();
-
-    // Nalaganje GeoJSON sektorjev nazaj na sloj
-    L.geoJSON(podatki.sektorji, {
-        onEachFeature: (feature, layer) => {
-            const barva = feature.properties?.barvaSektorja || "red";
-            narisaniSektorjiSloj.addLayer(layer);
-            nastaviPopupZaSektor(layer, barva);
-        }
-    });
-}
-
-/**
- * Pripravi poseben prikaz zemljevida in tabele ter sproži tiskanje (A4 poročilo)
- */
-export function pripraviInNatisni() {
-    const printMapEl = document.getElementById('print-map');
-    const printTabelaEl = document.getElementById('print-tabela');
-
-    if (!printMapEl) {
-        console.error("Element #print-map ne obstaja!");
-        window.print();
-        return;
-    }
-
-    // Ocistimo prejšnji tiskalni zemljevid, če obstaja
-    printMapEl.innerHTML = '';
-
-    // Ustvarimo začasni Leaflet zemljevid za tisk
-    const printMap = L.map('print-map', {
-        attributionControl: false,
-        zoomControl: false
-    }).setView(map.getCenter(), map.getZoom());
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(printMap);
-
-    // Kloniranje sektorjev na tiskalni zemljevid
-    narisaniSektorjiSloj.eachLayer((layer) => {
-        if (layer instanceof L.Path) {
-            const barva = layer.options.barvaSektorja || 'red';
-            if (layer instanceof L.Polygon) {
-                L.polygon(layer.getLatLngs(), { color: barva, fillColor: barva, fillOpacity: 0.3 }).addTo(printMap);
-            } else if (layer instanceof L.Polyline) {
-                L.polyline(layer.getLatLngs(), { color: barva }).addTo(printMap);
-            } else if (layer instanceof L.Circle) {
-                L.circle(layer.getLatLng(), { radius: layer.getRadius(), color: barva }).addTo(printMap);
-            }
-        }
-    });
-
-    // Kloniranje markerjev enot skupaj z napisi (Tooltip)
-    enoteSloj.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-            const novMarker = L.marker(layer.getLatLng(), { icon: layer.options.icon }).addTo(printMap);
-            if (layer.getTooltip()) {
-                novMarker.bindTooltip(layer.getTooltip().getContent(), {
-                    permanent: true,
-                    direction: 'top'
-                });
-            }
-        }
-    });
-
-    // Generiranje tabele enot za tisk
-    if (printTabelaEl) {
-        let htmlTabela = `
-            <table class="tisk-tabela">
-                <thead>
-                    <tr>
-                        <th>Enota</th>
-                        <th>Status</th>
-                        <th>Zadnja kooperativa / Lokacija</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        enoteSloj.eachLayer((layer) => {
-            if (layer instanceof L.Marker) {
-                const ll = layer.getLatLng();
-                const ime = layer.options.title || "Enota";
-                htmlTabela += `
-                    <tr>
-                        <td><b>${ime}</b></td>
-                        <td>Aktivno</td>
-                        <td>${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}</td>
-                    </tr>
-                `;
-            }
-        });
-
-        htmlTabela += `</tbody></table>`;
-        printTabelaEl.innerHTML = htmlTabela;
-    }
-
-    // Počakamo kratek trenutek, da se ploščice (tiles) zemljevida naložijo, nato sprožimo tisk
-    setTimeout(() => {
-        window.print();
-    }, 500);
 }
