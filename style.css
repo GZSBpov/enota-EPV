@@ -176,3 +176,61 @@ header {
     font-size: 0.85rem;
     margin-top: 10px;
 }
+/* VRSTICE ENOT V STRANSKI VRSTICI */
+.enota-vrstica {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    font-size: 0.85rem;
+}
+
+.enota-vrstica input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.status-zacka {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+.status-zacka.aktiven { background: #10b981; color: #fff; }
+.status-zacka.neaktiven { background: #64748b; color: #fff; }
+
+/* ==========================================
+   PRILAGODITEV ZA TISK (PRINT VIEW FIX)
+   ========================================== */
+@media print {
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: visible !important;
+    }
+
+    /* Skrijemo vse stranske menije, gumbe in resizer */
+    #sidebar, #resizer, .leaflet-control-container, .btn-fullscreen, .modal-overlay {
+        display: none !important;
+    }
+
+    #app-container {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    #map-container {
+        width: 100% !important;
+        height: 500px !important;
+        page-break-after: always;
+    }
+
+    #map {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
