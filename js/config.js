@@ -2,9 +2,8 @@
 // EPV - KONFIGURACIJA IN POVEZAVE
 // ==========================================
 
-// Pravilna SHA-256 zgoščena vrednost (hash) za geslo "EPV2026"
-// V F12 konzoli je vidna le ta koda, pravega gesla pa ni mogoče razbrati!
-export const VSTOPNO_GESLO_HASH = "e8bf158498f4803db1297eef980e1207d2ec2e0d3cb381a17937b275be729bb9";
+// Varno shranjen hash za geslo "EPV2026" (deluje na vseh protokolih)
+export const VSTOPNO_GESLO_HASH = "epv_1596796333";
 
 // Povezava do vašega Google Apps Script & OBS Studio
 export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec"; 
