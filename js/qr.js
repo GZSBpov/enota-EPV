@@ -1,67 +1,72 @@
 // ==========================================
-// EPV - PRVOTNI GENERATOR QR KODE
+// EPV - MODUL ZA GENERIRANJE TERENSKE QR KODE
 // ==========================================
 
 import { TEREN_EPV_URL } from './config.js';
 
 /**
- * Ustvari QR kodo z uporabo prvotne QRCode knjižnice
+ * Ustvari QR kodo z aktivnim dogodkom in jo prikaže v modalnem oknu
  */
-export function ustvariQrKodo() {
-    const tipEl = document.getElementById('qrTip');
-    const clanovEl = document.getElementById('qrClanov');
-    const qrIzhodEl = document.getElementById('qr-izhod');
-    const qrUrlTekstEl = document.getElementById('qr-url-tekst');
+export function prikaziQRModal() {
+    const modal = document.getElementById('qr-modal');
+    const qrContainer = document.getElementById('qr-code-container');
     const selectDogodek = document.getElementById('select-dogodek');
+    const inputImeDogodka = document.getElementById('input-ime-dogodka');
 
-    if (!tipEl || !clanovEl || !qrIzhodEl) return;
+    if (!modal || !qrContainer) return;
 
-    const t = tipEl.value;
-    const c = clanovEl.value;
-
-    // Pridobimo še ime dogodka, če je izbrano
-    let dogodekParam = "";
-    if (selectDogodek && selectDogodek.value && selectDogodek.selectedIndex >= 0) {
-        const dogodekIme = selectDogodek.options[selectDogodek.selectedIndex].text;
-        dogodekParam = `&dogodek=${encodeURIComponent(dogodekIme)}`;
+    // Pridobimo ime trenutno izbranega ali vnesenega dogodka
+    let dogodekIme = "Splošno";
+    
+    if (inputImeDogodka && inputImeDogodka.value.trim() !== "") {
+        dogodekIme = inputImeDogodka.value.trim();
+    } else if (selectDogodek && selectDogodek.selectedIndex >= 0 && selectDogodek.value !== "novy") {
+        dogodekIme = selectDogodek.options[selectDogodek.selectedIndex].text;
     }
 
-    // Sestavimo URL (uporabi TEREN_EPV_URL ali neposredno GitHub povezavo)
+    // Sestavimo celoten URL do terenEPV.html
     const bazniUrl = TEREN_EPV_URL || "https://gzsbpov.github.io/enota-EPV/terenEPV.html";
-    const url = `${bazniUrl}?tip=${t}&clanov=${c}${dogodekParam}`;
+    const terenskiUrl = `${bazniUrl}?dogodek=${encodeURIComponent(dogodekIme)}`;
 
     // Počistimo prejšnjo QR kodo
-    qrIzhodEl.innerHTML = "";
-    
-    if (qrUrlTekstEl) {
-        qrUrlTekstEl.innerText = url;
-    }
+    qrContainer.innerHTML = "";
 
-    // Ustvarimo novo QR kodo z uporabo prvotne knjižnice QRCode
+    // Ustvarimo novo QR kodo z uporabo qrcode.min.js
     if (typeof QRCode !== 'undefined') {
-        new QRCode(qrIzhodEl, {
-            text: url,
-            width: 110,
-            height: 110
+        new QRCode(qrContainer, {
+            text: terenskiUrl,
+            width: 200,
+            height: 200,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
         });
     } else {
-        console.warn("Knjižnica QRCode.js ni naložena v HTML!");
+        // Če knjižnica ni naložena, uporabi rezervni API
+        qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(terenskiUrl)}" alt="QR Koda" style="border: 1px solid #ccc; padding: 5px; background: white; border-radius: 4px;" />`;
+    }
+
+    // Prikažemo modalno okno
+    modal.style.display = 'flex';
+}
+
+/**
+ * Zapre modalno okno za QR kodo
+ */
+export function zapriQRModal() {
+    const modal = document.getElementById('qr-modal');
+    if (modal) {
+        modal.style.display = 'none';
     }
 }
 
 /**
- * Iniciira poslušalce sprememb na vnosnih poljih
+ * Iniciira poslušalce dogodkov za gumb "📱 QR Teren" in gumb za zapiranje
  */
 export function iniciirajQRGenerator() {
-    const tipEl = document.getElementById('qrTip');
-    const clanovEl = document.getElementById('qrClanov');
-    const selectDogodek = document.getElementById('select-dogodek');
+    const btnQrTeren = document.getElementById('btn-qr-teren');
+    const btnZapriQr = document.getElementById('btn-zapri-qr');
 
-    tipEl?.addEventListener('change', ustvariQrKodo);
-    clanovEl?.addEventListener('input', ustvariQrKodo);
-    clanovEl?.addEventListener('change', ustvariQrKodo);
-    selectDogodek?.addEventListener('change', ustvariQrKodo);
-
-    // Začetni izris QR kode
-    ustvariQrKodo();
+    btnQrTeren?.addEventListener('click', prikaziQRModal);
+    btnZapriQr?.addEventListener('click', zapriQRModal);
 }
