@@ -1,20 +1,16 @@
 // ==========================================
-// EPV - MODUL ZA ENOTE IN SLEJENJE (GPS)
+// EPV - MODUL ZA ENOTE IN SLEDENJE (GPS)
 // ==========================================
 
 import { map } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 
-// Sloji za markerje enot in njihove poti (polylines)
 export const enoteSloj = new L.FeatureGroup();
 export const slediSloj = new L.FeatureGroup();
 
-// Lokalna shramba za sledenje enot (struktura: { enotaId: { marker, pathLayer, coords: [] } })
 const enoteBaza = {};
+const vidnostEnot = {};
 
-/**
- * Inicializira sloje za enote na zemljevidu
- */
 export function iniciirajSlojeEnot() {
     if (map) {
         map.addLayer(slediSloj);
@@ -23,49 +19,77 @@ export function iniciirajSlojeEnot() {
 }
 
 /**
- * Posodobi ali doda enoto na zemljevid ter v stransko vrstico
- * @param {Object} enota - Objekt z podatki enote (id, naziv, lat, lng, tip, status...)
+ * Vrne barvo glede na tip enote:
+ * - GASILEC: rdeča (#ef4444)
+ * - VOZILO: modra (#3b82f6)
+ * - VODJA: rumena (#eab308)
+ * - REŠEVALCI in ostali: zelena (#10b981)
  */
+function pridobiBarvoZaTip(tip) {
+    const t = (tip || '').toUpperCase();
+    if (t.includes('GASILEC')) return '#ef4444'; // Rdeča
+    if (t.includes('VOZILO')) return '#3b82f6';  // Modra
+    if (t.includes('VODJA')) return '#eab308';   // Rumena
+    if (t.includes('RESEVALEC') || t.includes('REŠEVALEC')) return '#10b981'; // Zelena
+    return '#10b981'; // Privzeto zelena za ostale
+}
+
+/**
+ * Ustvari barvno ikono za marker na podlagi barve tipa
+ */
+function ustvariIkono(barva) {
+    const svgIcon = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${barva}" width="32px" height="32px" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+    `;
+    return L.divIcon({
+        className: 'custom-map-pin',
+        html: svgIcon,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -30]
+    });
+}
+
 export function posodobiEnoto(enota) {
     if (!enota || !enota.id || !enota.lat || !enota.lng) return;
 
     const latLng = [enota.lat, enota.lng];
+    const barva = pridobiBarvoZaTip(enota.tip);
 
-    // Če enota še ne obstaja v bazi, jo ustvarimo
+    if (vidnostEnot[enota.id] === undefined) {
+        vidnostEnot[enota.id] = true;
+    }
+
     if (!enoteBaza[enota.id]) {
-        // Ustvarjanje markerja za enoto
         const marker = L.marker(latLng, {
+            icon: ustvariIkono(barva),
             title: enota.naziv
         });
 
-        // Stalni napis (Tooltip) nad markerjem
         marker.bindTooltip(enota.naziv, {
             permanent: true,
             direction: 'top',
-            offset: [0, -10]
+            offset: [0, -28]
         });
 
-        // Popup z podrobnostmi
         marker.bindPopup(`
             <div style="font-size: 12px; color: #000;">
-                <b>${enota.naziv}</b><br>
+                <b style="color: ${barva};">${enota.naziv}</b><br>
                 Tip: ${enota.tip || 'Splošno'}<br>
-                Status: ${enota.status || 'Aktivno'}<br>
+                Status: ${enota.status || 'Aktivna'}<br>
                 Zadnji čas: ${enota.cas || '-'}<br>
                 Koordinate: ${enota.lat.toFixed(5)}, ${enota.lng.toFixed(5)}
             </div>
         `);
 
-        // Sled (Polyline) za pot gibanja
         const pathLayer = L.polyline([latLng], {
-            color: pridobiBarvoZaTip(enota.tip),
+            color: barva,
             weight: 3,
-            opacity: 0.7,
+            opacity: 0.8,
             dashArray: '5, 5'
         });
-
-        enoteSloj.addLayer(marker);
-        slediSloj.addLayer(pathLayer);
 
         enoteBaza[enota.id] = {
             marker: marker,
@@ -74,12 +98,11 @@ export function posodobiEnoto(enota) {
             podatki: enota
         };
     } else {
-        // Posodobitev obstoječe enote
         const e = enoteBaza[enota.id];
         e.podatki = enota;
         e.marker.setLatLng(latLng);
+        e.marker.setIcon(ustvariIkono(barva));
 
-        // Dodajanje nove koordinate v pot sledenja le, če se je lokacija spremenila
         const zadnjaCoord = e.coords[e.coords.length - 1];
         if (!zadnjaCoord || zadnjaCoord[0] !== latLng[0] || zadnjaCoord[1] !== latLng[1]) {
             e.coords.push(latLng);
@@ -87,27 +110,25 @@ export function posodobiEnoto(enota) {
         }
     }
 
-    // Posodobi še prikaz v stranski vrstici
+    osveziPrikazEnotNaMapi();
     osveziStranskoVrstico();
 }
 
-/**
- * Vrne barvo črte sledenja glede na tip enote
- */
-function pridobiBarvoZaTip(tip) {
-    switch (tip?.toUpperCase()) {
-        case 'GASILEC':
-        case 'VOZILO': return '#ef4444'; // Rdeča
-        case 'VODJA':
-        case 'POLICIJA': return '#3b82f6';  // Modra
-        case 'RESEVALEC': return '#10b981'; // Zelena
-        default: return '#8b5cf6';       // Vijolična
-    }
+function osveziPrikazEnotNaMapi() {
+    Object.keys(enoteBaza).forEach(id => {
+        const item = enoteBaza[id];
+        const jeVidna = vidnostEnot[id];
+
+        if (jeVidna) {
+            if (!enoteSloj.hasLayer(item.marker)) enoteSloj.addLayer(item.marker);
+            if (!slediSloj.hasLayer(item.pathLayer)) slediSloj.addLayer(item.pathLayer);
+        } else {
+            if (enoteSloj.hasLayer(item.marker)) enoteSloj.removeLayer(item.marker);
+            if (slediSloj.hasLayer(item.pathLayer)) slediSloj.removeLayer(item.pathLayer);
+        }
+    });
 }
 
-/**
- * Ponovno izriše seznam enot v stranski vrstici (#seznamEnotGumbi)
- */
 export function osveziStranskoVrstico() {
     const kontejner = document.getElementById('seznamEnotGumbi');
     if (!kontejner) return;
@@ -116,28 +137,48 @@ export function osveziStranskoVrstico() {
 
     const enoteSeznam = Object.values(enoteBaza);
     if (enoteSeznam.length === 0) {
-        kontejner.innerHTML = '<div style="font-size: 0.85rem; color: #64748b; padding: 8px;">Ni aktivnih enot na terenu.</div>';
+        kontejner.innerHTML = '<div style="font-size: 0.85rem; color: #64748b; padding: 12px; text-align: center;">Ni aktivnih enot za ta dogodek.</div>';
         return;
     }
 
     enoteSeznam.forEach(({ podatki, marker }) => {
+        const id = podatki.id;
+        const jeChecked = vidnostEnot[id] !== false;
+        const barva = pridobiBarvoZaTip(podatki.tip);
+
         const kartica = document.createElement('div');
-        kartica.className = 'enota-kartica';
-        kartica.style.cssText = 'cursor: pointer; padding: 8px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;';
+        kartica.className = 'enota-vrstica';
+        kartica.style.cssText = 'padding: 10px 12px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b;';
 
         kartica.innerHTML = `
-            <div>
-                <div class="enota-naziv" style="font-weight: bold; font-size: 0.9rem;">${podatki.naziv}</div>
-                <div style="font-size: 0.75rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" class="chk-enota" id="chk-${id}" ${jeChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+                <div>
+                    <div style="font-weight: bold; font-size: 0.88rem; color: #f8fafc;">
+                        <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
+                        ${podatki.naziv}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
+                </div>
             </div>
-            <span class="enota-status" style="font-size: 0.75rem; background: #059669; padding: 2px 6px; border-radius: 4px;">${podatki.status || 'Aktivna'}</span>
+            <span style="font-size: 0.72rem; background: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                ${podatki.status || 'Aktivna'}
+            </span>
         `;
 
-        // Klik na kartico usmeri zemljevid na dano enoto
-        kartica.addEventListener('click', () => {
-            if (map && marker) {
-                map.flyTo(marker.getLatLng(), 16);
-                marker.openPopup();
+        const chk = kartica.querySelector(`#chk-${id}`);
+        chk.addEventListener('change', (e) => {
+            e.stopPropagation();
+            vidnostEnot[id] = e.target.checked;
+            osveziPrikazEnotNaMapi();
+        });
+
+        kartica.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT') {
+                if (map && marker && vidnostEnot[id]) {
+                    map.flyTo(marker.getLatLng(), 16);
+                    marker.openPopup();
+                }
             }
         });
 
@@ -145,45 +186,54 @@ export function osveziStranskoVrstico() {
     });
 }
 
-/**
- * Pridobi najnovejše lokacije enot iz Google Apps Script (zavihek "Lokacije")
- */
 export async function osveziLokacijeEnot() {
+    const aktivniDogodekId = document.getElementById('select-dogodek')?.value || '';
+
     try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`);
-        if (response.ok) {
-            const odgovor = await response.json();
-            
-            if (odgovor.status === "success" && Array.isArray(odgovor.data)) {
-                const vrstice = odgovor.data;
-                const zadnjeLokacijeEnot = {};
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiLokacije&dogodekId=${aktivniDogodekId}&geslo=EPV2026`);
+        if (!response.ok) return;
 
-                for (let i = 1; i < vrstice.length; i++) {
-                    const [cas, enotaPolno, lat, lon, acc] = vrstice[i];
-                    if (!enotaPolno || !lat || !lon) continue;
+        const odgovor = await response.json();
+        
+        if (odgovor.status === "success" && Array.isArray(odgovor.data)) {
+            const vrstice = odgovor.data;
+            const zadnjeLokacijeEnot = {};
 
-                    const deli = enotaPolno.split(':');
-                    const tip = deli[0] || 'Splošno';
-                    const ime = deli[1] || enotaPolno;
-                    const clanov = deli[2] ? `(${deli[2]} članov)` : '';
+            for (let i = 1; i < vrstice.length; i++) {
+                const [cas, enotaPolno, lat, lon, acc, dId] = vrstice[i];
+                if (!enotaPolno || !lat || !lon) continue;
 
-                    zadnjeLokacijeEnot[enotaPolno] = {
-                        id: enotaPolno,
-                        naziv: `${ime} ${clanov}`.trim(),
-                        tip: tip,
-                        lat: parseFloat(lat),
-                        lng: parseFloat(lon),
-                        status: 'Aktivna',
-                        cas: cas
-                    };
-                }
+                if (aktivniDogodekId && dId && dId !== aktivniDogodekId && aktivniDogodekId !== 'novy') continue;
 
-                Object.values(zadnjeLokacijeEnot).forEach(enota => {
-                    posodobiEnoto(enota);
-                });
+                const deli = enotaPolno.split(':');
+                const tip = deli[0] || 'Splošno';
+                const ime = deli[1] || enotaPolno;
+                const clanov = deli[2] ? `(${deli[2]} članov)` : '';
+
+                zadnjeLokacijeEnot[enotaPolno] = {
+                    id: enotaPolno,
+                    naziv: `${ime} ${clanov}`.trim(),
+                    tip: tip,
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lon),
+                    status: 'Aktivna',
+                    cas: cas
+                };
             }
+
+            Object.keys(enoteBaza).forEach(id => {
+                if (!zadnjeLokacijeEnot[id]) {
+                    enoteSloj.removeLayer(enoteBaza[id].marker);
+                    slediSloj.removeLayer(enoteBaza[id].pathLayer);
+                    delete enoteBaza[id];
+                }
+            });
+
+            Object.values(zadnjeLokacijeEnot).forEach(enota => {
+                posodobiEnoto(enota);
+            });
         }
     } catch (err) {
-        console.error("Napaka pri osveževanju lokacij enot iz Driva:", err);
+        console.error("Napaka pri osveževanju lokacij enot:", err);
     }
 }
