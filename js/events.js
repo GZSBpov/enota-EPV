@@ -50,7 +50,7 @@ export async function naloziAktivniDogodek() {
             const podatki = await response.json();
             const dejanskiPodatki = podatki.data || podatki;
             if (dejanskiPodatki && !dejanskiPodatki.error) {
-                const inputNaziv = document.getElementById('input-naziv-dogodka');
+                const inputNaziv = document.getElementById('input-ime-dogodka');
                 if (inputNaziv && dejanskiPodatki.naziv) {
                     inputNaziv.value = dejanskiPodatki.naziv;
                 }
@@ -65,7 +65,7 @@ export async function naloziAktivniDogodek() {
  * Shrani trenutni dogodek na Google Apps Script
  */
 export async function shraniDogodek() {
-    const nazivInput = document.getElementById('input-naziv-dogodka');
+    const nazivInput = document.getElementById('input-ime-dogodka');
     const naziv = nazivInput ? nazivInput.value.trim() : "";
 
     if (!naziv) {
