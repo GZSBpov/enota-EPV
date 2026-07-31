@@ -3,6 +3,7 @@
 // ==========================================
 
 import { map } from './map.js';
+import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 
 // Sloji za markerje enot in njihove poti (polylines)
 export const enoteSloj = new L.FeatureGroup();
@@ -46,10 +47,11 @@ export function posodobiEnoto(enota) {
 
         // Popup z podrobnostmi
         marker.bindPopup(`
-            <div style="font-size: 12px;">
+            <div style="font-size: 12px; color: #000;">
                 <b>${enota.naziv}</b><br>
                 Tip: ${enota.tip || 'Splošno'}<br>
                 Status: ${enota.status || 'Aktivno'}<br>
+                Zadnji čas: ${enota.cas || '-'}<br>
                 Koordinate: ${enota.lat.toFixed(5)}, ${enota.lng.toFixed(5)}
             </div>
         `);
@@ -77,9 +79,12 @@ export function posodobiEnoto(enota) {
         e.podatki = enota;
         e.marker.setLatLng(latLng);
 
-        // Dodajanje nove koordinate v pot sledenja
-        e.coords.push(latLng);
-        e.pathLayer.setLatLngs(e.coords);
+        // Dodajanje nove koordinate v pot sledenja le, če se je lokacija spremenila
+        const zadnjaCoord = e.coords[e.coords.length - 1];
+        if (!zadnjaCoord || zadnjaCoord[0] !== latLng[0] || zadnjaCoord[1] !== latLng[1]) {
+            e.coords.push(latLng);
+            e.pathLayer.setLatLngs(e.coords);
+        }
     }
 
     // Posodobi še prikaz v stranski vrstici
@@ -90,10 +95,12 @@ export function posodobiEnoto(enota) {
  * Vrne barvo črte sledenja glede na tip enote
  */
 function pridobiBarvoZaTip(tip) {
-    switch (tip?.toLowerCase()) {
-        case 'vozilo': return '#ef4444'; // Rdeča
-        case 'vodja': return '#3b82f6';  // Modra
-        case 'resevalec': return '#10b981'; // Zelena
+    switch (tip?.toUpperCase()) {
+        case 'GASILEC':
+        case 'VOZILO': return '#ef4444'; // Rdeča
+        case 'VODJA':
+        case 'POLICIJA': return '#3b82f6';  // Modra
+        case 'RESEVALEC': return '#10b981'; // Zelena
         default: return '#8b5cf6';       // Vijolična
     }
 }
@@ -116,14 +123,14 @@ export function osveziStranskoVrstico() {
     enoteSeznam.forEach(({ podatki, marker }) => {
         const kartica = document.createElement('div');
         kartica.className = 'enota-kartica';
-        kartica.style.cursor = 'pointer';
+        kartica.style.cssText = 'cursor: pointer; padding: 8px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;';
 
         kartica.innerHTML = `
             <div>
-                <div class="enota-naziv">${podatki.naziv}</div>
-                <div style="font-size: 0.75rem; color: #64748b;">${podatki.tip || 'Enota'}</div>
+                <div class="enota-naziv" style="font-weight: bold; font-size: 0.9rem;">${podatki.naziv}</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
             </div>
-            <span class="enota-status">${podatki.status || 'Aktivna'}</span>
+            <span class="enota-status" style="font-size: 0.75rem; background: #059669; padding: 2px 6px; border-radius: 4px;">${podatki.status || 'Aktivna'}</span>
         `;
 
         // Klik na kartico usmeri zemljevid na dano enoto
@@ -148,8 +155,6 @@ export async function osveziLokacijeEnot() {
             const odgovor = await response.json();
             
             if (odgovor.status === "success" && Array.isArray(odgovor.data)) {
-                // Tabela vsebuje vrstice: ["Čas", "Enota", "Latitude", "Longitude", "Natančnost"]
-                // Preskočimo prvo vrstico (naslove stolpcev)
                 const vrstice = odgovor.data;
                 const zadnjeLokacijeEnot = {};
 
@@ -157,16 +162,14 @@ export async function osveziLokacijeEnot() {
                     const [cas, enotaPolno, lat, lon, acc] = vrstice[i];
                     if (!enotaPolno || !lat || !lon) continue;
 
-                    // Razbijemo zapis "TIP:IME:CLANI" (npr. GASILEC:Slb 1:4)
                     const deli = enotaPolno.split(':');
                     const tip = deli[0] || 'Splošno';
                     const ime = deli[1] || enotaPolno;
-                    const clanov = deli[2] || '1';
+                    const clanov = deli[2] ? `(${deli[2]} članov)` : '';
 
-                    // Zapomnimo si le zadnjo (najnovejšo) lokacijo posamezne enote
                     zadnjeLokacijeEnot[enotaPolno] = {
                         id: enotaPolno,
-                        naziv: `${ime} (${clanov})`,
+                        naziv: `${ime} ${clanov}`.trim(),
                         tip: tip,
                         lat: parseFloat(lat),
                         lng: parseFloat(lon),
@@ -175,7 +178,6 @@ export async function osveziLokacijeEnot() {
                     };
                 }
 
-                // Posodobimo vsako enoto na zemljevidu
                 Object.values(zadnjeLokacijeEnot).forEach(enota => {
                     posodobiEnoto(enota);
                 });
