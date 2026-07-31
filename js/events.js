@@ -2,6 +2,9 @@ import { map, narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja
 import { GOOGLE_APPS_SCRIPT_URL, STORAGE_KEY_DOGODEK } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 
+/**
+ * Naloži aktivni dogodek iz lokalne shrambe ali baze
+ */
 export async function naloziAktivniDogodek() {
     let podatki = null;
     const lokalniPodatki = localStorage.getItem(STORAGE_KEY_DOGODEK);
@@ -36,6 +39,12 @@ export async function naloziAktivniDogodek() {
     osveziLokacijeEnot();
 }
 
+// Alias za naloziAktivniDogodek (da odpravi napako v app.js)
+export const naloziPodatkeDogodka = naloziAktivniDogodek;
+
+/**
+ * Shrani trenutno stanje sektorjev in dogodka
+ */
 export async function shraniDogodek() {
     const imeDogodka = document.getElementById('input-ime-dogodka')?.value || "Intervencija";
     const geojsonSektorji = pridobiGeoJsonSektorjev();
@@ -62,6 +71,9 @@ export async function shraniDogodek() {
     }
 }
 
+/**
+ * Naloži seznam vseh dogodkov v padajoči meni
+ */
 export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
     if (!selectEl) return;
@@ -85,6 +97,9 @@ export async function naloziSeznamDogodkov() {
     } catch (err) {}
 }
 
+/**
+ * Odpre pogovorno okno za tiskanje
+ */
 export function pripraviInNatisni() {
     window.print();
 }
