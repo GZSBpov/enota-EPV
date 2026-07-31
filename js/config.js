@@ -6,7 +6,7 @@
 export const VSTOPNO_GESLO = "EPV2024";
 
 // Povezava do vašega Google Apps Script (za shranjevanje in nalaganje dogodkov ter GPS enot)
-export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz.../exec"; // Sem prilepite vaš polni Apps Script URL
+export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec"; // Sem prilepite vaš polni Apps Script URL
 
 // Povezava do OBS Studio Live Stream-a (ali HLS/RTMP predvajalnika)
 export const OBS_STREAM_URL = "https://your-obs-stream-server.com/live/stream.m3u8";
