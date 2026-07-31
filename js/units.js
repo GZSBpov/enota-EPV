@@ -31,24 +31,24 @@ function pridobiBarvoZaTip(tip) {
     if (t.includes('VOZILO')) return '#3b82f6';  // Modra
     if (t.includes('VODJA')) return '#eab308';   // Rumena
     if (t.includes('RESEVALEC') || t.includes('REŠEVALEC')) return '#10b981'; // Zelena
-    return '#10b981'; // Privzeto zelena za ostale
+    return '#10b981'; // Privzeto zelena
 }
 
 /**
- * Ustvari barvno ikono za marker na podlagi barve tipa
+ * Ustvari barvno ikono za Leaflet marker
  */
 function ustvariIkono(barva) {
     const svgIcon = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${barva}" width="32px" height="32px" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${barva}" width="30px" height="30px" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
     `;
     return L.divIcon({
         className: 'custom-map-pin',
         html: svgIcon,
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -30]
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -28]
     });
 }
 
@@ -117,7 +117,7 @@ export function posodobiEnoto(enota) {
 function osveziPrikazEnotNaMapi() {
     Object.keys(enoteBaza).forEach(id => {
         const item = enoteBaza[id];
-        const jeVidna = vidnostEnot[id];
+        const jeVidna = vidnostEnot[id] !== false;
 
         if (jeVidna) {
             if (!enoteSloj.hasLayer(item.marker)) enoteSloj.addLayer(item.marker);
@@ -133,11 +133,15 @@ export function osveziStranskoVrstico() {
     const kontejner = document.getElementById('seznamEnotGumbi');
     if (!kontejner) return;
 
+    // Omogoči drsenje (scroll) seznama v stranski vrstici
+    kontejner.style.maxHeight = 'calc(100vh - 250px)';
+    kontejner.style.overflowY = 'auto';
+
     kontejner.innerHTML = '';
 
     const enoteSeznam = Object.values(enoteBaza);
     if (enoteSeznam.length === 0) {
-        kontejner.innerHTML = '<div style="font-size: 0.85rem; color: #64748b; padding: 12px; text-align: center;">Ni aktivnih enot za ta dogodek.</div>';
+        kontejner.innerHTML = '<div style="font-size: 0.85rem; color: #64748b; padding: 12px; text-align: center;">Ni aktivnih enot na terenu.</div>';
         return;
     }
 
@@ -148,37 +152,43 @@ export function osveziStranskoVrstico() {
 
         const kartica = document.createElement('div');
         kartica.className = 'enota-vrstica';
-        kartica.style.cssText = 'padding: 10px 12px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b;';
+        kartica.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b; user-select: none;';
 
         kartica.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" class="chk-enota" id="chk-${id}" ${jeChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
                 <div>
-                    <div style="font-weight: bold; font-size: 0.88rem; color: #f8fafc;">
+                    <div style="font-weight: bold; font-size: 0.85rem; color: #f8fafc;">
                         <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
                         ${podatki.naziv}
                     </div>
-                    <div style="font-size: 0.75rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
                 </div>
             </div>
-            <span style="font-size: 0.72rem; background: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
-                ${podatki.status || 'Aktivna'}
+            <span style="font-size: 0.7rem; background: ${jeChecked ? '#059669' : '#64748b'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                ${jeChecked ? (podatki.status || 'Aktivna') : 'Skrito'}
             </span>
         `;
 
         const chk = kartica.querySelector(`#chk-${id}`);
+        
+        // Ob spremembi kljukice posodobimo stanje
         chk.addEventListener('change', (e) => {
-            e.stopPropagation();
             vidnostEnot[id] = e.target.checked;
             osveziPrikazEnotNaMapi();
+            osveziStranskoVrstico();
         });
 
-        kartica.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'INPUT') {
-                if (map && marker && vidnostEnot[id]) {
-                    map.flyTo(marker.getLatLng(), 16);
-                    marker.openPopup();
-                }
+        // Klik na kljukico ne sme sprožiti klika na celo kartico
+        chk.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Klik na vrstico usmeri zemljevid k enoti (če je obkljukana)
+        kartica.addEventListener('click', () => {
+            if (map && marker && vidnostEnot[id] !== false) {
+                map.flyTo(marker.getLatLng(), 16);
+                marker.openPopup();
             }
         });
 
@@ -190,7 +200,7 @@ export async function osveziLokacijeEnot() {
     const aktivniDogodekId = document.getElementById('select-dogodek')?.value || '';
 
     try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiLokacije&dogodekId=${aktivniDogodekId}&geslo=EPV2026`);
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`);
         if (!response.ok) return;
 
         const odgovor = await response.json();
