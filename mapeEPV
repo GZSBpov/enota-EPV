@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPV - Enota Podpore Vodenju</title>
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Draw CSS & JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <!-- Vaš Stil -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Glavni vsebnik aplikacije -->
+    <div id="app-container">
+        
+        <!-- Stranska vrstica (Sidebar) -->
+        <aside id="sidebar">
+            <header>
+                <h2>Enotni nadzor EPV</h2>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Pregled enot in sektorjev</p>
+            </header>
+
+            <!-- Nadzorni gumbi -->
+            <div style="padding: 12px; display: flex; gap: 8px; border-bottom: 1px solid #e2e8f0;">
+                <button id="btn-shrani" style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                    💾 Shrani
+                </button>
+                <button id="btn-tisk" style="flex: 1; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                    🖨️ Tiskaj
+                </button>
+            </div>
+
+            <!-- Seznam enot na terenu -->
+            <div id="seznamEnotGumbi">
+                <!-- Dinamično se napolni preko units.js -->
+            </div>
+        </aside>
+
+        <!-- Glavni zemljevid -->
+        <main id="map-container">
+            <div id="map"></div>
+        </main>
+    </div>
+
+    <!-- Skrita sekcija namenjena tiska poročila (A4 format) -->
+    <div id="print-section" class="print-only">
+        <h1 id="print-naslov">EPV - Poročilo Intervencije</h1>
+        <div id="print-map"></div>
+        <div id="print-tabela"></div>
+    </div>
+
+    <!-- Glavni JavaScript modul (poveže vse ostale module iz js/ mape) -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
