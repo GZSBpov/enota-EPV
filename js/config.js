@@ -1,27 +1,22 @@
 // ==========================================
-// EPV - KONFIGURACIJA IN POVEZAVE (EXACT API)
+// EPV - KONFIGURACIJA IN POVEZAVE
 // ==========================================
 
-// Vstopno geslo za poveljniški vmesnik
-export const VSTOPNO_GESLO = "EPV2024";
+export const VSTOPNO_GESLO = "VsadL12"; // Geslo z vašega zaslona
 
-// Povezava do vašega Google Apps Script (za shranjevanje in nalaganje dogodkov ter GPS enot)
-export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec"; // Sem prilepite vaš polni Apps Script URL
-
-// Povezava do OBS Studio Live Stream-a (ali HLS/RTMP predvajalnika)
+// Povezava do vašega Google Apps Script & OBS Studio
+export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz.../exec"; 
 export const OBS_STREAM_URL = "https://your-obs-stream-server.com/live/stream.m3u8";
-
-// Povezava do terenske aplikacije (terenEPV.html), ki se uporabi v QR kodi
 export const TEREN_EPV_URL = window.location.origin + window.location.pathname.replace("mapeEPV.html", "terenEPV.html");
 
-// Začetne nastavitve zemljevida
-export const ZACETNE_KOORDINATE = [46.0569, 14.5058]; 
-export const ZACETNI_ZOOM = 13;
+// FOKUS ZEMLJEVIDA: SLOVENSKA BISTRICA
+export const ZACETNE_KOORDINATE = [46.3934, 15.5746]; 
+export const ZACETNI_ZOOM = 14;
 
 export const SLOVAR_BARV = {
-    "red": "Rdeča",
-    "blue": "Modra",
-    "green": "Zelena",
+    "red": "Rdeča (Gasilci)",
+    "blue": "Modra (Policija)",
+    "green": "Zelena (Reševalci)",
     "gold": "Rumena/Zlata",
     "orange": "Oranžna",
     "purple": "Vijolična"
