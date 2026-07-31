@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPV - Enota Podpore Vodenju</title>
+    <title>EPV - Elektronski Poveljniški Vodnik</title>
 
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,12 +13,23 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-    <!-- Vaš Stil -->
+    <!-- Stil -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Glavni vsebnik aplikacije -->
+    <!-- 1. MODALNO OKNO ZA VSTOPNO GESLO -->
+    <div id="vstopno-geslo-modal" class="modal-overlay">
+        <div class="modal-vsebina">
+            <h2>EPV Vstopna Avtentikacija</h2>
+            <p>Vnesite dostopno geslo za dostop do poveljniškega vmesnika:</p>
+            <input type="password" id="input-geslo" placeholder="Vnesite geslo..." autocomplete="off">
+            <button id="btn-potrdi-geslo">Prijava</button>
+            <div id="geslo-napaka" class="napaka-sporocilo"></div>
+        </div>
+    </div>
+
+    <!-- 2. GLAVNI VSEBNIK APLIKACIJE -->
     <div id="app-container">
         
         <!-- Stranska vrstica (Sidebar) -->
@@ -28,14 +39,33 @@
                 <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Pregled enot in sektorjev</p>
             </header>
 
+            <!-- Izbira in shranjevanje dogodkov -->
+            <div class="dogodek-panel">
+                <label for="select-dogodek">Aktivni dogodek / Intervencija:</label>
+                <div style="display: flex; gap: 4px; margin-top: 4px;">
+                    <select id="select-dogodek" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
+                        <option value="novy">-- Nov dogodek --</option>
+                    </select>
+                    <button id="btn-osvezi-dogodke" title="Osveži seznam iz strežnika/Driva">🔄</button>
+                </div>
+                <input type="text" id="input-ime-dogodka" placeholder="Naziv nove intervencije..." style="width: 100%; margin-top: 6px; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
+            </div>
+
             <!-- Nadzorni gumbi -->
-            <div style="padding: 12px; display: flex; gap: 8px; border-bottom: 1px solid #e2e8f0;">
-                <button id="btn-shrani" style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
-                    💾 Shrani
-                </button>
-                <button id="btn-tisk" style="flex: 1; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
-                    🖨️ Tiskaj
-                </button>
+            <div class="gumbi-panel">
+                <button id="btn-shrani" class="btn btn-primaren">💾 Shrani</button>
+                <button id="btn-tisk" class="btn btn-sekundaren">🖨️ Tiskaj</button>
+            </div>
+
+            <!-- Video predvajalnik v živo (OBS Stream / Drone) -->
+            <div id="video-stream-container" class="video-panel">
+                <div class="video-header">
+                    <span>📹 Live Stream (Dron / OBS)</span>
+                    <button id="btn-toggle-video" style="background:none; border:none; color:white; cursor:pointer;">▼</button>
+                </div>
+                <div id="video-wrapper" class="video-body">
+                    <iframe id="iframe-obs-stream" src="" frameborder="0" allowfullscreen></iframe>
+                </div>
             </div>
 
             <!-- Seznam enot na terenu -->
@@ -57,7 +87,7 @@
         <div id="print-tabela"></div>
     </div>
 
-    <!-- Glavni JavaScript modul (poveže vse ostale module iz js/ mape) -->
+    <!-- Glavni JavaScript modul -->
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
