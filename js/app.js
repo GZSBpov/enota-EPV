@@ -4,56 +4,52 @@
 
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
-import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni } from './events.js';
-import { OSVEZEVANJE_INTERVAL_MS } from './config.js';
+import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
+import { OSVEZEVANJE_INTERVAL_MS, VSTOPNO_GESLO, OBS_STREAM_URL, TEREN_EPV_URL, STORAGE_KEY_GESLO } from './config.js';
 
-/**
- * Glavna funkcija za inicializacijo aplikacije ob zagonu
- */
+function generirajQrKodo() {
+    const qrContainer = document.getElementById('qr-code-container');
+    const qrModal = document.getElementById('qr-modal');
+    
+    if (!qrContainer) return;
+    qrContainer.innerHTML = '';
+
+    // Uporaba qrcode.js knjižnice
+    new QRCode(qrContainer, {
+        text: TEREN_EPV_URL,
+        width: 180,
+        height: 180
+    });
+
+    qrModal.style.display = 'flex';
+}
+
+function poveziQrInVideoEvents() {
+    // QR gumb in okno
+    document.getElementById('btn-qr-teren')?.addEventListener('click', generirajQrKodo);
+    document.getElementById('btn-zapri-qr')?.addEventListener('click', () => {
+        document.getElementById('qr-modal').style.display = 'none';
+    });
+
+    // OBS Stream
+    const iframe = document.getElementById('iframe-obs-stream');
+    if (iframe && OBS_STREAM_URL) {
+        iframe.src = OBS_STREAM_URL;
+    }
+}
+
 async function zagonAplikacije() {
-    console.log("Zagon EPV aplikacije...");
-
-    // 1. Inicializacija zemljevida in slojev
     iniciirajZemljevid();
     iniciirajSlojeEnot();
+    poveziQrInVideoEvents();
 
-    // 2. Nalaganje shranjenega dogodka (iz localStorage ali strežnika)
+    await naloziSeznamDogodkov();
     await naloziAktivniDogodek();
 
-    // 3. Prvo osveževanje lokacij enot
-    await osveziLokacijeEnot();
+    setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
 
-    // 4. Nastavitev periodičnega osveževanja enot na terenu
-    setInterval(() => {
-        osveziLokacijeEnot();
-    }, OSVEZEVANJE_INTERVAL_MS);
-
-    // 5. Nastavitev poslušalcev dogodkov za gumba (če obstajata v HTML-ju)
-    poveziGumbe();
-
-    console.log("EPV aplikacija je uspešno pripravljena.");
+    document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
+    document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
 }
 
-/**
- * Poveže interaktivne gumba (npr. Shrani, Tiskaj) z ustreznimi funkcijami
- */
-function poveziGumbe() {
-    // Gumb za shranjevanje dogodka
-    const gumbShrani = document.getElementById('btn-shrani');
-    if (gumbShrani) {
-        gumbShrani.addEventListener('click', () => {
-            shraniDogodek();
-        });
-    }
-
-    // Gumb za tiskanje poročila
-    const gumbTisk = document.getElementById('btn-tisk');
-    if (gumbTisk) {
-        gumbTisk.addEventListener('click', () => {
-            pripraviInNatisni();
-        });
-    }
-}
-
-// Zagon aplikacije ko se celoten DOM naloži
 document.addEventListener('DOMContentLoaded', zagonAplikacije);
