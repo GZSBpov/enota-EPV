@@ -4,7 +4,7 @@
 
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
-import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
+import { shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
 import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
@@ -17,8 +17,8 @@ async function naloziVsebinoAplikacije() {
     iniciirajResizer();
     iniciirajFullscreen();
 
+    // Naložimo seznam dogodkov iz Google Sheeta
     await naloziSeznamDogodkov();
-    await naloziAktivniDogodek();
 
     // Iniciacija modalnega okna za QR kodo
     iniciirajQRGenerator();
