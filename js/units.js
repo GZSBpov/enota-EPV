@@ -139,15 +139,49 @@ export function osveziStranskoVrstico() {
 }
 
 /**
- * Funkcija za pridobivanje osveženih lokacij enot iz strežnika (ali simulacija)
+ * Pridobi najnovejše lokacije enot iz Google Apps Script (zavihek "Lokacije")
  */
 export async function osveziLokacijeEnot() {
     try {
-        // Tu se po potrebi doda fetch request na vaš backend API
-        // const response = await fetch('/api/enote');
-        // const podatki = await response.json();
-        // podatki.forEach(posodobiEnoto);
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`);
+        if (response.ok) {
+            const odgovor = await response.json();
+            
+            if (odgovor.status === "success" && Array.isArray(odgovor.data)) {
+                // Tabela vsebuje vrstice: ["Čas", "Enota", "Latitude", "Longitude", "Natančnost"]
+                // Preskočimo prvo vrstico (naslove stolpcev)
+                const vrstice = odgovor.data;
+                const zadnjeLokacijeEnot = {};
+
+                for (let i = 1; i < vrstice.length; i++) {
+                    const [cas, enotaPolno, lat, lon, acc] = vrstice[i];
+                    if (!enotaPolno || !lat || !lon) continue;
+
+                    // Razbijemo zapis "TIP:IME:CLANI" (npr. GASILEC:Slb 1:4)
+                    const deli = enotaPolno.split(':');
+                    const tip = deli[0] || 'Splošno';
+                    const ime = deli[1] || enotaPolno;
+                    const clanov = deli[2] || '1';
+
+                    // Zapomnimo si le zadnjo (najnovejšo) lokacijo posamezne enote
+                    zadnjeLokacijeEnot[enotaPolno] = {
+                        id: enotaPolno,
+                        naziv: `${ime} (${clanov})`,
+                        tip: tip,
+                        lat: parseFloat(lat),
+                        lng: parseFloat(lon),
+                        status: 'Aktivna',
+                        cas: cas
+                    };
+                }
+
+                // Posodobimo vsako enoto na zemljevidu
+                Object.values(zadnjeLokacijeEnot).forEach(enota => {
+                    posodobiEnoto(enota);
+                });
+            }
+        }
     } catch (err) {
-        console.error("Napaka pri osveževanju enot:", err);
+        console.error("Napaka pri osveževanju lokacij enot iz Driva:", err);
     }
 }
