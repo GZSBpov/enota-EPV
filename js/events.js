@@ -4,7 +4,6 @@
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 
-// Geslo, ki ga pošiljamo v Google Apps Script
 const EPV_GESLO = "EPV2026";
 
 /**
@@ -15,23 +14,25 @@ export async function naloziSeznamDogodkov() {
     if (!selectEl) return;
 
     try {
-        // Dodan parameter &geslo=EPV2026
         const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&geslo=${encodeURIComponent(EPV_GESLO)}`);
         if (response.ok) {
-            const dogodki = await response.json();
+            const odgovor = await response.json();
             
-            if (Array.isArray(dogodki)) {
-                selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
-                dogodki.forEach(d => {
+            // Izvlečemo listo dogodkov (če je zapakirana v odgovor.data ali neposredno tabela)
+            const seznamDogodkov = Array.isArray(odgovor) ? odgovor : (odgovor.data || []);
+
+            selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
+
+            if (Array.isArray(seznamDogodkov) && seznamDogodkov.length > 0) {
+                seznamDogodkov.forEach(d => {
                     const opt = document.createElement('option');
-                    opt.value = d.id;
-                    opt.textContent = `${d.naziv} (${new Date(d.datum).toLocaleDateString()})`;
+                    opt.value = d.id || d.ID || d.naziv;
+                    const datumPrikaz = d.datum ? ` (${new Date(d.datum).toLocaleDateString()})` : '';
+                    opt.textContent = `${d.naziv || d.Naziv || 'Dogodek brez naslova'}${datumPrikaz}`;
                     selectEl.appendChild(opt);
                 });
-            } else if (dogodki.status === 'error') {
-                console.warn("Google Apps Script napaka:", dogodki.message);
-            } else {
-                console.warn("Prejet odgovor iz Driva ni tabela:", dogodki);
+            } else if (odgovor.status === 'error') {
+                console.warn("Google Apps Script napaka:", odgovor.message);
             }
         }
     } catch (err) {
@@ -44,14 +45,14 @@ export async function naloziSeznamDogodkov() {
  */
 export async function naloziAktivniDogodek() {
     try {
-        // Dodan parameter &geslo=EPV2026
         const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiAktivniDogodek&geslo=${encodeURIComponent(EPV_GESLO)}`);
         if (response.ok) {
             const podatki = await response.json();
-            if (podatki && !podatki.error && !podatki.status) {
+            const dejanskiPodatki = podatki.data || podatki;
+            if (dejanskiPodatki && !dejanskiPodatki.error) {
                 const inputNaziv = document.getElementById('input-naziv-dogodka');
-                if (inputNaziv && podatki.naziv) {
-                    inputNaziv.value = podatki.naziv;
+                if (inputNaziv && dejanskiPodatki.naziv) {
+                    inputNaziv.value = dejanskiPodatki.naziv;
                 }
             }
         }
@@ -75,12 +76,12 @@ export async function shraniDogodek() {
     try {
         const payload = {
             akcija: "shraniDogodek",
-            geslo: EPV_GESLO, // Dodano geslo v telo zahtevka
+            geslo: EPV_GESLO,
             naziv: naziv,
             timestamp: new Date().toISOString()
         };
 
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors',
             headers: {
