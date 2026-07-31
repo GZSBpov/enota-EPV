@@ -63,7 +63,7 @@ export async function shraniDogodek() {
 }
 
 /**
- * Naloži seznam vseh dogodkov iz Google Apps Script
+ * Naloži seznam vseh dogodkov iz Google Apps Script (Varno pred napakami)
  */
 export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
@@ -74,12 +74,18 @@ export async function naloziSeznamDogodkov() {
         if (response.ok) {
             const dogodki = await response.json();
             selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
-            dogodki.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.id;
-                opt.textContent = `${d.naziv} (${new Date(d.datum).toLocaleDateString()})`;
-                selectEl.appendChild(opt);
-            });
+            
+            // PREVERBA: Šele če so podatki dejansko seznam/tabela, izvedi forEach
+            if (Array.isArray(dogodki)) {
+                dogodki.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = `${d.naziv} (${new Date(d.datum).toLocaleDateString()})`;
+                    selectEl.appendChild(opt);
+                });
+            } else {
+                console.warn("Prejet odgovor iz Driva ni tabela:", dogodki);
+            }
         }
     } catch (err) {
         console.warn("Ni mogoče naložiti seznama z Google Apps Script:", err);
