@@ -1,84 +1,80 @@
 // ==========================================
-// EPV - MODUL ZA UPRAVLJANJE DOGODKOV
+// EPV - MODUL ZA UPRAVLJANJE DOGODKOV IN SEKTORJEV
 // ==========================================
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
+import { pridobiGeoJsonSektorjev } from './map.js';
 
-const EPV_GESLO = "EPV2026";
+const NAVADNO_GESLO = "EPV2026";
 
 /**
- * Naloži seznam vseh dogodkov iz Google Apps Script
+ * Naloži seznam unikatnih dogodkov iz zavihka "Dogodki" v Google Sheetu
  */
 export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
     if (!selectEl) return;
 
     try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&geslo=${encodeURIComponent(EPV_GESLO)}`);
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=${encodeURIComponent(NAVADNO_GESLO)}`);
         if (response.ok) {
             const odgovor = await response.json();
             
-            // Izvlečemo listo dogodkov (če je zapakirana v odgovor.data ali neposredno tabela)
-            const seznamDogodkov = Array.isArray(odgovor) ? odgovor : (odgovor.data || []);
+            if (odgovor.status === "success" && Array.isArray(odgovor.data)) {
+                selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
 
-            selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
-
-            if (Array.isArray(seznamDogodkov) && seznamDogodkov.length > 0) {
-                seznamDogodkov.forEach(d => {
+                odgovor.data.forEach(imeDogodka => {
                     const opt = document.createElement('option');
-                    opt.value = d.id || d.ID || d.naziv;
-                    const datumPrikaz = d.datum ? ` (${new Date(d.datum).toLocaleDateString()})` : '';
-                    opt.textContent = `${d.naziv || d.Naziv || 'Dogodek brez naslova'}${datumPrikaz}`;
+                    opt.value = imeDogodka;
+                    opt.textContent = imeDogodka;
                     selectEl.appendChild(opt);
                 });
-            } else if (odgovor.status === 'error') {
-                console.warn("Google Apps Script napaka:", odgovor.message);
+            } else if (odgovor.status === "error") {
+                console.warn("Apps Script napaka:", odgovor.message);
             }
         }
     } catch (err) {
-        console.warn("Ni mogoče naložiti seznama z Google Apps Script:", err);
+        console.warn("Ni mogoče naložiti seznama dogodkov:", err);
     }
 }
 
 /**
- * Naloži podrobnosti aktivnega dogodka
- */
-export async function naloziAktivniDogodek() {
-    try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiAktivniDogodek&geslo=${encodeURIComponent(EPV_GESLO)}`);
-        if (response.ok) {
-            const podatki = await response.json();
-            const dejanskiPodatki = podatki.data || podatki;
-            if (dejanskiPodatki && !dejanskiPodatki.error) {
-                const inputNaziv = document.getElementById('input-ime-dogodka');
-                if (inputNaziv && dejanskiPodatki.naziv) {
-                    inputNaziv.value = dejanskiPodatki.naziv;
-                }
-            }
-        }
-    } catch (err) {
-        console.warn("Ni mogoče naložiti aktivnega dogodka:", err);
-    }
-}
-
-/**
- * Shrani trenutni dogodek na Google Apps Script
+ * Shrani narisane sektorje/markerje za trenutni dogodek v zavihek "Dogodki"
  */
 export async function shraniDogodek() {
-    const nazivInput = document.getElementById('input-ime-dogodka');
-    const naziv = nazivInput ? nazivInput.value.trim() : "";
+    const inputIme = document.getElementById('input-ime-dogodka');
+    const selectDogodek = document.getElementById('select-dogodek');
 
-    if (!naziv) {
-        alert("Prosimo, vnesite naziv dogodka!");
+    let dogodekNaziv = inputIme ? inputIme.value.trim() : "";
+    
+    // Če polje za nov dogodek ni izpolnjeno, uporabimo izbiro iz seznama
+    if (!dogodekNaziv && selectDogodek && selectDogodek.value !== "novy") {
+        dogodekNaziv = selectDogodek.value;
+    }
+
+    if (!dogodekNaziv) {
+        alert("Prosimo, vnesite ali izberite naziv dogodka!");
         return;
+    }
+
+    // Pridobimo narisane sektorje v GeoJSON formatu
+    const geojsonSektorji = pridobiGeoJsonSektorjev();
+    const sektorjiZaShranjevanje = [];
+
+    if (geojsonSektorji && geojsonSektorji.features) {
+        geojsonSektorji.features.forEach(feature => {
+            sektorjiZaShranjevanje.push({
+                tip: feature.geometry.type,
+                geojson: feature
+            });
+        });
     }
 
     try {
         const payload = {
-            akcija: "shraniDogodek",
-            geslo: EPV_GESLO,
-            naziv: naziv,
-            timestamp: new Date().toISOString()
+            geslo: NAVADNO_GESLO,
+            akcija: "shraniSektorje",
+            dogodek: dogodekNaziv,
+            sektorji: sektorjiZaShranjevanje
         };
 
         await fetch(GOOGLE_APPS_SCRIPT_URL, {
@@ -90,15 +86,18 @@ export async function shraniDogodek() {
             body: JSON.stringify(payload)
         });
 
-        alert("Dogodek je bil uspešno poslan v shranjevanje!");
+        alert(`Sektorji in markerji za dogodek "${dogodekNaziv}" so bili uspešno shranjeni v Google Sheet!`);
+        
+        // Osvežimo padajoči seznam
+        await naloziSeznamDogodkov();
     } catch (err) {
-        console.error("Napaka pri shranjevanju dogodka:", err);
-        alert("Napaka pri shranjevanju dogodka.");
+        console.error("Napaka pri shranjevanju sektorjev:", err);
+        alert("Napaka pri shranjevanju na strežnik.");
     }
 }
 
 /**
- * Pripravi pogled in odpre okno za tiskanje
+ * Pripravi okno za tiskanje
  */
 export function pripraviInNatisni() {
     window.print();
