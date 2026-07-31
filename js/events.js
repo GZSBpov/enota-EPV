@@ -2,22 +2,24 @@ import { map, narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja
 import { GOOGLE_APPS_SCRIPT_URL, STORAGE_KEY_DOGODEK } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 
-/**
- * Naloži aktivni dogodek iz lokalne shrambe ali baze
- */
-export async function naloziAktivniDogodek() {
-    let podatki = null;
-    const lokalniPodatki = localStorage.getItem(STORAGE_KEY_DOGODEK);
-    
-    if (lokalniPodatki) {
-        try { podatki = JSON.parse(lokalniPodatki); } catch (e) {}
-    }
+export async function naloziAktivniDogodek(podatkiSektorjev = null) {
+    let sektorji = podatkiSektorjev;
 
-    if (!podatki || !podatki.sektorji) return;
+    if (!sektorji) {
+        const lokalniPodatki = localStorage.getItem(STORAGE_KEY_DOGODEK);
+        if (lokalniPodatki) {
+            try {
+                const parsed = JSON.parse(lokalniPodatki);
+                sektorji = parsed.sektorji;
+            } catch (e) {}
+        }
+    }
 
     narisaniSektorjiSloj.clearLayers();
 
-    podatki.sektorji.forEach(elem => {
+    if (!sektorji || !Array.isArray(sektorji)) return;
+
+    sektorji.forEach(elem => {
         let layer;
         const barva = elem.properties?.barvaSektorja || "red";
         const tip = elem.properties?.tipObmočja;
@@ -39,18 +41,64 @@ export async function naloziAktivniDogodek() {
     osveziLokacijeEnot();
 }
 
-// Alias za naloziAktivniDogodek (da odpravi napako v app.js)
 export const naloziPodatkeDogodka = naloziAktivniDogodek;
 
-/**
- * Shrani trenutno stanje sektorjev in dogodka
- */
+export async function naloziSeznamDogodkov() {
+    const selectEl = document.getElementById('select-dogodek');
+    if (!selectEl) return;
+
+    selectEl.addEventListener('change', async (e) => {
+        const dogodekId = e.target.value;
+        if (dogodekId === 'novy' || !dogodekId) {
+            narisaniSektorjiSloj.clearLayers();
+            osveziLokacijeEnot();
+            return;
+        }
+
+        // Pridobimo območja izbranega dogodka iz strežnika
+        try {
+            const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSektorjeDogodka&id=${dogodekId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.sektorji) {
+                    naloziAktivniDogodek(data.sektorji);
+                    const inputIme = document.getElementById('input-ime-dogodka');
+                    if (inputIme && data.naziv) inputIme.value = data.naziv;
+                }
+            }
+        } catch (err) {
+            console.warn("Ni mogoče pridobiti podatkov dogodka:", err);
+        }
+
+        osveziLokacijeEnot();
+    });
+
+    try {
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke`);
+        if (response.ok) {
+            const dogodki = await response.json();
+            selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
+            dogodki.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = `${d.naziv} (${d.datum || ''})`;
+                selectEl.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.warn("Seznam dogodkov ni dostopen:", err);
+    }
+}
+
 export async function shraniDogodek() {
     const imeDogodka = document.getElementById('input-ime-dogodka')?.value || "Intervencija";
+    const selectEl = document.getElementById('select-dogodek');
+    const dogodekId = selectEl?.value !== 'novy' ? selectEl?.value : Date.now().toString();
     const geojsonSektorji = pridobiGeoJsonSektorjev();
     
     const podatkiDogodka = {
         akcija: "shraniDogodek",
+        id: dogodekId,
         naziv: imeDogodka,
         casShranjevanja: new Date().toISOString(),
         sektorji: geojsonSektorji
@@ -66,40 +114,12 @@ export async function shraniDogodek() {
             body: JSON.stringify(podatkiDogodka)
         });
         alert("Dogodek uspešno shranjen!");
+        naloziSeznamDogodkov();
     } catch (err) {
         alert("Shranjeno lokalno na tej napravi.");
     }
 }
 
-/**
- * Naloži seznam vseh dogodkov v padajoči meni
- */
-export async function naloziSeznamDogodkov() {
-    const selectEl = document.getElementById('select-dogodek');
-    if (!selectEl) return;
-
-    selectEl.addEventListener('change', () => {
-        osveziLokacijeEnot();
-    });
-
-    try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke`);
-        if (response.ok) {
-            const dogodki = await response.json();
-            selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
-            dogodki.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.id;
-                opt.textContent = `${d.naziv}`;
-                selectEl.appendChild(opt);
-            });
-        }
-    } catch (err) {}
-}
-
-/**
- * Odpre pogovorno okno za tiskanje
- */
 export function pripraviInNatisni() {
     window.print();
 }
