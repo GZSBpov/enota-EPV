@@ -5,7 +5,7 @@
 export const VSTOPNO_GESLO = "VsadL12"; // Geslo z vašega zaslona
 
 // Povezava do vašega Google Apps Script & OBS Studio
-export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz.../exec"; 
+export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec"; 
 export const OBS_STREAM_URL = "https://your-obs-stream-server.com/live/stream.m3u8";
 export const TEREN_EPV_URL = window.location.origin + window.location.pathname.replace("mapeEPV.html", "terenEPV.html");
 
