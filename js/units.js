@@ -154,24 +154,35 @@ export function osveziStranskoVrstico() {
         kartica.className = 'enota-vrstica';
         kartica.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b; user-select: none;';
 
-        kartica.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" class="chk-enota" id="chk-${id}" ${jeChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-                <div>
-                    <div style="font-weight: bold; font-size: 0.85rem; color: #f8fafc;">
-                        <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
-                        ${podatki.naziv}
-                    </div>
-                    <div style="font-size: 0.72rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
-                </div>
+        // Ustvarimo checkbox neposredno kot DOM element (brez nevarnosti glede presledkov v ID-ju)
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.className = 'chk-enota';
+        chk.checked = jeChecked;
+        chk.style.cssText = 'width: 18px; height: 18px; cursor: pointer;';
+
+        const vsebina = document.createElement('div');
+        vsebina.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+        
+        const besedilo = document.createElement('div');
+        besedilo.innerHTML = `
+            <div style="font-weight: bold; font-size: 0.85rem; color: #f8fafc;">
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
+                ${podatki.naziv}
             </div>
-            <span style="font-size: 0.7rem; background: ${jeChecked ? '#059669' : '#64748b'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
-                ${jeChecked ? (podatki.status || 'Aktivna') : 'Skrito'}
-            </span>
+            <div style="font-size: 0.72rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
         `;
 
-        const chk = kartica.querySelector(`#chk-${id}`);
-        
+        vsebina.appendChild(chk);
+        vsebina.appendChild(besedilo);
+
+        const statusBadge = document.createElement('span');
+        statusBadge.style.cssText = `font-size: 0.7rem; background: ${jeChecked ? '#059669' : '#64748b'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;`;
+        statusBadge.textContent = jeChecked ? (podatki.status || 'Aktivna') : 'Skrito';
+
+        kartica.appendChild(vsebina);
+        kartica.appendChild(statusBadge);
+
         // Ob spremembi kljukice posodobimo stanje
         chk.addEventListener('change', (e) => {
             vidnostEnot[id] = e.target.checked;
@@ -184,7 +195,7 @@ export function osveziStranskoVrstico() {
             e.stopPropagation();
         });
 
-        // Klik na vrstico usmeri zemljevid k enoti (če je obkljukana)
+        // Klik na kartico usmeri zemljevid k enoti (če je obkljukana)
         kartica.addEventListener('click', () => {
             if (map && marker && vidnostEnot[id] !== false) {
                 map.flyTo(marker.getLatLng(), 16);
