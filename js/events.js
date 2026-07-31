@@ -2,6 +2,8 @@ import { map, narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja
 import { GOOGLE_APPS_SCRIPT_URL, STORAGE_KEY_DOGODEK } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 
+const STORAGE_SEZNAM_DOGODKOV = 'epv_vsi_dogodki';
+
 export async function naloziAktivniDogodek(podatkiSektorjev = null) {
     let sektorji = podatkiSektorjev;
 
@@ -47,83 +49,123 @@ export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
     if (!selectEl) return;
 
-    // Ob spremembi izbire naložimo območja ter osvežimo enote
-    selectEl.addEventListener('change', async (e) => {
-        const dogodekId = e.target.value;
-        if (dogodekId === 'novy' || !dogodekId) {
-            narisaniSektorjiSloj.clearLayers();
-            osveziLokacijeEnot();
-            return;
-        }
+    // 1. Zberemo lokalno shranjene dogodke
+    let lokalniDogodki = [];
+    try {
+        lokalniDogodki = JSON.parse(localStorage.getItem(STORAGE_SEZNAM_DOGODKOV)) || [];
+    } catch (e) {}
 
-        try {
-            const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSektorjeDogodka&id=${encodeURIComponent(dogodekId)}&geslo=EPV2026`);
-            if (res.ok) {
-                const data = await res.json();
-                const sektorji = data.sektorji || (data.data ? data.data.sektorji : null);
-                const naziv = data.naziv || (data.data ? data.data.naziv : '');
-
-                if (sektorji) {
-                    naloziAktivniDogodek(sektorji);
-                }
-                const inputIme = document.getElementById('input-ime-dogodka');
-                if (inputIme && naziv) inputIme.value = naziv;
-            }
-        } catch (err) {
-            console.warn("Ni mogoče pridobiti podatkov dogodka:", err);
-        }
-
-        osveziLokacijeEnot();
-    });
-
-    // Pridobivanje seznama vseh starih dogodkov
+    // 2. Poizkusimo pridobiti še dogodke s strežnika
+    let strezniskiDogodki = [];
     try {
         const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&geslo=EPV2026`);
         if (response.ok) {
             const odgovor = await response.json();
-            const dogodki = Array.isArray(odgovor) ? odgovor : (odgovor.data || []);
-
-            selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
-            dogodki.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.id || d.naziv;
-                opt.textContent = `${d.naziv} ${d.datum ? '(' + d.datum + ')' : ''}`;
-                selectEl.appendChild(opt);
-            });
+            strezniskiDogodki = Array.isArray(odgovor) ? odgovor : (odgovor.data || []);
         }
     } catch (err) {
-        console.warn("Seznam dogodkov ni dostopen:", err);
+        console.warn("Strežniški dogodki niso dosegljivi.");
     }
+
+    // Združimo oba seznama (brez podvajanja po id)
+    const vsiDogodkiMap = new Map();
+    lokalniDogodki.forEach(d => vsiDogodkiMap.set(d.id, d));
+    strezniskiDogodki.forEach(d => vsiDogodkiMap.set(d.id || d.naziv, d));
+
+    selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
+
+    vsiDogodkiMap.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = `${d.naziv} ${d.datum ? '(' + d.datum + ')' : ''}`;
+        selectEl.appendChild(opt);
+    });
+
+    // Ob spremembi v padajočem meniju
+    selectEl.addEventListener('change', async (e) => {
+        const dogodekId = e.target.value;
+        if (dogodekId === 'novy' || !dogodekId) {
+            narisaniSektorjiSloj.clearLayers();
+            const inputIme = document.getElementById('input-ime-dogodka');
+            if (inputIme) inputIme.value = '';
+            osveziLokacijeEnot();
+            return;
+        }
+
+        // Preverimo najprej lokalno
+        const izbranLokalno = vsiDogodkiMap.get(dogodekId);
+        if (izbranLokalno && izbranLokalno.sektorji) {
+            naloziAktivniDogodek(izbranLokalno.sektorji);
+            const inputIme = document.getElementById('input-ime-dogodka');
+            if (inputIme) inputIme.value = izbranLokalno.naziv;
+        } else {
+            // Če ni lokalno, naložimo iz strežnika
+            try {
+                const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSektorjeDogodka&id=${encodeURIComponent(dogodekId)}&geslo=EPV2026`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const sektorji = data.sektorji || (data.data ? data.data.sektorji : null);
+                    const naziv = data.naziv || (data.data ? data.data.naziv : '');
+
+                    if (sektorji) {
+                        naloziAktivniDogodek(sektorji);
+                    }
+                    const inputIme = document.getElementById('input-ime-dogodka');
+                    if (inputIme && naziv) inputIme.value = naziv;
+                }
+            } catch (err) {}
+        }
+
+        osveziLokacijeEnot();
+    });
 }
 
 export async function shraniDogodek() {
-    const imeDogodka = document.getElementById('input-ime-dogodka')?.value || "Intervencija";
+    const imeInput = document.getElementById('input-ime-dogodka');
+    const imeDogodka = imeInput?.value.trim() || "Intervencija " + new Date().toLocaleDateString();
+    
     const selectEl = document.getElementById('select-dogodek');
-    const dogodekId = selectEl?.value !== 'novy' ? selectEl?.value : Date.now().toString();
+    const dogodekId = (selectEl?.value && selectEl.value !== 'novy') ? selectEl.value : 'dogodek_' + Date.now();
     const geojsonSektorji = pridobiGeoJsonSektorjev();
     
     const podatkiDogodka = {
-        akcija: "shraniDogodek",
         id: dogodekId,
         naziv: imeDogodka,
+        datum: new Date().toLocaleDateString('sl-SI'),
         casShranjevanja: new Date().toISOString(),
         sektorji: geojsonSektorji
     };
 
+    // 1. Shranimo trenutno aktivni dogodek
     localStorage.setItem(STORAGE_KEY_DOGODEK, JSON.stringify(podatkiDogodka));
 
+    // 2. Dodamo v lokalni seznam vseh dogodkov
+    let lokalniDogodki = [];
+    try {
+        lokalniDogodki = JSON.parse(localStorage.getItem(STORAGE_SEZNAM_DOGODKOV)) || [];
+    } catch (e) {}
+
+    const obstojeciIdx = lokalniDogodki.findIndex(d => d.id === dogodekId);
+    if (obstojeciIdx >= 0) {
+        lokalniDogodki[obstojeciIdx] = podatkiDogodka;
+    } else {
+        lokalniDogodki.push(podatkiDogodka);
+    }
+    localStorage.setItem(STORAGE_SEZNAM_DOGODKOV, JSON.stringify(lokalniDogodki));
+
+    // 3. Pošljemo še na Apps Script strežnik
     try {
         await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(podatkiDogodka)
+            body: JSON.stringify({ akcija: "shraniDogodek", geslo: "EPV2026", ...podatkiDogodka })
         });
-        alert("Dogodek uspešno shranjen!");
-        naloziSeznamDogodkov();
-    } catch (err) {
-        alert("Shranjeno lokalno na tej napravi.");
-    }
+    } catch (err) {}
+
+    alert(`Dogodek "${imeDogodka}" uspešno shranjen!`);
+    await naloziSeznamDogodkov();
+    if (selectEl) selectEl.value = dogodekId;
 }
 
 export function pripraviInNatisni() {
