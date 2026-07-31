@@ -7,12 +7,17 @@ import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
 import { OSVEZEVANJE_INTERVAL_MS, VSTOPNO_GESLO_HASH, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
-async function izracunajSHA256(besedilo) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(besedilo);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+/**
+ * Preprosta in zanesljiva zgoščevalna funkcija (deluje brez HTTPS/crypto.subtle)
+ */
+function ustvariHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+    }
+    return "epv_" + hash;
 }
 
 /**
@@ -51,23 +56,23 @@ function preveriGeslo() {
 
     modal.style.display = 'flex';
 
-    const potrdi = async () => {
-        const vneseniVnos = input.value.trim();
-        const vneseniHash = await izracunajSHA256(vneseniVnos);
+    const potrdi = () => {
+        const vneseniVnos = input.value ? input.value.trim() : "";
+        const izracunanHash = ustvariHash(vneseniVnos);
         
-        if (vneseniHash === VSTOPNO_GESLO_HASH) {
+        if (izracunanHash === VSTOPNO_GESLO_HASH) {
             sessionStorage.setItem(STORAGE_KEY_GESLO, "true");
             modal.style.display = 'none';
-            napaka.textContent = "";
-            naloziVsebinoAplikacije(); // Zaženemo aplikacijo po uspešni prijavi
+            if (napaka) napaka.textContent = "";
+            naloziVsebinoAplikacije();
         } else {
-            napaka.textContent = "Napačno geslo!";
+            if (napaka) napaka.textContent = "Napačno geslo!";
             input.value = "";
         }
     };
 
-    btn.addEventListener('click', potrdi);
-    input.addEventListener('keypress', (e) => {
+    btn?.addEventListener('click', potrdi);
+    input?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') potrdi();
     });
 }
