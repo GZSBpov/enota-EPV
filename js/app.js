@@ -5,11 +5,8 @@
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
-import { OSVEZEVANJE_INTERVAL_MS, VSTOPNO_GESLO_HASH, OBS_STREAM_URL, TEREN_EPV_URL, STORAGE_KEY_GESLO } from './config.js';
+import { OSVEZEVANJE_INTERVAL_MS, VSTOPNO_GESLO_HASH, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
-/**
- * Varna pretvorba besedila v SHA-256 hash niz
- */
 async function izracunajSHA256(besedilo) {
     const encoder = new TextEncoder();
     const data = encoder.encode(besedilo);
@@ -19,8 +16,24 @@ async function izracunajSHA256(besedilo) {
 }
 
 /**
- * Preveri vstopno geslo ob zagonu
+ * Zažene delovanje aplikacije šele po uspešni avtentikaciji
  */
+async function naloziVsebinoAplikacije() {
+    iniciirajZemljevid();
+    iniciirajSlojeEnot();
+    iniciirajVideoStream();
+    iniciirajResizer();
+    iniciirajFullscreen();
+
+    await naloziSeznamDogodkov();
+    await naloziAktivniDogodek();
+
+    setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
+
+    document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
+    document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
+}
+
 function preveriGeslo() {
     const modal = document.getElementById('vstopno-geslo-modal');
     const input = document.getElementById('input-geslo');
@@ -29,20 +42,24 @@ function preveriGeslo() {
 
     if (!modal) return;
 
+    // Če je že prijavljen v tej seji
     if (sessionStorage.getItem(STORAGE_KEY_GESLO) === "true") {
         modal.style.display = 'none';
+        naloziVsebinoAplikacije();
         return;
     }
 
     modal.style.display = 'flex';
 
     const potrdi = async () => {
-        const vneseniHash = await izracunajSHA256(input.value.trim());
+        const vneseniVnos = input.value.trim();
+        const vneseniHash = await izracunajSHA256(vneseniVnos);
         
         if (vneseniHash === VSTOPNO_GESLO_HASH) {
             sessionStorage.setItem(STORAGE_KEY_GESLO, "true");
             modal.style.display = 'none';
             napaka.textContent = "";
+            naloziVsebinoAplikacije(); // Zaženemo aplikacijo po uspešni prijavi
         } else {
             napaka.textContent = "Napačno geslo!";
             input.value = "";
@@ -57,23 +74,8 @@ function preveriGeslo() {
 
 function iniciirajVideoStream() {
     const iframe = document.getElementById('iframe-obs-stream');
-    const btnToggle = document.getElementById('btn-toggle-video');
-    const wrapper = document.getElementById('video-wrapper');
-
     if (iframe && OBS_STREAM_URL) {
         iframe.src = OBS_STREAM_URL;
-    }
-
-    if (btnToggle && wrapper) {
-        btnToggle.addEventListener('click', () => {
-            if (wrapper.style.display === 'none') {
-                wrapper.style.display = 'block';
-                btnToggle.textContent = '▼';
-            } else {
-                wrapper.style.display = 'none';
-                btnToggle.textContent = '▲';
-            }
-        });
     }
 }
 
@@ -103,20 +105,20 @@ function iniciirajResizer() {
     });
 }
 
-async function zagonAplikacije() {
-    preveriGeslo();
-    iniciirajZemljevid();
-    iniciirajSlojeEnot();
-    iniciirajVideoStream();
-    iniciirajResizer();
-
-    await naloziSeznamDogodkov();
-    await naloziAktivniDogodek();
-
-    setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
-
-    document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
-    document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
+function iniciirajFullscreen() {
+    document.querySelectorAll('.btn-fullscreen').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target');
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                if (!document.fullscreenElement) {
+                    targetEl.requestFullscreen?.() || targetEl.webkitRequestFullscreen?.();
+                } else {
+                    document.exitFullscreen?.();
+                }
+            }
+        });
+    });
 }
 
-document.addEventListener('DOMContentLoaded', zagonAplikacije);
+document.addEventListener('DOMContentLoaded', preveriGeslo);
