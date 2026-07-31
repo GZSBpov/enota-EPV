@@ -5,7 +5,18 @@
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
-import { OSVEZEVANJE_INTERVAL_MS, VSTOPNO_GESLO, OBS_STREAM_URL, TEREN_EPV_URL, STORAGE_KEY_GESLO } from './config.js';
+import { OSVEZEVANJE_INTERVAL_MS, VSTOPNO_GESLO_HASH, OBS_STREAM_URL, TEREN_EPV_URL, STORAGE_KEY_GESLO } from './config.js';
+
+/**
+ * Varna pretvorba besedila v SHA-256 hash niz
+ */
+async function izracunajSHA256(besedilo) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(besedilo);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 /**
  * Preveri vstopno geslo ob zagonu
@@ -25,12 +36,16 @@ function preveriGeslo() {
 
     modal.style.display = 'flex';
 
-    const potrdi = () => {
-        if (input.value === VSTOPNO_GESLO) {
+    const potrdi = async () => {
+        const vneseniHash = await izracunajSHA256(input.value.trim());
+        
+        if (vneseniHash === VSTOPNO_GESLO_HASH) {
             sessionStorage.setItem(STORAGE_KEY_GESLO, "true");
             modal.style.display = 'none';
+            napaka.textContent = "";
         } else {
             napaka.textContent = "Napačno geslo!";
+            input.value = "";
         }
     };
 
