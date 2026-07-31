@@ -5,6 +5,7 @@
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
+import { iniciirajQRGenerator } from './qr.js';
 import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
 const PRAVO_GESLO = "EPV2026";
@@ -19,10 +20,15 @@ async function naloziVsebinoAplikacije() {
     await naloziSeznamDogodkov();
     await naloziAktivniDogodek();
 
+    // Iniciacija modalnega okna za QR kodo
+    iniciirajQRGenerator();
+
     setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
 
+    // Poslušalci dogodkov za gumba
     document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
     document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
+    document.getElementById('btn-osvezi-dogodke')?.addEventListener('click', () => naloziSeznamDogodkov());
 }
 
 function preveriGeslo() {
@@ -33,7 +39,6 @@ function preveriGeslo() {
 
     if (!modal) return;
 
-    // Preverimo, ali je uporabnik že prijavljen v trenutni seji
     if (sessionStorage.getItem(STORAGE_KEY_GESLO) === "true") {
         modal.style.display = 'none';
         naloziVsebinoAplikacije();
