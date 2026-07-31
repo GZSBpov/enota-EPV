@@ -7,7 +7,6 @@ import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { naloziAktivniDogodek, shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
 import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
-// DIREKTNO VSTOPNO GESLO
 const PRAVO_GESLO = "EPV2026";
 
 async function naloziVsebinoAplikacije() {
@@ -32,12 +31,9 @@ function preveriGeslo() {
     const btn = document.getElementById('btn-potrdi-geslo');
     const napaka = document.getElementById('geslo-napaka');
 
-    if (!modal) {
-        console.error("Modalno okno #vstopno-geslo-modal ne obstaja v HTML!");
-        return;
-    }
+    if (!modal) return;
 
-    // Preverimo, če je v tej seji že potrjen vstop
+    // Preverimo, ali je uporabnik že prijavljen v trenutni seji
     if (sessionStorage.getItem(STORAGE_KEY_GESLO) === "true") {
         modal.style.display = 'none';
         naloziVsebinoAplikacije();
@@ -48,7 +44,6 @@ function preveriGeslo() {
 
     function potrdiPrijavo() {
         const vnos = input ? input.value.trim() : "";
-        console.log("Vneseno geslo:", vnos); // Izpis v F12 konzolo za preverjanje
 
         if (vnos === PRAVO_GESLO) {
             sessionStorage.setItem(STORAGE_KEY_GESLO, "true");
@@ -64,10 +59,7 @@ function preveriGeslo() {
         }
     }
 
-    // Odstranimo stare event listenere in dodamo nove
-    if (btn) {
-        btn.onclick = potrdiPrijavo;
-    }
+    if (btn) btn.onclick = potrdiPrijavo;
 
     if (input) {
         input.onkeydown = function(e) {
