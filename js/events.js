@@ -47,6 +47,7 @@ export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
     if (!selectEl) return;
 
+    // Ob spremembi izbire naložimo območja ter osvežimo enote
     selectEl.addEventListener('change', async (e) => {
         const dogodekId = e.target.value;
         if (dogodekId === 'novy' || !dogodekId) {
@@ -55,16 +56,18 @@ export async function naloziSeznamDogodkov() {
             return;
         }
 
-        // Pridobimo območja izbranega dogodka iz strežnika
         try {
-            const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSektorjeDogodka&id=${dogodekId}`);
+            const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSektorjeDogodka&id=${encodeURIComponent(dogodekId)}&geslo=EPV2026`);
             if (res.ok) {
                 const data = await res.json();
-                if (data && data.sektorji) {
-                    naloziAktivniDogodek(data.sektorji);
-                    const inputIme = document.getElementById('input-ime-dogodka');
-                    if (inputIme && data.naziv) inputIme.value = data.naziv;
+                const sektorji = data.sektorji || (data.data ? data.data.sektorji : null);
+                const naziv = data.naziv || (data.data ? data.data.naziv : '');
+
+                if (sektorji) {
+                    naloziAktivniDogodek(sektorji);
                 }
+                const inputIme = document.getElementById('input-ime-dogodka');
+                if (inputIme && naziv) inputIme.value = naziv;
             }
         } catch (err) {
             console.warn("Ni mogoče pridobiti podatkov dogodka:", err);
@@ -73,15 +76,18 @@ export async function naloziSeznamDogodkov() {
         osveziLokacijeEnot();
     });
 
+    // Pridobivanje seznama vseh starih dogodkov
     try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke`);
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&geslo=EPV2026`);
         if (response.ok) {
-            const dogodki = await response.json();
+            const odgovor = await response.json();
+            const dogodki = Array.isArray(odgovor) ? odgovor : (odgovor.data || []);
+
             selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
             dogodki.forEach(d => {
                 const opt = document.createElement('option');
-                opt.value = d.id;
-                opt.textContent = `${d.naziv} (${d.datum || ''})`;
+                opt.value = d.id || d.naziv;
+                opt.textContent = `${d.naziv} ${d.datum ? '(' + d.datum + ')' : ''}`;
                 selectEl.appendChild(opt);
             });
         }
