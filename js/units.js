@@ -34,9 +34,6 @@ function pridobiBarvoZaTip(tip) {
     return '#10b981'; // Privzeto zelena
 }
 
-/**
- * Ustvari barvno ikono za Leaflet marker
- */
 function ustvariIkono(barva) {
     const svgIcon = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${barva}" width="30px" height="30px" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">
@@ -133,13 +130,18 @@ export function osveziStranskoVrstico() {
     const kontejner = document.getElementById('seznamEnotGumbi');
     if (!kontejner) return;
 
-    // Omogoči drsenje (scroll) seznama v stranski vrstici
     kontejner.style.maxHeight = 'calc(100vh - 250px)';
     kontejner.style.overflowY = 'auto';
 
     kontejner.innerHTML = '';
 
-    const enoteSeznam = Object.values(enoteBaza);
+    // Razvrsti enote glede na čas (najnovejša prijava gre NA VRH)
+    const enoteSeznam = Object.values(enoteBaza).sort((a, b) => {
+        const casA = new Date(a.podatki.cas || 0).getTime();
+        const casB = new Date(b.podatki.cas || 0).getTime();
+        return casB - casA;
+    });
+
     if (enoteSeznam.length === 0) {
         kontejner.innerHTML = '<div style="font-size: 0.85rem; color: #64748b; padding: 12px; text-align: center;">Ni aktivnih enot na terenu.</div>';
         return;
@@ -152,9 +154,8 @@ export function osveziStranskoVrstico() {
 
         const kartica = document.createElement('div');
         kartica.className = 'enota-vrstica';
-        kartica.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b; user-select: none;';
+        kartica.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b; user-select: none; margin-bottom: 2px; border-radius: 4px;';
 
-        // Ustvarimo checkbox neposredno kot DOM element (brez nevarnosti glede presledkov v ID-ju)
         const chk = document.createElement('input');
         chk.type = 'checkbox';
         chk.className = 'chk-enota';
@@ -170,7 +171,7 @@ export function osveziStranskoVrstico() {
                 <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
                 ${podatki.naziv}
             </div>
-            <div style="font-size: 0.72rem; color: #94a3b8;">Tip: ${podatki.tip || 'Enota'}</div>
+            <div style="font-size: 0.72rem; color: #94a3b8;">${podatki.cas ? 'Čas: ' + podatki.cas.toString().substring(11, 16) : 'Tip: ' + (podatki.tip || 'Enota')}</div>
         `;
 
         vsebina.appendChild(chk);
@@ -183,19 +184,16 @@ export function osveziStranskoVrstico() {
         kartica.appendChild(vsebina);
         kartica.appendChild(statusBadge);
 
-        // Ob spremembi kljukice posodobimo stanje
         chk.addEventListener('change', (e) => {
             vidnostEnot[id] = e.target.checked;
             osveziPrikazEnotNaMapi();
             osveziStranskoVrstico();
         });
 
-        // Klik na kljukico ne sme sprožiti klika na celo kartico
         chk.addEventListener('click', (e) => {
             e.stopPropagation();
         });
 
-        // Klik na kartico usmeri zemljevid k enoti (če je obkljukana)
         kartica.addEventListener('click', () => {
             if (map && marker && vidnostEnot[id] !== false) {
                 map.flyTo(marker.getLatLng(), 16);
