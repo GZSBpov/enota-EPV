@@ -3,11 +3,34 @@
 // ==========================================
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
+import { map } from './map.js';
+
+const STORAGE_PREBRANA = 'epv_prebrana_sporocila';
 
 function escapeHtml(niz) {
     const el = document.createElement('div');
     el.textContent = niz ?? '';
     return el.innerHTML;
+}
+
+function pridobiPrebrana() {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(STORAGE_PREBRANA)) || []);
+    } catch (e) {
+        return new Set();
+    }
+}
+
+function oznaciPrebrano(id) {
+    const prebrana = pridobiPrebrana();
+    prebrana.add(id);
+    // Omejimo velikost (obdržimo zadnjih 500), da localStorage ne raste v nedogled
+    const seznam = Array.from(prebrana).slice(-500);
+    localStorage.setItem(STORAGE_PREBRANA, JSON.stringify(seznam));
+}
+
+function sporociloId(s) {
+    return `${s.cas}|${s.enota}|${s.sporocilo}`;
 }
 
 function izrisiSporocila(sporocila) {
@@ -32,16 +55,23 @@ function izrisiSporocila(sporocila) {
         return;
     }
 
+    const prebrana = pridobiPrebrana();
+    const prikazana = veljavna.slice(0, 20);
     let imaSOS = false;
 
-    kontejner.innerHTML = veljavna.slice(0, 20).map(s => {
+    kontejner.innerHTML = prikazana.map((s, idx) => {
         const jeSOS = (s.sporocilo || '').toString().toUpperCase().includes('SOS');
         if (jeSOS) imaSOS = true;
+        const jeNovo = !prebrana.has(sporociloId(s));
         const cas = (s.cas || '').toString();
         const kratekCas = cas.length > 16 ? cas.substring(11, 16) : cas;
 
+        let razredi = 'sporocilo-vrstica';
+        if (jeSOS) razredi += ' sos';
+        if (jeNovo) razredi += ' novo';
+
         return `
-            <div class="sporocilo-vrstica${jeSOS ? ' sos' : ''}">
+            <div class="${razredi}" data-idx="${idx}" title="Klikni za lokacijo na zemljevidu">
                 <div class="sporocilo-glava">
                     <span>${jeSOS ? '🆘 ' : ''}${escapeHtml(s.enota)}</span>
                     <span class="sporocilo-cas">${escapeHtml(kratekCas)}</span>
@@ -52,6 +82,20 @@ function izrisiSporocila(sporocila) {
     }).join('');
 
     if (panel) panel.classList.toggle('ima-sos', imaSOS);
+
+    kontejner.querySelectorAll('.sporocilo-vrstica').forEach(el => {
+        const idx = parseInt(el.dataset.idx, 10);
+        const s = prikazana[idx];
+        el.addEventListener('click', () => {
+            const lat = parseFloat(s.lat);
+            const lon = parseFloat(s.lon);
+            if (map && !isNaN(lat) && !isNaN(lon)) {
+                map.flyTo([lat, lon], 17);
+            }
+            oznaciPrebrano(sporociloId(s));
+            el.classList.remove('novo');
+        });
+    });
 }
 
 export async function naloziSporocila() {
@@ -59,6 +103,12 @@ export async function naloziSporocila() {
     if (!kontejner) return;
 
     const aktivniDogodekId = document.getElementById('select-dogodek')?.value || '';
+
+    // Dokler dogodek ni izbran/ustvarjen ("novy"/prazno), ne prikažemo sporočil iz vseh dogodkov skupaj.
+    if (!aktivniDogodekId || aktivniDogodekId === 'novy') {
+        izrisiSporocila([]);
+        return;
+    }
 
     try {
         const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(aktivniDogodekId)}&geslo=EPV2026`, { cache: 'no-store' });

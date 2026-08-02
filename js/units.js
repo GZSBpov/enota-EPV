@@ -254,7 +254,9 @@ export async function osveziLokacijeEnot() {
                 const [cas, enotaPolno, lat, lon, acc, dId] = vrstice[i];
                 if (!enotaPolno || !lat || !lon) continue;
 
-                if (aktivniDogodekId && dId && dId !== aktivniDogodekId && aktivniDogodekId !== 'novy') continue;
+                // Enoto prikažemo samo, če pripada trenutno izbranemu/ustvarjenemu dogodku.
+                // Dokler dogodek ni izbran ali ustvarjen ("novy"/prazno), ne prikažemo nobene enote.
+                if (!aktivniDogodekId || aktivniDogodekId === 'novy' || dId !== aktivniDogodekId) continue;
 
                 const deli = enotaPolno.split(':');
                 const tip = deli[0] || 'Splošno';

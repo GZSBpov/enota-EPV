@@ -4,9 +4,10 @@
 
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
-import { shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
+import { shraniDogodek, naloziSeznamDogodkov } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
 import { naloziSporocila } from './sporocila.js';
+import { pripraviInNatisni } from './tisk.js';
 import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
 const PRAVO_GESLO = "EPV2026";

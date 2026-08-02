@@ -255,6 +255,10 @@
             }
 
             sprostiWakeLock();
+
+            // Pošljemo eksplicitno "Konec oddajanja" - da ima poveljstvo pravi čas zaključka
+            // enote, ne le čas zadnjega utripa pred tišino (npr. izklop telefona).
+            posljiSporociloZLokacijo('Konec oddajanja');
         }
     }
 

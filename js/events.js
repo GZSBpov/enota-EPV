@@ -187,7 +187,3 @@ export async function shraniDogodek() {
     await naloziSeznamDogodkov();
     if (selectEl) selectEl.value = imeDogodka;
 }
-
-export function pripraviInNatisni() {
-    window.print();
-}
