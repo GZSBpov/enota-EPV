@@ -1,16 +1,34 @@
 import { ZACETNE_KOORDINATE, ZACETNI_ZOOM, SLOVAR_BARV } from './config.js';
+import { pridobiZnanaImenaEnot } from './enote-register.js';
+
+function pobegniAtribut(niz) {
+    const el = document.createElement('div');
+    el.textContent = niz ?? '';
+    return el.innerHTML.replace(/"/g, '&quot;');
+}
 
 export let map;
 export let narisaniSektorjiSloj;
 export let enoteMarkerjiSloj;
 
 export function iniciirajZemljevid() {
-    map = L.map('map').setView(ZACETNE_KOORDINATE, ZACETNI_ZOOM);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Dva podlagna sloja (kot v V1): satelitski posnetki (Esri) in navadna cestna karta (OSM)
+    const satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles © Esri'
+    });
+    const cestnaMapa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
-    }).addTo(map);
+    });
+
+    map = L.map('map', {
+        center: ZACETNE_KOORDINATE,
+        zoom: ZACETNI_ZOOM,
+        layers: [satelitskaMapa]
+    });
+
+    L.control.layers({ "Satelit": satelitskaMapa, "Ceste": cestnaMapa }, null, { position: 'bottomright' }).addTo(map);
 
     narisaniSektorjiSloj = new L.FeatureGroup().addTo(map);
     enoteMarkerjiSloj = new L.LayerGroup().addTo(map);
@@ -115,6 +133,11 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
         opcijeBarv += `<option value="${kly}" ${sel}>${naziv}</option>`;
     }
 
+    const trenutnaDodelitev = layer.options.dodeljenaEnota || "";
+    const datalistOpcije = pridobiZnanaImenaEnot()
+        .map(ime => `<option value="${pobegniAtribut(ime)}"></option>`)
+        .join('');
+
     const htmlVsebina = `
         <div style="color: #000; font-family: sans-serif;">
             <strong style="font-size: 1rem;">Sektor / Območje</strong><br>
@@ -123,6 +146,9 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
             <select class="popup-barva-select" style="width: 100%; padding: 4px; margin-top: 4px;">
                 ${opcijeBarv}
             </select>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-top:8px;">Dodeli enoti (ime, npr. "Slb 1"):</label>
+            <input type="text" class="popup-dodelitev-input" list="seznam-znanih-enot-popup" value="${pobegniAtribut(trenutnaDodelitev)}" placeholder="Prazno = ni dodeljeno" style="width:100%; padding:4px; margin-top:4px; box-sizing:border-box;">
+            <datalist id="seznam-znanih-enot-popup">${datalistOpcije}</datalist>
         </div>
     `;
 
@@ -137,6 +163,12 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
                 posodobiIzgledSektorja(layer, novaBarva);
             });
         }
+        const dodelitevInput = popNode.querySelector('.popup-dodelitev-input');
+        if (dodelitevInput) {
+            dodelitevInput.addEventListener('change', (evt) => {
+                layer.options.dodeljenaEnota = evt.target.value.trim();
+            });
+        }
     });
 }
 
@@ -149,7 +181,8 @@ export function pridobiGeoJsonSektorjev() {
         let geojson = layer.toGeoJSON();
         geojson.properties = geojson.properties || {};
         geojson.properties.barvaSektorja = layer.options.barvaSektorja || "red";
-        
+        geojson.properties.dodeljenaEnota = layer.options.dodeljenaEnota || "";
+
         if (layer instanceof L.Circle) {
             geojson.properties.tipObmočja = "circle";
             geojson.properties.polmer = layer.getRadius();

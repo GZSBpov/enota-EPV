@@ -18,6 +18,9 @@
 
     <!-- Stil -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL) -->
+    <script src="js/shared-config.js"></script>
 </head>
 <body>
 
@@ -81,6 +84,15 @@
                 <button id="btn-shrani" class="btn btn-primaren">💾 Shrani</button>
                 <button id="btn-tisk" class="btn btn-sekundaren">🖨️ Tisk</button>
                 <button id="btn-qr-teren" class="btn" style="background-color: #8b5cf6; color: white;">📱 QR Teren</button>
+            </div>
+
+            <!-- Sporočila s terena (SOS, najdena oseba/žival, ...) -->
+            <div id="sporocila-panel" class="sporocila-panel card-fullscreen-target">
+                <div style="padding: 8px 12px; background: #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 0.85rem;">
+                    <span>📢 Sporočila s terena</span>
+                    <button class="btn-fullscreen" data-target="sporocila-panel" title="Celozaslonski prikaz sporočil">⛶</button>
+                </div>
+                <div id="seznamSporocil"></div>
             </div>
 
             <!-- OBS Video Predvajalnik v živo -->

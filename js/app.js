@@ -4,8 +4,9 @@
 
 import { iniciirajZemljevid } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
-import { shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov, naloziPodatkeDogodka } from './events.js';
+import { shraniDogodek, pripraviInNatisni, naloziSeznamDogodkov } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
+import { naloziSporocila } from './sporocila.js';
 import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
 const PRAVO_GESLO = "EPV2026";
@@ -24,17 +25,15 @@ async function naloziVsebinoAplikacije() {
     iniciirajQRGenerator();
 
     setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
+    setInterval(naloziSporocila, OSVEZEVANJE_INTERVAL_MS);
+    naloziSporocila();
 
     // Poslušalci dogodkov za gumba in padajoči meni
     document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
     document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
     document.getElementById('btn-osvezi-dogodke')?.addEventListener('click', () => naloziSeznamDogodkov());
-
-    // Poslušalec za preklop med dogodki v padajočem meniju
-    const selectDogodek = document.getElementById('select-dogodek');
-    selectDogodek?.addEventListener('change', (e) => {
-        naloziPodatkeDogodka(e.target.value);
-    });
+    // Opomba: poslušalec za preklop dogodkov v spustnem meniju se registrira
+    // znotraj naloziSeznamDogodkov() (v events.js), zato ga tu ne podvajamo.
 }
 
 function preveriGeslo() {

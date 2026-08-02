@@ -4,6 +4,7 @@
 
 import { map } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
+import { registrirajEnoto } from './enote-register.js';
 
 export const enoteSloj = new L.FeatureGroup();
 export const slediSloj = new L.FeatureGroup();
@@ -49,6 +50,39 @@ function ustvariIkono(barva) {
     });
 }
 
+function escapeHtml(niz) {
+    const el = document.createElement('div');
+    el.textContent = niz ?? '';
+    return el.innerHTML;
+}
+
+/**
+ * Pripravi vsebino pojavnega okna enote, vključno z gumboma za navigacijo (Google Maps)
+ * in pošiljanje lokacije preko SMS - uporabno, ko vodja na tablici/GSM-u odpre navigacijo do enote.
+ */
+function pripraviPopupVsebino(enota, barva) {
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${enota.lat},${enota.lng}`;
+    const smsBesedilo = encodeURIComponent(`Lokacija ${enota.naziv}: https://www.google.com/maps?q=${enota.lat},${enota.lng}`);
+    const smsUrl = `sms:?body=${smsBesedilo}`;
+
+    return `
+        <div style="font-size: 12px; color: #000;">
+            <b style="color: ${barva};">${escapeHtml(enota.naziv)}</b><br>
+            Tip: ${escapeHtml(enota.tip || 'Splošno')}<br>
+            Status: ${escapeHtml(enota.status || 'Aktivna')}<br>
+            Zadnji čas: ${escapeHtml(enota.cas || '-')}<br>
+            Koordinate: ${enota.lat.toFixed(5)}, ${enota.lng.toFixed(5)}
+            <div style="display:flex; gap:6px; margin-top:8px;">
+                <a href="${mapsUrl}" target="_blank" rel="noopener" style="flex:1; text-align:center; background:#2563eb; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">🧭 Navigacija</a>
+                <a href="${smsUrl}" style="flex:1; text-align:center; background:#059669; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">📩 Pošlji SMS</a>
+            </div>
+        </div>
+    `;
+}
+
+// Opomba: posodobiEnoto() samo posodobi podatke/marker - izris zemljevida in stranske vrstice
+// je treba klicati LOČENO in samo ENKRAT po tem, ko so posodobljene vse enote (glej osveziLokacijeEnot),
+// sicer se pri npr. 20 enotah cela stranska vrstica znova izriše 20-krat v vsakem ciklu osveževanja.
 export function posodobiEnoto(enota) {
     if (!enota || !enota.id || !enota.lat || !enota.lng) return;
 
@@ -71,15 +105,7 @@ export function posodobiEnoto(enota) {
             offset: [0, -28]
         });
 
-        marker.bindPopup(`
-            <div style="font-size: 12px; color: #000;">
-                <b style="color: ${barva};">${enota.naziv}</b><br>
-                Tip: ${enota.tip || 'Splošno'}<br>
-                Status: ${enota.status || 'Aktivna'}<br>
-                Zadnji čas: ${enota.cas || '-'}<br>
-                Koordinate: ${enota.lat.toFixed(5)}, ${enota.lng.toFixed(5)}
-            </div>
-        `);
+        marker.bindPopup(pripraviPopupVsebino(enota, barva));
 
         const pathLayer = L.polyline([latLng], {
             color: barva,
@@ -99,6 +125,8 @@ export function posodobiEnoto(enota) {
         e.podatki = enota;
         e.marker.setLatLng(latLng);
         e.marker.setIcon(ustvariIkono(barva));
+        // Osvežimo tudi vsebino pojavnega okna - sicer bi ob ponovnem odpiranju kazalo zastarele koordinate/čas
+        e.marker.setPopupContent(pripraviPopupVsebino(enota, barva));
 
         const zadnjaCoord = e.coords[e.coords.length - 1];
         if (!zadnjaCoord || zadnjaCoord[0] !== latLng[0] || zadnjaCoord[1] !== latLng[1]) {
@@ -106,9 +134,6 @@ export function posodobiEnoto(enota) {
             e.pathLayer.setLatLngs(e.coords);
         }
     }
-
-    osveziPrikazEnotNaMapi();
-    osveziStranskoVrstico();
 }
 
 function osveziPrikazEnotNaMapi() {
@@ -205,11 +230,18 @@ export function osveziStranskoVrstico() {
     });
 }
 
+let osvezevanjeVTeku = false;
+
 export async function osveziLokacijeEnot() {
+    // Če prejšnja zahteva (npr. zaradi počasne povezave) še ni končana, nove ne sprožimo,
+    // da se zahteve na Apps Script ne kopičijo druga čez drugo.
+    if (osvezevanjeVTeku) return;
+    osvezevanjeVTeku = true;
+
     const aktivniDogodekId = document.getElementById('select-dogodek')?.value || '';
 
     try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`);
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`, { cache: 'no-store' });
         if (!response.ok) return;
 
         const odgovor = await response.json();
@@ -228,6 +260,8 @@ export async function osveziLokacijeEnot() {
                 const tip = deli[0] || 'Splošno';
                 const ime = deli[1] || enotaPolno;
                 const clanov = deli[2] ? `(${deli[2]} članov)` : '';
+
+                registrirajEnoto(ime);
 
                 zadnjeLokacijeEnot[enotaPolno] = {
                     id: enotaPolno,
@@ -251,8 +285,14 @@ export async function osveziLokacijeEnot() {
             Object.values(zadnjeLokacijeEnot).forEach(enota => {
                 posodobiEnoto(enota);
             });
+
+            // Izris naredimo samo ENKRAT za celoten cikel osveževanja (ne za vsako enoto posebej)
+            osveziPrikazEnotNaMapi();
+            osveziStranskoVrstico();
         }
     } catch (err) {
         console.error("Napaka pri osveževanju lokacij enot:", err);
+    } finally {
+        osvezevanjeVTeku = false;
     }
 }

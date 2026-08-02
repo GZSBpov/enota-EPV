@@ -5,9 +5,11 @@
 // Varno shranjen hash za geslo "EPV2026" (deluje na vseh protokolih)
 export const VSTOPNO_GESLO_HASH = "epv_1596796333";
 
-// Povezava do vašega Google Apps Script & OBS Studio
-export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7BvUZKpXxeUZlncA01hVLngHIhI3nsWADQFec1ETrD04JnN2TO8Ug5nWzsTXNbeTelg/exec"; 
-export const OBS_STREAM_URL = "https://your-obs-stream-server.com/live/stream.m3u8";
+// Povezava do vašega Google Apps Script (definirana v js/shared-config.js, ker jo potrebuje tudi terenEPV.html)
+export const GOOGLE_APPS_SCRIPT_URL = window.GOOGLE_APPS_SCRIPT_URL;
+
+// Video prenos v živo (VDO.Ninja - dron)
+export const OBS_STREAM_URL = "https://vdo.ninja/?view=enota_epv_dron&autoplay=1&mute=1&hd=1&codec=h264";
 export const TEREN_EPV_URL = window.location.origin + window.location.pathname.replace("mapeEPV.html", "terenEPV.html");
 
 // FOKUS ZEMLJEVIDA: SLOVENSKA BISTRICA
@@ -26,3 +28,12 @@ export const SLOVAR_BARV = {
 export const OSVEZEVANJE_INTERVAL_MS = 5000;
 export const STORAGE_KEY_GESLO = "epv_prijavljen";
 export const STORAGE_KEY_DOGODEK = "epv_aktivni_dogodek";
+
+// TODO (arhiv dogodkov za analizo intervencij):
+// Trenutno shraniDogodek() v events.js ob shranjevanju zabeleži samo sektorje (geometrijo),
+// enote pa se pri odpiranju starega dogodka berejo "živo" iz Google Sheeta (osveziLokacijeEnot),
+// zato pretekli dogodek ne prikaže enot take, kot so bile aktivne takrat.
+// Za analizo intervencij je treba ob shranjevanju dogodka zajeti tudi trenutni posnetek enot
+// (naziv, tip, zadnja lokacija, čas) in ga shraniti skupaj s sektorji v podatkiDogodka.sektorji,
+// nato pa naloziAktivniDogodek() prikaže ta posnetek namesto klica osveziLokacijeEnot(),
+// ko gre za arhiviran (ne aktiven) dogodek.
