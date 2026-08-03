@@ -25,13 +25,15 @@ export function iniciirajSlojeEnot() {
  * - GASILEC: rdeča (#ef4444)
  * - VOZILO: modra (#3b82f6)
  * - VODJA: rumena (#eab308)
- * - REŠEVALCI in ostali: zelena (#10b981)
+ * - REŠEVALEC/NMP: zelena (#10b981)
+ * - DRUGO (CZ): oranžna (#f97316)
  */
 function pridobiBarvoZaTip(tip) {
     const t = (tip || '').toUpperCase();
     if (t.includes('GASILEC')) return '#ef4444'; // Rdeča
     if (t.includes('VOZILO')) return '#3b82f6';  // Modra
     if (t.includes('VODJA')) return '#eab308';   // Rumena
+    if (t.includes('DRUGO')) return '#f97316';   // Oranžna
     if (t.includes('RESEVALEC') || t.includes('REŠEVALEC')) return '#10b981'; // Zelena
     return '#10b981'; // Privzeto zelena
 }
