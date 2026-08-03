@@ -156,8 +156,7 @@ export function osveziStranskoVrstico() {
     const kontejner = document.getElementById('seznamEnotGumbi');
     if (!kontejner) return;
 
-    kontejner.style.maxHeight = 'calc(100vh - 250px)';
-    kontejner.style.overflowY = 'auto';
+    // Velikost/scroll ureja CSS (flex:1; min-height:0; overflow-y:auto na #seznamEnotGumbi)
 
     kontejner.innerHTML = '';
 

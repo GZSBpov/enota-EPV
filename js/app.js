@@ -2,7 +2,7 @@
 // EPV - GLAVNI MODUL APLIKACIJE (ENTRY POINT)
 // ==========================================
 
-import { iniciirajZemljevid } from './map.js';
+import { iniciirajZemljevid, map } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { shraniDogodek, naloziSeznamDogodkov } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
@@ -16,8 +16,10 @@ async function naloziVsebinoAplikacije() {
     iniciirajZemljevid();
     iniciirajSlojeEnot();
     iniciirajVideoStream();
+    iniciirajStrnitevVidea();
     iniciirajResizer();
     iniciirajFullscreen();
+    iniciirajPrilagajanjeVelikosti();
 
     // Naložimo seznam dogodkov iz Google Sheeta
     await naloziSeznamDogodkov();
@@ -88,6 +90,17 @@ function iniciirajVideoStream() {
     }
 }
 
+function iniciirajStrnitevVidea() {
+    const btn = document.getElementById('btn-toggle-video');
+    const panel = document.getElementById('video-stream-container');
+    if (!btn || !panel) return;
+
+    btn.addEventListener('click', () => {
+        const strnjen = panel.classList.toggle('strnjen');
+        btn.textContent = strnjen ? '▶' : '▼';
+    });
+}
+
 function iniciirajResizer() {
     const resizer = document.getElementById('resizer');
     const sidebar = document.getElementById('sidebar');
@@ -112,6 +125,20 @@ function iniciirajResizer() {
         isResizing = false;
         document.body.style.cursor = 'default';
     });
+}
+
+/**
+ * Leaflet ob spremembi velikosti vsebnika (npr. preklop mobilne/namizne postavitve,
+ * vrtenje telefona, strnitev video okna) ne prilagodi izrisa samodejno - to je treba sprožiti ročno.
+ */
+function iniciirajPrilagajanjeVelikosti() {
+    let casovnik = null;
+    const osveziZemljevid = () => {
+        clearTimeout(casovnik);
+        casovnik = setTimeout(() => map?.invalidateSize(), 150);
+    };
+    window.addEventListener('resize', osveziZemljevid);
+    window.addEventListener('orientationchange', osveziZemljevid);
 }
 
 function iniciirajFullscreen() {

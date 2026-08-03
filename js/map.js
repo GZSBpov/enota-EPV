@@ -133,10 +133,6 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
         opcijeBarv += `<option value="${kly}" ${sel}>${naziv}</option>`;
     }
 
-    const datalistOpcije = pridobiZnanaImenaEnot()
-        .map(ime => `<option value="${pobegniAtribut(ime)}"></option>`)
-        .join('');
-
     const htmlVsebina = `
         <div style="color: #000; font-family: sans-serif; min-width: 190px;">
             <strong style="font-size: 1rem;">Sektor / Območje</strong><br>
@@ -147,8 +143,11 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
             </select>
             <label style="font-size:0.8rem; font-weight:bold; display:block; margin-top:8px;">Dodeljene enote:</label>
             <div class="popup-dodelitve-seznam" style="display:flex; flex-wrap:wrap; gap:4px; margin:4px 0;"></div>
-            <input type="text" class="popup-dodelitev-input" list="seznam-znanih-enot-popup" placeholder="Dodaj enoto in pritisni Enter..." style="width:100%; padding:4px; box-sizing:border-box;">
-            <datalist id="seznam-znanih-enot-popup">${datalistOpcije}</datalist>
+            <select class="popup-dodelitev-select" style="width:100%; padding:4px; box-sizing:border-box;">
+                <option value="">-- Izberi registrirano enoto --</option>
+            </select>
+            <input type="text" class="popup-dodelitev-input" list="seznam-znanih-enot-popup" placeholder="Ali vpiši novo ime in pritisni Enter..." style="width:100%; padding:4px; margin-top:4px; box-sizing:border-box;">
+            <datalist id="seznam-znanih-enot-popup"></datalist>
         </div>
     `;
 
@@ -156,6 +155,20 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
 
     layer.on('popupopen', (e) => {
         const popNode = e.popup.getElement();
+
+        // Seznam registriranih enot osvežimo OB VSAKEM odprtju (ne samo enkrat ob risanju sektorja),
+        // sicer novo prijavljene enote ne bi bile na voljo v spustnem meniju/predlogih.
+        const znaneEnote = pridobiZnanaImenaEnot();
+        const dodelitevSelectZaOsvezitev = popNode.querySelector('.popup-dodelitev-select');
+        if (dodelitevSelectZaOsvezitev) {
+            dodelitevSelectZaOsvezitev.innerHTML = '<option value="">-- Izberi registrirano enoto --</option>' +
+                znaneEnote.map(ime => `<option value="${pobegniAtribut(ime)}">${pobegniAtribut(ime)}</option>`).join('');
+        }
+        const datalistZaOsvezitev = popNode.querySelector('#seznam-znanih-enot-popup');
+        if (datalistZaOsvezitev) {
+            datalistZaOsvezitev.innerHTML = znaneEnote.map(ime => `<option value="${pobegniAtribut(ime)}"></option>`).join('');
+        }
+
         const selectEl = popNode.querySelector('.popup-barva-select');
         if (selectEl) {
             selectEl.addEventListener('change', (evt) => {
@@ -166,6 +179,7 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
 
         const seznamEl = popNode.querySelector('.popup-dodelitve-seznam');
         const inputEl = popNode.querySelector('.popup-dodelitev-input');
+        const dodelitevSelectEl = popNode.querySelector('.popup-dodelitev-select');
 
         function izrisiChipe() {
             const enote = layer.options.dodeljeneEnote || [];
@@ -195,6 +209,15 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
                 if (!ime) return;
                 dodajEnotoSektorju(layer, ime, izrisiChipe);
                 inputEl.value = '';
+            });
+        }
+
+        if (dodelitevSelectEl) {
+            dodelitevSelectEl.addEventListener('change', (evt) => {
+                const ime = evt.target.value;
+                if (!ime) return;
+                dodajEnotoSektorju(layer, ime, izrisiChipe);
+                dodelitevSelectEl.value = '';
             });
         }
     });

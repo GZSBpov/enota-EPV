@@ -56,23 +56,27 @@ body {
     width: 380px;
     min-width: 280px;
     height: 100%;
+    min-height: 0;
     background-color: #1e293b;
     border-left: 1px solid #334155;
     display: flex;
     flex-direction: column;
     z-index: 1000;
+    overflow: hidden;
 }
 
 header {
     padding: 12px;
     background: #0f172a;
     border-bottom: 1px solid #334155;
+    flex-shrink: 0;
 }
 
 .dogodek-panel {
     padding: 12px;
     border-bottom: 1px solid #334155;
     background: #1e293b;
+    flex-shrink: 0;
 }
 
 .dogodek-panel select, .dogodek-panel input {
@@ -87,6 +91,7 @@ header {
     gap: 6px;
     border-bottom: 1px solid #334155;
     background: #0f172a;
+    flex-shrink: 0;
 }
 
 .btn {
@@ -105,7 +110,8 @@ header {
 .sporocila-panel {
     border-bottom: 1px solid #334155;
     background: #1e293b;
-    max-height: 180px;
+    max-height: 150px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
 }
@@ -169,6 +175,11 @@ header {
 .video-panel {
     border-bottom: 1px solid #334155;
     background: #000;
+    flex-shrink: 0;
+}
+
+.video-panel.strnjen .video-body {
+    display: none;
 }
 
 .video-header {
@@ -332,5 +343,65 @@ header {
 
     .tisk-tabela th {
         background: #e2e8f0;
+    }
+}
+
+/* ==========================================
+   ODZIVNA POSTAVITEV ZA TELEFONE (ANDROID/iOS)
+   Pod to širino zemljevid in stranska vrstica ne gresta več eden ob drugem,
+   ampak se zložita eden pod drugega (oba delno vidna, brez vodoravnega drsenja).
+   ========================================== */
+@media (max-width: 820px) {
+    #app-container {
+        flex-direction: column;
+    }
+
+    #map-container {
+        flex: none;
+        width: 100%;
+        height: 42vh;
+        min-height: 220px;
+        min-width: 0;
+    }
+
+    /* Vodoravni premik med zemljevidom in stransko vrstico ni smiseln na dotik - skrijemo ga */
+    #resizer {
+        display: none;
+    }
+
+    #sidebar {
+        width: 100% !important;
+        min-width: 0;
+        flex: 1;
+        min-height: 0;
+        /* Na mobilnem se cela stranska vrstica premika kot ena dolga stran - preprosteje in
+           zanesljiveje kot poskušati vsak notranji panel stisniti v premalo prostora. */
+        overflow-y: auto;
+    }
+
+    #seznam-enot-wrapper {
+        flex: none;
+        min-height: 220px;
+    }
+
+    #seznamEnotGumbi {
+        max-height: 280px;
+    }
+
+    .gumbi-panel {
+        flex-wrap: wrap;
+    }
+
+    .gumbi-panel .btn {
+        min-width: 90px;
+    }
+
+    /* Na ozkem zaslonu telefonske naprave sporočila in video ne smejo pojesti vsega prostora */
+    .sporocila-panel {
+        max-height: 110px;
+    }
+
+    .video-body {
+        height: 140px;
     }
 }
