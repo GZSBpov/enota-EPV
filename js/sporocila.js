@@ -33,6 +33,44 @@ function sporociloId(s) {
     return `${s.cas}|${s.enota}|${s.sporocilo}`;
 }
 
+function formatCas(cas) {
+    const s = (cas || '').toString();
+    return s.includes('T') ? s.replace('T', ' ').substring(0, 19) : s;
+}
+
+let sporociloOznacevalec = null;
+
+/**
+ * Doda (oz. premakne) oznako na zemljevidu z izpisom časa, koordinat in vsebine sporočila.
+ */
+function oznaciSporociloNaZemljevidu(s, lat, lon) {
+    if (!map) return;
+
+    if (sporociloOznacevalec) {
+        map.removeLayer(sporociloOznacevalec);
+    }
+
+    const vsebina = `
+        <div style="color:#000; font-family:sans-serif; font-size:12px;">
+            <b>${escapeHtml(s.enota)}</b><br>
+            Čas: ${escapeHtml(formatCas(s.cas))}<br>
+            Koordinate: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
+            ${escapeHtml(s.sporocilo)}
+        </div>
+    `;
+
+    sporociloOznacevalec = L.marker([lat, lon], {
+        icon: L.divIcon({
+            className: 'sporocilo-oznacevalec-ikona',
+            html: '📍',
+            iconSize: [30, 30],
+            iconAnchor: [15, 28]
+        })
+    }).addTo(map);
+
+    sporociloOznacevalec.bindPopup(vsebina).openPopup();
+}
+
 function izrisiSporocila(sporocila) {
     const kontejner = document.getElementById('seznamSporocil');
     const panel = document.getElementById('sporocila-panel');
@@ -91,6 +129,7 @@ function izrisiSporocila(sporocila) {
             const lon = parseFloat(s.lon);
             if (map && !isNaN(lat) && !isNaN(lon)) {
                 map.flyTo([lat, lon], 17);
+                oznaciSporociloNaZemljevidu(s, lat, lon);
             }
             oznaciPrebrano(sporociloId(s));
             el.classList.remove('novo');

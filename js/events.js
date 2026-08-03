@@ -1,6 +1,7 @@
 import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, pridobiGeoJsonSektorjev } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
+import { naloziSporocila } from './sporocila.js';
 
 // Lokalna varnostna kopija dogodkov, ker Google Apps Script ni vedno dosegljiv.
 // Dogodek je identificiran po IMENU (tako ga hrani tudi Apps Script - glej list "Dogodki").
@@ -136,12 +137,14 @@ export async function naloziSeznamDogodkov() {
                 narisaniSektorjiSloj.clearLayers();
                 if (inputIme) inputIme.value = '';
                 osveziLokacijeEnot();
+                naloziSporocila();
                 return;
             }
 
             if (inputIme) inputIme.value = imeDogodka;
             await naloziSektorjeDogodka(imeDogodka);
             osveziLokacijeEnot();
+            naloziSporocila();
         });
     }
 }
