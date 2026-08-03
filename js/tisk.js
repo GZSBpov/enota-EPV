@@ -25,12 +25,14 @@ function pridobiDodeljitve() {
     if (!narisaniSektorjiSloj) return dodelitve;
 
     narisaniSektorjiSloj.eachLayer(layer => {
-        const enota = (layer.options?.dodeljenaEnota || '').trim();
-        if (!enota) return;
-        const kljuc = enota.toLowerCase();
-        const seznam = dodelitve.get(kljuc) || [];
-        seznam.push(layer.options?.barvaSektorja || 'red');
-        dodelitve.set(kljuc, seznam);
+        const enote = layer.options?.dodeljeneEnote || [];
+        enote.forEach(enota => {
+            const kljuc = enota.trim().toLowerCase();
+            if (!kljuc) return;
+            const seznam = dodelitve.get(kljuc) || [];
+            seznam.push(layer.options?.barvaSektorja || 'red');
+            dodelitve.set(kljuc, seznam);
+        });
     });
     return dodelitve;
 }

@@ -12,7 +12,8 @@
         button.oddaja { background: #388e3c; }
         .status { font-weight: bold; margin-top: 15px; color: #555; }
         .zacka-dogodek { background: #e0e0e0; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; color: #333; margin-bottom: 10px; display: inline-block; }
-        #oznakaDodeljenSektor { font-size: 13px; color: #555; margin-top: 6px; text-align: left; }
+        #oznakaDodeljenSektor { font-size: 13px; color: #555; margin-top: 6px; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        #btnOsveziSektor { width: auto; margin: 0; padding: 4px 10px; font-size: 12px; background: #1976d2; flex-shrink: 0; }
         #terenski-zemljevid { width: 100%; height: 220px; border-radius: 8px; margin: 10px 0; display: none; }
         .posoda-sporocila { margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; text-align: left; }
         .posoda-sporocila label { font-weight: bold; display: block; margin-bottom: 6px; }
@@ -57,7 +58,10 @@
         ℹ️ Oddajanje deluje zanesljivo, dokler je zaslon prižgan in je ta stran odprta v ospredju. Na iPhone (Safari) se oddajanje ustavi, če zaklenete zaslon ali zamenjate aplikacijo - to je omejitev iOS-a, ne te aplikacije.
     </div>
 
-    <div id="oznakaDodeljenSektor"></div>
+    <div id="oznakaDodeljenSektor">
+        <span id="oznakaDodeljenSektorTekst"></span>
+        <button type="button" id="btnOsveziSektor">🔄 Osveži sektor</button>
+    </div>
     <div id="terenski-zemljevid"></div>
 
     <div class="posoda-sporocila">
@@ -84,6 +88,8 @@
     let dodeljenSektorIntervalId = null;
     let terenskiMap = null;
     let terenskaSektorjiSloj = null;
+    let terenskaSporocilaSloj = null;
+    let mojaLokacijaOznacevalec = null;
     let wakeLock = null;
 
     // Wake Lock: prepreči zaspanje zaslona med oddajanjem (najpogostejši vzrok prekinitve na terenu).
@@ -130,6 +136,7 @@
 
         // Če enota svoje ime že pozna (npr. shranjeno iz prejšnje seje), takoj preverimo dodelitev
         document.getElementById('imeEnote').addEventListener('change', naloziDodeljenSektor);
+        document.getElementById('btnOsveziSektor').addEventListener('click', naloziDodeljenSektor);
     };
 
     function pripraviTerenskiZemljevid() {
@@ -140,15 +147,118 @@
             attribution: '© OpenStreetMap'
         }).addTo(terenskiMap);
         terenskaSektorjiSloj = L.featureGroup().addTo(terenskiMap);
+        terenskaSporocilaSloj = L.featureGroup().addTo(terenskiMap);
+    }
+
+    function pobegniHtmlLokalno(niz) {
+        const el = document.createElement('div');
+        el.textContent = niz ?? '';
+        return el.innerHTML;
+    }
+
+    // Enak +2h popravek kot v js/cas-pomoc.js (terenEPV.html ni modul, zato je podvojen)
+    function formatirajCasLokalno(cas) {
+        if (!cas) return '-';
+        const niz = cas.toString();
+        if (niz.includes('T') || /Z$/i.test(niz)) {
+            const datum = new Date(niz);
+            if (!isNaN(datum.getTime())) {
+                const premaknjen = new Date(datum.getTime() + 2 * 60 * 60 * 1000);
+                const p = (n) => n.toString().padStart(2, '0');
+                return `${premaknjen.getUTCFullYear()}-${p(premaknjen.getUTCMonth() + 1)}-${p(premaknjen.getUTCDate())} ${p(premaknjen.getUTCHours())}:${p(premaknjen.getUTCMinutes())}:${p(premaknjen.getUTCSeconds())}`;
+            }
+        }
+        return niz;
+    }
+
+    // Ray-casting test točka-v-poligonu (GeoJSON [lon,lat] zunanji obroč, brez lukenj)
+    function tockaVPoligonu(lat, lon, coordinates) {
+        const ring = coordinates[0];
+        let znotraj = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const xi = ring[i][0], yi = ring[i][1];
+            const xj = ring[j][0], yj = ring[j][1];
+            const presek = ((yi > lat) !== (yj > lat)) &&
+                (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (presek) znotraj = !znotraj;
+        }
+        return znotraj;
+    }
+
+    function tockaVSektorju(lat, lon, elem) {
+        if (!elem || !elem.geometry) return false;
+        const tip = elem.properties?.tipObmočja;
+
+        if (tip === "circle" && elem.geometry.type === "Point") {
+            const center = L.latLng(elem.geometry.coordinates[1], elem.geometry.coordinates[0]);
+            const polmer = elem.properties.polmer || 100;
+            return L.latLng(lat, lon).distanceTo(center) <= polmer;
+        }
+        if (elem.geometry.type === "Polygon") {
+            return tockaVPoligonu(lat, lon, elem.geometry.coordinates);
+        }
+        return false; // črte (polyline) nimajo "notranjosti"
+    }
+
+    function izrisiSporocilaVSektorju(sporocila, sektorji) {
+        if (!terenskaSporocilaSloj) return;
+        terenskaSporocilaSloj.clearLayers();
+        if (!sporocila || !sektorji || sektorji.length === 0) return;
+
+        sporocila.forEach(s => {
+            if (!s || !s.sporocilo) return;
+            const lat = parseFloat(s.lat);
+            const lon = parseFloat(s.lon);
+            if (isNaN(lat) || isNaN(lon)) return;
+
+            const vSektorju = sektorji.some(elem => tockaVSektorju(lat, lon, elem));
+            if (!vSektorju) return;
+
+            const jeSOS = (s.sporocilo || '').toString().toUpperCase().includes('SOS');
+            const marker = L.marker([lat, lon], {
+                icon: L.divIcon({
+                    className: 'teren-sporocilo-ikona',
+                    html: jeSOS ? '🆘' : '📍',
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 24]
+                })
+            });
+
+            marker.bindPopup(`
+                <div style="color:#000; font-family:sans-serif; font-size:12px;">
+                    <b>${pobegniHtmlLokalno(s.enota)}</b><br>
+                    Čas: ${pobegniHtmlLokalno(formatirajCasLokalno(s.cas))}<br>
+                    Koordinate: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
+                    ${pobegniHtmlLokalno(s.sporocilo)}
+                </div>
+            `);
+
+            terenskaSporocilaSloj.addLayer(marker);
+        });
+    }
+
+    function naloziSporocilaVSektorju(sektorji) {
+        if (!sektorji || sektorji.length === 0) {
+            if (terenskaSporocilaSloj) terenskaSporocilaSloj.clearLayers();
+            return;
+        }
+        fetch(`${SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(izbranDogodek)}&geslo=EPV2026`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(odgovor => {
+                if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
+                    izrisiSporocilaVSektorju(odgovor.data, sektorji);
+                }
+            })
+            .catch(() => { /* tiho - sporočila na mini zemljevidu niso nujna za osnovno delovanje */ });
     }
 
     function izrisiDodeljeneSektorje(sektorji) {
         const zemljevidEl = document.getElementById('terenski-zemljevid');
-        const oznakaEl = document.getElementById('oznakaDodeljenSektor');
+        const oznakaEl = document.getElementById('oznakaDodeljenSektorTekst');
 
         if (!sektorji || sektorji.length === 0) {
-            zemljevidEl.style.display = 'none';
-            oznakaEl.innerText = '';
+            oznakaEl.innerText = 'Ni dodeljenih sektorjev.';
+            if (!mojaLokacijaOznacevalec) zemljevidEl.style.display = 'none';
             return;
         }
 
@@ -179,20 +289,61 @@
         setTimeout(() => {
             terenskiMap.invalidateSize();
             if (terenskaSektorjiSloj.getLayers().length > 0) {
-                terenskiMap.fitBounds(terenskaSektorjiSloj.getBounds(), { maxZoom: 16 });
+                const meje = terenskaSektorjiSloj.getBounds();
+                if (mojaLokacijaOznacevalec) meje.extend(mojaLokacijaOznacevalec.getLatLng());
+                terenskiMap.fitBounds(meje, { maxZoom: 16 });
+            }
+        }, 100);
+    }
+
+    /**
+     * Doda (oz. premakne) modro piko z lastno GPS lokacijo na mini zemljevidu.
+     * Prvič, ko se pika ustvari, zemljevid tudi približa nanjo (in na morebiten dodeljen sektor);
+     * kasnejše posodobitve samo premaknejo piko, brez skakanja pogleda.
+     */
+    function posodobiMojoLokacijoNaZemljevidu(lat, lon) {
+        const zemljevidEl = document.getElementById('terenski-zemljevid');
+        zemljevidEl.style.display = 'block';
+        pripraviTerenskiZemljevid();
+
+        if (mojaLokacijaOznacevalec) {
+            mojaLokacijaOznacevalec.setLatLng([lat, lon]);
+            return;
+        }
+
+        mojaLokacijaOznacevalec = L.circleMarker([lat, lon], {
+            radius: 8,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: '#2563eb',
+            fillOpacity: 1
+        }).addTo(terenskiMap).bindTooltip('Moja lokacija');
+
+        setTimeout(() => {
+            terenskiMap.invalidateSize();
+            if (terenskaSektorjiSloj.getLayers().length > 0) {
+                terenskiMap.fitBounds(terenskaSektorjiSloj.getBounds().extend([lat, lon]), { maxZoom: 16 });
+            } else {
+                terenskiMap.setView([lat, lon], 16);
             }
         }, 100);
     }
 
     function naloziDodeljenSektor() {
         const ime = document.getElementById('imeEnote').value.trim();
-        if (!ime) return;
+        const oznakaEl = document.getElementById('oznakaDodeljenSektorTekst');
+        if (!ime) {
+            if (oznakaEl) oznakaEl.innerText = 'Za prikaz sektorja najprej vpiši ime enote.';
+            return;
+        }
 
         fetch(`${SCRIPT_URL}?akcija=pridobiDodeljeneSektorje&dogodek=${encodeURIComponent(izbranDogodek)}&enotaIme=${encodeURIComponent(ime)}&geslo=EPV2026`, { cache: 'no-store' })
             .then(res => res.json())
             .then(odgovor => {
                 if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
-                    izrisiDodeljeneSektorje(odgovor.data.map(v => v.podatki).filter(Boolean));
+                    const sektorji = odgovor.data.map(v => v.podatki).filter(Boolean);
+                    izrisiDodeljeneSektorje(sektorji);
+                    naloziSporocilaVSektorju(sektorji);
                 }
             })
             .catch(() => { /* tiho - dodeljen sektor ni nujen za osnovno delovanje oddajanja lokacije */ });
@@ -324,6 +475,8 @@
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
         const acc = Math.round(position.coords.accuracy);
+
+        posodobiMojoLokacijoNaZemljevidu(lat, lon);
 
         document.getElementById('statusPolje').innerText = `Pošiljam... Natančnost: ${acc}m`;
 

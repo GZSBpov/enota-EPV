@@ -50,7 +50,11 @@ function narisiSektorje(sektorji) {
         }
 
         if (layer) {
-            layer.options.dodeljenaEnota = elem.properties?.dodeljenaEnota || "";
+            // "dodeljenaEnota" je shranjena kot en niz z imeni, ločenimi z vejico (lahko je več enot na sektor)
+            layer.options.dodeljeneEnote = (elem.properties?.dodeljenaEnota || '')
+                .split(',')
+                .map(ime => ime.trim())
+                .filter(Boolean);
             narisaniSektorjiSloj.addLayer(layer);
             if (jeOkvarjenPodatek) {
                 layer.bindPopup('<div style="color:#000; font-family:sans-serif; font-size:0.85rem; max-width:220px;"><b>⚠️ Star/okvarjen podatek</b><br>Ta krog je bil narisan s staro različico aplikacije, ki ni shranila polmera. Prosimo, na novo ga nariši in znova shrani dogodek.</div>');

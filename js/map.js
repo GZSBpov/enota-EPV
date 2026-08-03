@@ -133,21 +133,21 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
         opcijeBarv += `<option value="${kly}" ${sel}>${naziv}</option>`;
     }
 
-    const trenutnaDodelitev = layer.options.dodeljenaEnota || "";
     const datalistOpcije = pridobiZnanaImenaEnot()
         .map(ime => `<option value="${pobegniAtribut(ime)}"></option>`)
         .join('');
 
     const htmlVsebina = `
-        <div style="color: #000; font-family: sans-serif;">
+        <div style="color: #000; font-family: sans-serif; min-width: 190px;">
             <strong style="font-size: 1rem;">Sektor / Območje</strong><br>
             <span style="font-size: 0.85rem; color: #475569;">${meroTekst}</span><br><br>
             <label style="font-size:0.8rem; font-weight:bold;">Barva sektorja:</label><br>
             <select class="popup-barva-select" style="width: 100%; padding: 4px; margin-top: 4px;">
                 ${opcijeBarv}
             </select>
-            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-top:8px;">Dodeli enoti (ime, npr. "Slb 1"):</label>
-            <input type="text" class="popup-dodelitev-input" list="seznam-znanih-enot-popup" value="${pobegniAtribut(trenutnaDodelitev)}" placeholder="Prazno = ni dodeljeno" style="width:100%; padding:4px; margin-top:4px; box-sizing:border-box;">
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-top:8px;">Dodeljene enote:</label>
+            <div class="popup-dodelitve-seznam" style="display:flex; flex-wrap:wrap; gap:4px; margin:4px 0;"></div>
+            <input type="text" class="popup-dodelitev-input" list="seznam-znanih-enot-popup" placeholder="Dodaj enoto in pritisni Enter..." style="width:100%; padding:4px; box-sizing:border-box;">
             <datalist id="seznam-znanih-enot-popup">${datalistOpcije}</datalist>
         </div>
     `;
@@ -163,13 +163,71 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
                 posodobiIzgledSektorja(layer, novaBarva);
             });
         }
-        const dodelitevInput = popNode.querySelector('.popup-dodelitev-input');
-        if (dodelitevInput) {
-            dodelitevInput.addEventListener('change', (evt) => {
-                layer.options.dodeljenaEnota = evt.target.value.trim();
+
+        const seznamEl = popNode.querySelector('.popup-dodelitve-seznam');
+        const inputEl = popNode.querySelector('.popup-dodelitev-input');
+
+        function izrisiChipe() {
+            const enote = layer.options.dodeljeneEnote || [];
+            seznamEl.innerHTML = enote.length ? enote.map(ime => `
+                <span class="popup-dodelitev-chip" data-ime="${pobegniAtribut(ime)}" style="background:#e2e8f0; border-radius:4px; padding:2px 6px; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">
+                    ${pobegniAtribut(ime)}
+                    <span class="popup-dodelitev-odstrani" style="cursor:pointer; font-weight:bold;">×</span>
+                </span>
+            `).join('') : '<span style="font-size:0.75rem; color:#94a3b8;">Ni dodeljenih enot.</span>';
+
+            seznamEl.querySelectorAll('.popup-dodelitev-chip').forEach(chip => {
+                chip.querySelector('.popup-dodelitev-odstrani').addEventListener('click', () => {
+                    const ime = chip.dataset.ime;
+                    layer.options.dodeljeneEnote = (layer.options.dodeljeneEnote || []).filter(e2 => e2 !== ime);
+                    izrisiChipe();
+                });
+            });
+        }
+
+        izrisiChipe();
+
+        if (inputEl) {
+            inputEl.addEventListener('keydown', (evt) => {
+                if (evt.key !== 'Enter') return;
+                evt.preventDefault();
+                const ime = inputEl.value.trim();
+                if (!ime) return;
+                dodajEnotoSektorju(layer, ime, izrisiChipe);
+                inputEl.value = '';
             });
         }
     });
+}
+
+/**
+ * Doda enoto na seznam dodeljenih enot izbranega sektorja. Če je enota že dodeljena
+ * drugemu sektorju, uporabnika vpraša, ali naj jo prestavi (odstrani iz starega, doda v novega)
+ * ali prekliče (enota ostane v prvotnem sektorju).
+ */
+function dodajEnotoSektorju(ciljniLayer, ime, osveziChipe) {
+    const imeMalo = ime.toLowerCase();
+
+    if ((ciljniLayer.options.dodeljeneEnote || []).some(e => e.toLowerCase() === imeMalo)) {
+        return; // enota je že dodeljena temu sektorju
+    }
+
+    let staraLayer = null;
+    narisaniSektorjiSloj.eachLayer(l => {
+        if (l === ciljniLayer || staraLayer) return;
+        if ((l.options.dodeljeneEnote || []).some(e => e.toLowerCase() === imeMalo)) {
+            staraLayer = l;
+        }
+    });
+
+    if (staraLayer) {
+        const potrdi = window.confirm(`Enota "${ime}" je že dodeljena drugemu sektorju.\nAli želite enoti dodeliti nov sektor?`);
+        if (!potrdi) return; // Prekliči - enota ostane v prvotnem sektorju
+        staraLayer.options.dodeljeneEnote = (staraLayer.options.dodeljeneEnote || []).filter(e => e.toLowerCase() !== imeMalo);
+    }
+
+    ciljniLayer.options.dodeljeneEnote = [...(ciljniLayer.options.dodeljeneEnote || []), ime];
+    osveziChipe();
 }
 
 /**
@@ -181,7 +239,7 @@ export function pridobiGeoJsonSektorjev() {
         let geojson = layer.toGeoJSON();
         geojson.properties = geojson.properties || {};
         geojson.properties.barvaSektorja = layer.options.barvaSektorja || "red";
-        geojson.properties.dodeljenaEnota = layer.options.dodeljenaEnota || "";
+        geojson.properties.dodeljenaEnota = (layer.options.dodeljeneEnote || []).join(', ');
 
         if (layer instanceof L.Circle) {
             geojson.properties.tipObmočja = "circle";
