@@ -4,6 +4,7 @@
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { map } from './map.js';
+import { formatirajCas } from './cas-pomoc.js';
 
 const STORAGE_PREBRANA = 'epv_prebrana_sporocila';
 
@@ -33,11 +34,6 @@ function sporociloId(s) {
     return `${s.cas}|${s.enota}|${s.sporocilo}`;
 }
 
-function formatCas(cas) {
-    const s = (cas || '').toString();
-    return s.includes('T') ? s.replace('T', ' ').substring(0, 19) : s;
-}
-
 let sporociloOznacevalec = null;
 
 /**
@@ -53,7 +49,7 @@ function oznaciSporociloNaZemljevidu(s, lat, lon) {
     const vsebina = `
         <div style="color:#000; font-family:sans-serif; font-size:12px;">
             <b>${escapeHtml(s.enota)}</b><br>
-            Čas: ${escapeHtml(formatCas(s.cas))}<br>
+            Čas: ${escapeHtml(formatirajCas(s.cas))}<br>
             Koordinate: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
             ${escapeHtml(s.sporocilo)}
         </div>
@@ -101,8 +97,7 @@ function izrisiSporocila(sporocila) {
         const jeSOS = (s.sporocilo || '').toString().toUpperCase().includes('SOS');
         if (jeSOS) imaSOS = true;
         const jeNovo = !prebrana.has(sporociloId(s));
-        const cas = (s.cas || '').toString();
-        const kratekCas = cas.length > 16 ? cas.substring(11, 16) : cas;
+        const kratekCas = formatirajCas(s.cas, true);
 
         let razredi = 'sporocilo-vrstica';
         if (jeSOS) razredi += ' sos';

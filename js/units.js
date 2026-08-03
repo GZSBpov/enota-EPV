@@ -5,6 +5,7 @@
 import { map } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { registrirajEnoto } from './enote-register.js';
+import { formatirajCas } from './cas-pomoc.js';
 
 export const enoteSloj = new L.FeatureGroup();
 export const slediSloj = new L.FeatureGroup();
@@ -70,7 +71,7 @@ function pripraviPopupVsebino(enota, barva) {
             <b style="color: ${barva};">${escapeHtml(enota.naziv)}</b><br>
             Tip: ${escapeHtml(enota.tip || 'Splošno')}<br>
             Status: ${escapeHtml(enota.status || 'Aktivna')}<br>
-            Zadnji čas: ${escapeHtml(enota.cas || '-')}<br>
+            Zadnji čas: ${escapeHtml(formatirajCas(enota.cas))}<br>
             Koordinate: ${enota.lat.toFixed(5)}, ${enota.lng.toFixed(5)}
             <div style="display:flex; gap:6px; margin-top:8px;">
                 <a href="${mapsUrl}" target="_blank" rel="noopener" style="flex:1; text-align:center; background:#2563eb; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">🧭 Navigacija</a>
@@ -196,7 +197,7 @@ export function osveziStranskoVrstico() {
                 <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
                 ${podatki.naziv}
             </div>
-            <div style="font-size: 0.72rem; color: #94a3b8;">${podatki.cas ? 'Čas: ' + podatki.cas.toString().substring(11, 16) : 'Tip: ' + (podatki.tip || 'Enota')}</div>
+            <div style="font-size: 0.72rem; color: #94a3b8;">${podatki.cas ? 'Čas: ' + formatirajCas(podatki.cas, true) : 'Tip: ' + (podatki.tip || 'Enota')}</div>
         `;
 
         vsebina.appendChild(chk);

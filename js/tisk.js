@@ -4,18 +4,12 @@
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
+import { formatirajCas as formatCas } from './cas-pomoc.js';
 
 function escapeHtml(niz) {
     const el = document.createElement('div');
     el.textContent = niz ?? '';
     return el.innerHTML;
-}
-
-function formatCas(cas) {
-    if (!cas) return '-';
-    const s = cas.toString();
-    // Google Sheets včasih vrne ISO datum (npr. "2026-08-02T11:15:52.000Z"), včasih navaden niz
-    return s.includes('T') ? s.replace('T', ' ').substring(0, 19) : s;
 }
 
 function imeIzPolnegaImena(polnoIme) {
