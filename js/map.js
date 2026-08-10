@@ -7,6 +7,36 @@ function pobegniAtribut(niz) {
     return el.innerHTML.replace(/"/g, '&quot;');
 }
 
+const BARVE_HEX = {
+    "red": "#ef4444",
+    "blue": "#3b82f6",
+    "green": "#10b981",
+    "gold": "#eab308",
+    "orange": "#f97316",
+    "purple": "#a855f7"
+};
+
+/**
+ * Ikona za posamezno označeno točko (npr. lokacijo, ki jo je opazil dron) - tarča namesto
+ * navadnega pina, da se vizualno loči od enot in sektorjev.
+ */
+function ustvariTockaIkono(barva) {
+    const hex = BARVE_HEX[barva] || "#ef4444";
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26px" height="26px" style="filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.6));">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="${hex}" stroke-width="3"/>
+            <circle cx="12" cy="12" r="3" fill="${hex}"/>
+        </svg>
+    `;
+    return L.divIcon({
+        className: 'tocka-oznaka-ikona',
+        html: svg,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -12]
+    });
+}
+
 export let map;
 export let narisaniSektorjiSloj;
 export let enoteMarkerjiSloj;
@@ -40,7 +70,7 @@ export function iniciirajZemljevid() {
             polyline: true,
             rectangle: true,
             circle: true,
-            marker: false,
+            marker: true,
             circlemarker: false
         }
     });
@@ -64,6 +94,10 @@ export function iniciirajZemljevid() {
  * Изračuna površino ali dolžino sloja
  */
 export function izracunajVelikost(layer) {
+    if (layer instanceof L.Marker) {
+        const ll = layer.getLatLng();
+        return `Koordinate: ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+    }
     if (layer instanceof L.Circle) {
         const r = layer.getRadius();
         const area = Math.PI * r * r;
@@ -100,17 +134,10 @@ export function izracunajVelikost(layer) {
  * Posodobi stil barve sloja
  */
 export function posodobiIzgledSektorja(layer, barva) {
-    const barveHex = {
-        "red": "#ef4444",
-        "blue": "#3b82f6",
-        "green": "#10b981",
-        "gold": "#eab308",
-        "orange": "#f97316",
-        "purple": "#a855f7"
-    };
-    const hex = barveHex[barva] || "#ef4444";
-    
-    if (layer.setStyle) {
+    if (layer instanceof L.Marker) {
+        layer.setIcon(ustvariTockaIkono(barva));
+    } else if (layer.setStyle) {
+        const hex = BARVE_HEX[barva] || "#ef4444";
         layer.setStyle({
             color: hex,
             fillColor: hex,
@@ -126,18 +153,35 @@ export function posodobiIzgledSektorja(layer, barva) {
  */
 export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
     const meroTekst = izracunajVelikost(layer);
-    
+    const jeTocka = layer instanceof L.Marker;
+
     let opcijeBarv = "";
     for (const [kly, naziv] of Object.entries(SLOVAR_BARV)) {
         const sel = (kly === izbranaBarva) ? "selected" : "";
         opcijeBarv += `<option value="${kly}" ${sel}>${naziv}</option>`;
     }
 
+    let navigacijaSmsGumbi = "";
+    if (jeTocka) {
+        const ll = layer.getLatLng();
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${ll.lat},${ll.lng}`;
+        const smsBesedilo = encodeURIComponent(`Preveri to lokacijo: https://www.google.com/maps?q=${ll.lat},${ll.lng}`);
+        const smsUrl = `sms:?body=${smsBesedilo}`;
+        navigacijaSmsGumbi = `
+            <div style="display:flex; gap:6px; margin-top:8px;">
+                <a href="${mapsUrl}" target="_blank" rel="noopener" style="flex:1; text-align:center; background:#2563eb; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">🧭 Navigacija</a>
+                <a href="${smsUrl}" style="flex:1; text-align:center; background:#059669; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">📩 Pošlji SMS</a>
+            </div>
+        `;
+    }
+
     const htmlVsebina = `
         <div style="color: #000; font-family: sans-serif; min-width: 190px;">
-            <strong style="font-size: 1rem;">Sektor / Območje</strong><br>
-            <span style="font-size: 0.85rem; color: #475569;">${meroTekst}</span><br><br>
-            <label style="font-size:0.8rem; font-weight:bold;">Barva sektorja:</label><br>
+            <strong style="font-size: 1rem;">${jeTocka ? 'Označena točka' : 'Sektor / Območje'}</strong><br>
+            <span style="font-size: 0.85rem; color: #475569;">${meroTekst}</span>
+            ${navigacijaSmsGumbi}
+            <br>
+            <label style="font-size:0.8rem; font-weight:bold;">${jeTocka ? 'Barva oznake:' : 'Barva sektorja:'}</label><br>
             <select class="popup-barva-select" style="width: 100%; padding: 4px; margin-top: 4px;">
                 ${opcijeBarv}
             </select>
@@ -264,7 +308,9 @@ export function pridobiGeoJsonSektorjev() {
         geojson.properties.barvaSektorja = layer.options.barvaSektorja || "red";
         geojson.properties.dodeljenaEnota = (layer.options.dodeljeneEnote || []).join(', ');
 
-        if (layer instanceof L.Circle) {
+        if (layer instanceof L.Marker) {
+            geojson.properties.tipObmočja = "tocka";
+        } else if (layer instanceof L.Circle) {
             geojson.properties.tipObmočja = "circle";
             geojson.properties.polmer = layer.getRadius();
         } else if (layer instanceof L.Rectangle) {

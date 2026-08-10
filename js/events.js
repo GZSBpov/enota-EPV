@@ -35,6 +35,9 @@ function narisiSektorje(sektorji) {
         if (tip === "circle" && elem.geometry.type === "Point") {
             const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
             layer = L.circle(coords, { radius: elem.properties.polmer || 100 });
+        } else if (tip === "tocka" && elem.geometry.type === "Point") {
+            const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
+            layer = L.marker(coords); // ikona (barva) se nastavi spodaj preko posodobiIzgledSektorja
         } else if (jeOkvarjenPodatek) {
             const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
             layer = L.marker(coords, {

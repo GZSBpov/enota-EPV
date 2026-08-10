@@ -279,6 +279,10 @@
             if (tip === "circle" && elem.geometry.type === "Point") {
                 const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
                 layer = L.circle(coords, { radius: elem.properties.polmer || 100, color: barva, fillColor: barva, fillOpacity: 0.35, weight: 3 });
+            } else if (tip === "tocka" && elem.geometry.type === "Point") {
+                const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
+                layer = L.circleMarker(coords, { radius: 9, color: '#ffffff', weight: 2, fillColor: barva, fillOpacity: 1 });
+                layer.bindTooltip('📍 Označena točka');
             } else if (elem.geometry.type !== "Point") {
                 layer = L.geoJSON(elem, { style: { color: barva, fillColor: barva, fillOpacity: 0.35, weight: 3 } }).getLayers()[0];
             }
