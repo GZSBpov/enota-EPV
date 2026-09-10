@@ -7,7 +7,7 @@ function pobegniAtribut(niz) {
     return el.innerHTML.replace(/"/g, '&quot;');
 }
 
-const BARVE_HEX = {
+export const BARVE_HEX = {
     "red": "#ef4444",
     "blue": "#3b82f6",
     "green": "#10b981",

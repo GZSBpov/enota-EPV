@@ -3,7 +3,7 @@
 // ==========================================
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
-import { map } from './map.js';
+import { map, narisaniSektorjiSloj, BARVE_HEX } from './map.js';
 import { formatirajCas } from './cas-pomoc.js';
 
 const STORAGE_PREBRANA = 'epv_prebrana_sporocila';
@@ -32,6 +32,35 @@ function oznaciPrebrano(id) {
 
 function sporociloId(s) {
     return `${s.cas}|${s.enota}|${s.sporocilo}`;
+}
+
+/**
+ * "enota" v sporočilu je celoten niz TIP:IME:CLANOV:VOZILA - za ujemanje s sektorsko
+ * dodelitvijo (ki hrani samo golo ime) potrebujemo samo IME (2. del).
+ */
+function imeIzPolnegaImenaSporocila(polnoIme) {
+    const deli = (polnoIme || '').split(':');
+    return deli[1] || polnoIme || '';
+}
+
+/**
+ * Vrne barvo (ključ, npr. "red") sektorja, ki mu je trenutno dodeljena podana enota,
+ * ali null, če enota ni dodeljena nobenemu sektorju. Uporabimo za obarvan okvir sporočila,
+ * da je na prvi pogled vidno, iz katerega sektorja sporočilo prihaja (usklajeno z barvo
+ * sektorja na zemljevidu).
+ */
+function pridobiBarvoSektorjaZaEnoto(imeEnote) {
+    if (!narisaniSektorjiSloj || !imeEnote) return null;
+    const imeMalo = imeEnote.trim().toLowerCase();
+    let barva = null;
+    narisaniSektorjiSloj.eachLayer(layer => {
+        if (barva) return;
+        const enote = layer.options?.dodeljeneEnote || [];
+        if (enote.some(e => e.trim().toLowerCase() === imeMalo)) {
+            barva = layer.options?.barvaSektorja || null;
+        }
+    });
+    return barva;
 }
 
 let sporociloOznacevalec = null;
@@ -103,8 +132,20 @@ function izrisiSporocila(sporocila) {
         if (jeSOS) razredi += ' sos';
         if (jeNovo) razredi += ' novo';
 
+        // Okvir vrstice: pri SOS vedno debel rdeč (kritično, mora izstopati), sicer obarvan
+        // z barvo sektorja, ki mu je enota trenutno dodeljena (usklajeno z zemljevidom) -
+        // če enota ni dodeljena nobenemu sektorju, ostane nevtralen (prosojen) okvir.
+        let okvirSlog;
+        if (jeSOS) {
+            okvirSlog = 'border-left: 6px solid #ef4444;';
+        } else {
+            const barvaSektorja = pridobiBarvoSektorjaZaEnoto(imeIzPolnegaImenaSporocila(s.enota));
+            const barvaHex = barvaSektorja ? (BARVE_HEX[barvaSektorja] || '#64748b') : null;
+            okvirSlog = `border-left: 4px solid ${barvaHex || 'transparent'};`;
+        }
+
         return `
-            <div class="${razredi}" data-idx="${idx}" title="Klikni za lokacijo na zemljevidu">
+            <div class="${razredi}" style="${okvirSlog}" data-idx="${idx}" title="Klikni za lokacijo na zemljevidu">
                 <div class="sporocilo-glava">
                     <span>${jeSOS ? '🆘 ' : ''}${escapeHtml(s.enota)}</span>
                     <span class="sporocilo-cas">${escapeHtml(kratekCas)}</span>

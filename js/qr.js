@@ -28,6 +28,8 @@ export function prikaziQRModal() {
     const bazniUrl = TEREN_EPV_URL || "https://gzsbpov.github.io/enota-EPV/terenEPV.html";
     const terenskiUrl = `${bazniUrl}?dogodek=${encodeURIComponent(dogodekIme)}`;
 
+    posodobiPovezaveZaDeljenje(terenskiUrl, dogodekIme);
+
     // Počistimo prejšnjo QR kodo
     qrContainer.innerHTML = "";
 
@@ -48,6 +50,46 @@ export function prikaziQRModal() {
 
     // Prikažemo modalno okno
     modal.style.display = 'flex';
+}
+
+/**
+ * Poleg same QR kode pripravi tudi neposredno klikljivo povezavo do terenEPV.html in
+ * gumbe za deljenje preko SMS/WhatsApp/Viber/Messenger ali kopiranje v odložišče - za primer,
+ * ko skeniranje QR kode ni mogoče (npr. enota nima druge naprave ob sebi za skeniranje).
+ */
+function posodobiPovezaveZaDeljenje(terenskiUrl, dogodekIme) {
+    const besediloDeljenje = `Povezava za EPV teren (${dogodekIme}): ${terenskiUrl}`;
+
+    const direktnaEl = document.getElementById('qr-direktna-povezava');
+    if (direktnaEl) {
+        direktnaEl.href = terenskiUrl;
+        direktnaEl.textContent = terenskiUrl;
+    }
+
+    const smsEl = document.getElementById('qr-sms');
+    if (smsEl) smsEl.href = `sms:?body=${encodeURIComponent(besediloDeljenje)}`;
+
+    const waEl = document.getElementById('qr-whatsapp');
+    if (waEl) waEl.href = `https://wa.me/?text=${encodeURIComponent(besediloDeljenje)}`;
+
+    const viberEl = document.getElementById('qr-viber');
+    if (viberEl) viberEl.href = `viber://forward?text=${encodeURIComponent(besediloDeljenje)}`;
+
+    const messengerEl = document.getElementById('qr-messenger');
+    if (messengerEl) messengerEl.href = `fb-messenger://share?link=${encodeURIComponent(terenskiUrl)}`;
+
+    const kopirajBtn = document.getElementById('qr-kopiraj');
+    if (kopirajBtn) {
+        kopirajBtn.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(terenskiUrl);
+                kopirajBtn.textContent = '✅ Kopirano!';
+                setTimeout(() => { kopirajBtn.textContent = '📋 Kopiraj'; }, 2000);
+            } catch (err) {
+                alert('Kopiranje ni uspelo. Povezava:\n' + terenskiUrl);
+            }
+        };
+    }
 }
 
 /**
