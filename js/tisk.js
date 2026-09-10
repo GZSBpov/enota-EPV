@@ -4,7 +4,10 @@
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
+import { pridobiTrenutnoVidneEnote } from './units.js';
 import { formatirajCas as formatCas } from './cas-pomoc.js';
+
+const STORAGE_STEVILKA_TISKA = 'epv_stevilka_tiska';
 
 function escapeHtml(niz) {
     const el = document.createElement('div');
@@ -15,6 +18,20 @@ function escapeHtml(niz) {
 function imeIzPolnegaImena(polnoIme) {
     const deli = (polnoIme || '').split(':');
     return deli[1] || polnoIme || '';
+}
+
+/**
+ * Vrne (in poveča) zaporedno številko izpisa za ta dogodek - vsak klik na "Tisk" za isti
+ * dogodek dobi svojo zaporedno številko (koristno, če se med intervencijo tiska večkrat).
+ */
+function pridobiSteviloTiska(imeDogodka) {
+    let podatki = {};
+    try {
+        podatki = JSON.parse(localStorage.getItem(STORAGE_STEVILKA_TISKA)) || {};
+    } catch (e) {}
+    podatki[imeDogodka] = (podatki[imeDogodka] || 0) + 1;
+    localStorage.setItem(STORAGE_STEVILKA_TISKA, JSON.stringify(podatki));
+    return podatki[imeDogodka];
 }
 
 /**
@@ -37,9 +54,15 @@ function pridobiDodeljitve() {
     return dodelitve;
 }
 
-async function pripraviPodatkeZaTisk(dogodekId) {
+async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     const tabelaEl = document.getElementById('print-tabela');
     if (tabelaEl) tabelaEl.innerHTML = '<p>Nalagam podatke za tiskanje ...</p>';
+
+    // Enote, ki so TRENUTNO odkljukane (vidne) v stranski vrstici - poročilo vključi samo te,
+    // ne vseh, ki so kdajkoli poročale za ta dogodek.
+    const vidneEnote = pridobiTrenutnoVidneEnote();
+    const vidniIdji = new Set(vidneEnote.map(e => e.id));
+    const clanovPoEnoti = new Map(vidneEnote.map(e => [e.id, e.clanovStevilo || 0]));
 
     let lokacijeRes = { data: [] };
     let sporocilaRes = { data: [] };
@@ -55,13 +78,14 @@ async function pripraviPodatkeZaTisk(dogodekId) {
         return;
     }
 
-    // 1. Prva/zadnja prijava vsake enote na tem dogodku
+    // 1. Prva/zadnja prijava vsake TRENUTNO ODKLJUKANE enote na tem dogodku
     const vrstice = (lokacijeRes.data || []).slice(1); // brez glave
     const enote = new Map(); // polnoIme -> { prva, zadnja }
 
     vrstice.forEach(v => {
         const [cas, enotaPolno, lat, lon, acc, dId] = v;
         if (!enotaPolno || dId !== dogodekId) return;
+        if (!vidniIdji.has(enotaPolno)) return; // samo trenutno odkljukane enote
         const obstojeca = enote.get(enotaPolno);
         if (!obstojeca) {
             enote.set(enotaPolno, { prva: cas, zadnja: cas });
@@ -71,10 +95,11 @@ async function pripraviPodatkeZaTisk(dogodekId) {
         }
     });
 
-    // 2. Sporočila (SOS, najdena oseba/žival, konec oddajanja, ...) za ta dogodek
+    // 2. Sporočila (SOS, najdena oseba/žival, konec oddajanja, konec intervencije, ...) za ta dogodek
     const sporocila = (sporocilaRes.data || []).filter(s => s && s.sporocilo);
 
-    // "Konec oddajanja" štejemo kot uraden čas zaključka enote (če ga je poslala)
+    // "Konec oddajanja" štejemo kot uraden čas zaključka enote - enota lahko oddajanje večkrat
+    // ustavi in znova začne, zato štejemo samo NAJKASNEJŠI (zadnji) zabeležen čas konca.
     const koncOddaje = new Map(); // polnoIme -> zadnji zabeležen čas konca
     sporocila.forEach(s => {
         if ((s.sporocilo || '').toLowerCase().includes('konec oddajanja')) {
@@ -83,20 +108,34 @@ async function pripraviPodatkeZaTisk(dogodekId) {
         }
     });
 
+    // "Konec intervencije" - zaključek celotnega dogodka (gumb "🏁 Zaključi intervencijo")
+    const zakljucki = sporocila
+        .filter(s => (s.sporocilo || '').toLowerCase().includes('konec intervencije'))
+        .sort((a, b) => (a.cas || '').localeCompare(b.cas || ''));
+    const zakljucek = zakljucki.length ? zakljucki[zakljucki.length - 1] : null;
+
     const dodelitve = pridobiDodeljitve();
 
-    // --- Tabela enot ---
-    let html = `<h2>Enote na dogodku (${enote.size})</h2>`;
+    // Skupni seštevek enot in članov (samo trenutno odkljukanih, ki so dejansko poročale za ta dogodek)
+    let steviloClanov = 0;
+    enote.forEach((info, polnoIme) => {
+        steviloClanov += clanovPoEnoti.get(polnoIme) || 0;
+    });
+
+    let html = `<p style="font-size:1rem;"><b>Skupno enot: ${enote.size}</b> &nbsp;|&nbsp; <b>Skupno članov: ${steviloClanov}</b></p>`;
+
+    // --- Tabela enot (razvrščene KRONOLOŠKO po prvi prijavi - prva zgoraj) ---
+    html += `<h2>Enote na dogodku (${enote.size})</h2>`;
 
     if (enote.size === 0) {
-        html += '<p>Ni zabeleženih enot za ta dogodek.</p>';
+        html += '<p>Ni odkljukanih enot za ta dogodek.</p>';
     } else {
         html += `<table class="tisk-tabela"><thead><tr>
-            <th>Enota</th><th>Prva prijava</th><th>Zadnja znana lokacija</th><th>Konec oddajanja</th><th>Dodeljen sektor</th>
+            <th>Enota</th><th>Članov</th><th>Prva prijava</th><th>Zadnja znana lokacija</th><th>Konec oddajanja</th><th>Dodeljen sektor</th>
         </tr></thead><tbody>`;
 
         Array.from(enote.entries())
-            .sort((a, b) => imeIzPolnegaImena(a[0]).localeCompare(imeIzPolnegaImena(b[0])))
+            .sort((a, b) => (a[1].prva || '').localeCompare(b[1].prva || ''))
             .forEach(([polnoIme, info]) => {
                 const ime = imeIzPolnegaImena(polnoIme);
                 const koncCas = koncOddaje.get(polnoIme);
@@ -104,6 +143,7 @@ async function pripraviPodatkeZaTisk(dogodekId) {
 
                 html += `<tr>
                     <td>${escapeHtml(ime)}</td>
+                    <td>${clanovPoEnoti.get(polnoIme) || 0}</td>
                     <td>${escapeHtml(formatCas(info.prva))}</td>
                     <td>${escapeHtml(formatCas(info.zadnja))}</td>
                     <td>${koncCas ? escapeHtml(formatCas(koncCas)) : '-'}</td>
@@ -137,6 +177,13 @@ async function pripraviPodatkeZaTisk(dogodekId) {
         html += '</tbody></table>';
     }
 
+    // --- Zaključek intervencije (če je bila zaključena) - na koncu poročila ---
+    if (zakljucek) {
+        html += `<h2>🏁 Zaključek intervencije</h2><p style="font-size:1rem;"><b>${escapeHtml(formatCas(zakljucek.cas))}</b></p>`;
+    }
+
+    html += `<p style="font-size:0.75rem; color:#64748b; margin-top:20px;">Izpis št. ${stevilkaTiska} - natisnjeno ${escapeHtml(formatCas(new Date().toISOString()))}</p>`;
+
     if (tabelaEl) tabelaEl.innerHTML = html;
 }
 
@@ -145,19 +192,30 @@ export async function pripraviInNatisni() {
     const dogodekId = selectEl?.value || '';
     const naslovEl = document.getElementById('print-naslov');
     const tabelaEl = document.getElementById('print-tabela');
-
-    if (naslovEl) {
-        naslovEl.textContent = (dogodekId && dogodekId !== 'novy')
-            ? `EPV - Poročilo intervencije: ${dogodekId}`
-            : 'EPV - Poročilo intervencije';
-    }
+    const izvirniNaslovStrani = document.title;
 
     if (!dogodekId || dogodekId === 'novy') {
+        if (naslovEl) naslovEl.textContent = 'EPV - Poročilo intervencije';
         if (tabelaEl) tabelaEl.innerHTML = '<p>Dogodek ni izbran ali ustvarjen - ni podatkov za poročilo.</p>';
         window.print();
         return;
     }
 
-    await pripraviPodatkeZaTisk(dogodekId);
+    const stevilkaTiska = pridobiSteviloTiska(dogodekId);
+
+    if (naslovEl) {
+        naslovEl.textContent = `EPV - Poročilo intervencije: ${dogodekId} (izpis št. ${stevilkaTiska})`;
+    }
+    // Naslov strani (uporabijo ga brskalniki kot privzeto ime datoteke pri "Natisni v PDF")
+    document.title = `EPV - ${dogodekId} - izpis ${stevilkaTiska}`;
+
+    await pripraviPodatkeZaTisk(dogodekId, stevilkaTiska);
     window.print();
+
+    // Po tiskanju (ali preklicu) povrnemo prvotni naslov zavihka
+    const povrniNaslov = () => {
+        document.title = izvirniNaslovStrani;
+        window.removeEventListener('afterprint', povrniNaslov);
+    };
+    window.addEventListener('afterprint', povrniNaslov);
 }

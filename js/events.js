@@ -1,5 +1,5 @@
-import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, pridobiGeoJsonSektorjev } from './map.js';
-import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
+import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, pridobiGeoJsonSektorjev, map } from './map.js';
+import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 import { naloziSporocila } from './sporocila.js';
 
@@ -156,7 +156,7 @@ export async function naloziSeznamDogodkov() {
     }
 }
 
-export async function shraniDogodek() {
+export async function shraniDogodek(tiho = false) {
     const imeInput = document.getElementById('input-ime-dogodka');
     const selectEl = document.getElementById('select-dogodek');
 
@@ -193,7 +193,40 @@ export async function shraniDogodek() {
         console.warn("Shranjevanje na strežnik ni uspelo, dogodek je shranjen samo lokalno.", err);
     }
 
-    alert(`Dogodek "${imeDogodka}" uspešno shranjen!`);
+    if (!tiho) alert(`Dogodek "${imeDogodka}" uspešno shranjen!`);
     await naloziSeznamDogodkov();
     if (selectEl) selectEl.value = imeDogodka;
+}
+
+/**
+ * Zaključi trenutno izbrano intervencijo/dogodek: zabeleži čas zaključka (kot posebno
+ * sporočilo "KONEC INTERVENCIJE", da se to prikaže v poročilu za tisk) in shrani trenutno
+ * stanje sektorjev. Enkrat zaključena intervencija ostane v seznamu, le dodatno označena.
+ */
+export async function zakljuciIntervencijo() {
+    const selectEl = document.getElementById('select-dogodek');
+    const dogodekId = selectEl?.value || '';
+
+    if (!dogodekId || dogodekId === 'novy') {
+        alert('Najprej izberi ali ustvari dogodek.');
+        return;
+    }
+
+    const potrdi = window.confirm(`Ali res želite zaključiti intervencijo "${dogodekId}"?\nTega dejanja ni mogoče razveljaviti.`);
+    if (!potrdi) return;
+
+    const center = map ? map.getCenter() : { lat: ZACETNE_KOORDINATE[0], lng: ZACETNE_KOORDINATE[1] };
+
+    try {
+        const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:Zaključek intervencije:0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent('KONEC INTERVENCIJE')}`;
+        await fetch(url, { method: 'GET', mode: 'no-cors' });
+    } catch (err) {
+        console.warn('Napaka pri beleženju zaključka intervencije:', err);
+    }
+
+    // Poskrbimo, da je trenutno stanje sektorjev shranjeno ob zaključku
+    await shraniDogodek(true);
+
+    alert(`Intervencija "${dogodekId}" je bila zaključena ob ${new Date().toLocaleString('sl-SI')}.`);
+    naloziSporocila();
 }

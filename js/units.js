@@ -249,6 +249,17 @@ export function osveziStranskoVrstico() {
     });
 }
 
+/**
+ * Vrne podatke enot, ki so TRENUTNO odkljukane (vidne) v stranski vrstici - uporablja tisk.js,
+ * da poročilo vključi samo enote, ki so bile ob tiskanju dejansko odkljukane, ne vseh, ki so
+ * kdajkoli poročale za ta dogodek.
+ */
+export function pridobiTrenutnoVidneEnote() {
+    return Object.values(enoteBaza)
+        .filter(e => vidnostEnot[e.podatki.id] !== false)
+        .map(e => e.podatki);
+}
+
 let osvezevanjeVTeku = false;
 
 export async function osveziLokacijeEnot() {
@@ -279,7 +290,12 @@ export async function osveziLokacijeEnot() {
 
                 const deli = enotaPolno.split(':');
                 const tip = deli[0] || 'Splošno';
+                // Sistemski zaznamki (npr. zaključek intervencije) niso prava enota s terena -
+                // ne smejo se pojaviti med enotami v stranski vrstici/poročilu.
+                if (tip.toUpperCase() === 'SISTEM') continue;
+
                 const ime = deli[1] || enotaPolno;
+                const clanovStevilo = parseInt(deli[2], 10) || 0;
                 const clanov = deli[2] ? `(${deli[2]} članov)` : '';
 
                 registrirajEnoto(ime);
@@ -291,7 +307,8 @@ export async function osveziLokacijeEnot() {
                     lat: parseFloat(lat),
                     lng: parseFloat(lon),
                     status: 'Aktivna',
-                    cas: cas
+                    cas: cas,
+                    clanovStevilo: clanovStevilo
                 };
             }
 

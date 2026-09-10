@@ -4,7 +4,7 @@
 
 import { iniciirajZemljevid, map } from './map.js';
 import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
-import { shraniDogodek, naloziSeznamDogodkov } from './events.js';
+import { shraniDogodek, naloziSeznamDogodkov, zakljuciIntervencijo } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
 import { naloziSporocila } from './sporocila.js';
 import { pripraviInNatisni } from './tisk.js';
@@ -35,6 +35,7 @@ async function naloziVsebinoAplikacije() {
     document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
     document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
     document.getElementById('btn-osvezi-dogodke')?.addEventListener('click', () => naloziSeznamDogodkov());
+    document.getElementById('btn-zakljuci-dogodek')?.addEventListener('click', () => zakljuciIntervencijo());
     // Opomba: poslušalec za preklop dogodkov v spustnem meniju se registrira
     // znotraj naloziSeznamDogodkov() (v events.js), zato ga tu ne podvajamo.
 }
