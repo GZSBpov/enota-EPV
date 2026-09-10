@@ -2,6 +2,7 @@ import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, pos
 import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 import { naloziSporocila } from './sporocila.js';
+import { pridobiSejnoGeslo, vprasajZaGesloDogodka, generirajGesloDogodka, sha256Hex, shraniGesloDogodkaNaStreznik, shraniSejnoGeslo } from './geslo-dogodka.js';
 
 // Lokalna varnostna kopija dogodkov, ker Google Apps Script ni vedno dosegljiv.
 // Dogodek je identificiran po IMENU (tako ga hrani tudi Apps Script - glej list "Dogodki").
@@ -77,22 +78,46 @@ function narisiSektorje(sektorji) {
 }
 
 /**
- * Naloži sektorje za izbran dogodek (najprej strežnik, nato lokalna kopija kot rezerva)
+ * Naloži sektorje za izbran dogodek (najprej strežnik, nato lokalna kopija kot rezerva).
+ * Če je dogodek zaščiten z geslom (nastavljeno ob zaključku intervencije), strežnik vrne
+ * status "locked" - v tem primeru vprašamo uporabnika za geslo in poskusimo znova.
+ * Vrne true, če je dostop uspel (ali dogodek sploh ni zaščiten), false, če je bil dostop zavrnjen.
  */
 async function naloziSektorjeDogodka(imeDogodka) {
     const predpomnilnik = nalozitLokalniPredpomnilnik();
     let sektorji = predpomnilnik[imeDogodka];
+    let dostopUspel = true;
 
     try {
-        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&geslo=EPV2026`, { cache: 'no-store' });
-        if (res.ok) {
-            const odgovor = await res.json();
-            if (odgovor.status === 'success' && Array.isArray(odgovor.data) && odgovor.data.length > 0) {
-                sektorji = odgovor.data.map(vrstica => vrstica.podatki).filter(Boolean);
+        let gesloHash = pridobiSejnoGeslo(imeDogodka);
+        let res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+        let odgovor = res.ok ? await res.json() : null;
+
+        if (odgovor && odgovor.status === 'locked') {
+            gesloHash = await vprasajZaGesloDogodka(imeDogodka);
+            if (!gesloHash) {
+                dostopUspel = false;
+                alert(`Dostop do dogodka "${imeDogodka}" je zavrnjen - geslo ni bilo vneseno.`);
+            } else {
+                res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+                odgovor = res.ok ? await res.json() : null;
+                if (odgovor && odgovor.status === 'locked') {
+                    dostopUspel = false;
+                    alert('Napačno geslo - dostop do tega dogodka zavrnjen.');
+                }
             }
+        }
+
+        if (dostopUspel && odgovor && odgovor.status === 'success' && Array.isArray(odgovor.data) && odgovor.data.length > 0) {
+            sektorji = odgovor.data.map(vrstica => vrstica.podatki).filter(Boolean);
         }
     } catch (err) {
         console.warn(`Sektorjev za dogodek "${imeDogodka}" ni bilo mogoče naložiti s strežnika, uporabljam lokalno kopijo (če obstaja).`, err);
+    }
+
+    if (!dostopUspel) {
+        narisiSektorje([]);
+        return false;
     }
 
     narisiSektorje(sektorji);
@@ -101,6 +126,7 @@ async function naloziSektorjeDogodka(imeDogodka) {
         predpomnilnik[imeDogodka] = sektorji;
         shraniLokalniPredpomnilnik(predpomnilnik);
     }
+    return true;
 }
 
 export async function naloziSeznamDogodkov() {
@@ -157,7 +183,17 @@ export async function naloziSeznamDogodkov() {
             }
 
             if (inputIme) inputIme.value = imeDogodka;
-            await naloziSektorjeDogodka(imeDogodka);
+            const dostopUspel = await naloziSektorjeDogodka(imeDogodka);
+            if (!dostopUspel) {
+                // Dostop zavrnjen (napačno/manjkajoče geslo dogodka) - vrni izbiro na "Nov dogodek"
+                selectEl.value = 'novy';
+                if (inputIme) inputIme.value = '';
+                narisaniSektorjiSloj.clearLayers();
+                osveziLokacijeEnot();
+                naloziSporocila();
+                osveziGumbZakljucka();
+                return;
+            }
             osveziLokacijeEnot();
             naloziSporocila();
             osveziGumbZakljucka();
@@ -190,21 +226,56 @@ export async function shraniDogodek(tiho = false) {
         geojson: g
     }));
 
+    // Če je bil ta dogodek zaščiten z geslom (zaključena intervencija), moramo geslo poslati
+    // tudi tu (POST z mode:'no-cors' ne vrne odgovora, ki bi ga lahko prebrali, zato se ob
+    // napačnem/manjkajočem geslu sicer NE bo javila napaka - a strežnik shranjevanja ne bo izvedel).
+    let uspesnoShranjeno = await posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, pridobiSejnoGeslo(imeDogodka));
+    if (!uspesnoShranjeno) {
+        const gesloHash = await vprasajZaGesloDogodka(imeDogodka);
+        if (gesloHash) {
+            uspesnoShranjeno = await posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, gesloHash);
+        }
+        if (!uspesnoShranjeno) {
+            alert(`Shranjevanje na strežnik ni uspelo - dogodek "${imeDogodka}" je zaščiten in vneseno geslo ni pravilno. Sektorji so shranjeni samo lokalno na tej napravi.`);
+        }
+    }
+
+    if (!tiho && uspesnoShranjeno) alert(`Dogodek "${imeDogodka}" uspešno shranjen!`);
+    await naloziSeznamDogodkov();
+    if (selectEl) selectEl.value = imeDogodka;
+}
+
+/**
+ * Pošlje sektorje na strežnik (akcija shraniSektorje). Ker POST uporablja mode:'no-cors'
+ * (Apps Script POST sicer sproži CORS predhodno zahtevo), odgovora ne moremo prebrati -
+ * zato uporabimo ločeno GET-preverjanje gesla PRED pošiljanjem, da vemo, ali je verjetno uspelo.
+ */
+async function posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, gesloHash) {
+    try {
+        const preveriUrl = `${GOOGLE_APPS_SCRIPT_URL}?akcija=preveriGesloDogodka&dogodek=${encodeURIComponent(imeDogodka)}&gesloHash=${encodeURIComponent(gesloHash || '')}&geslo=EPV2026`;
+        const res = await fetch(preveriUrl, { cache: 'no-store' });
+        const odgovor = res.ok ? await res.json() : null;
+        if (odgovor && odgovor.status === 'success' && odgovor.zascitena === true && odgovor.ok !== true) {
+            return false; // dogodek je zaščiten in geslo ni pravilno - ne pošiljaj (bi bilo zavrnjeno)
+        }
+    } catch (err) {
+        // Preverjanje ni uspelo (npr. stara različica strežnika brez te akcije) - poskusimo vseeno poslati
+    }
+
     try {
         await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors',
             // text/plain namesto application/json, da Apps Script POST ne sproži CORS predhodne (preflight) zahteve
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ akcija: "shraniSektorje", geslo: "EPV2026", dogodek: imeDogodka, sektorji: sektorjiZaPosiljanje })
+            body: JSON.stringify({ akcija: "shraniSektorje", geslo: "EPV2026", dogodek: imeDogodka, sektorji: sektorjiZaPosiljanje, gesloHashDogodka: gesloHash || '' })
         });
+        if (gesloHash) shraniSejnoGeslo(imeDogodka, gesloHash);
+        return true;
     } catch (err) {
         console.warn("Shranjevanje na strežnik ni uspelo, dogodek je shranjen samo lokalno.", err);
+        return false;
     }
-
-    if (!tiho) alert(`Dogodek "${imeDogodka}" uspešno shranjen!`);
-    await naloziSeznamDogodkov();
-    if (selectEl) selectEl.value = imeDogodka;
 }
 
 /**
@@ -229,9 +300,12 @@ async function posljiZaznamekDogodka(dogodekId, besedilo) {
  */
 async function jeDogodekZakljucen(dogodekId) {
     try {
-        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' });
+        const gesloHash = pridobiSejnoGeslo(dogodekId);
+        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
         if (!res.ok) return false;
         const odgovor = await res.json();
+        // Če je dogodek zaščiten in geslo (še) ni bilo potrjeno za to sejo, sektorji zgoraj
+        // (naloziSektorjeDogodka) že niso bili naloženi - tu samo tiho obravnavamo kot "ni znano".
         if (odgovor.status !== 'success' || !Array.isArray(odgovor.data)) return false;
 
         const sporocila = odgovor.data.filter(s => s && s.sporocilo);
@@ -306,9 +380,24 @@ async function zakljuciIntervencijo() {
     if (!potrdi) return;
 
     await posljiZaznamekDogodka(dogodekId, 'Konec intervencije');
+
+    // Ob vsakem zaključku (tudi po popravku in ponovnem zaključku) se generira novo geslo za
+    // dostop do podatkov tega dogodka - od zdaj naprej so ogled/popravki/tisk zanj zaščiteni.
+    // Geslo na strežniku POSODOBIMO PRED shranjevanjem sektorjev, da se preverjanje gesla
+    // znotraj shraniDogodek() (ki uporabi novo geslo, saj ga takoj spodaj shranimo za to sejo)
+    // ujema s tem, kar strežnik v tistem trenutku dejansko pričakuje.
+    const novoGeslo = generirajGesloDogodka();
+    const novGesloHash = await sha256Hex(novoGeslo);
+    const gesloShranjenoNaStreznik = await shraniGesloDogodkaNaStreznik(dogodekId, novGesloHash);
+    shraniSejnoGeslo(dogodekId, novGesloHash); // takoj na voljo za to sejo, brez ponovnega vnosa
+
     await shraniDogodek(true);
 
-    alert(`Intervencija "${dogodekId}" je bila zaključena ob ${new Date().toLocaleString('sl-SI')}.`);
+    if (gesloShranjenoNaStreznik) {
+        alert(`Intervencija "${dogodekId}" je bila zaključena ob ${new Date().toLocaleString('sl-SI')}.\n\n🔑 GESLO ZA DOSTOP DO TE INTERVENCIJE (popravki/analiza): ${novoGeslo}\n\nShranite/zapišite si to geslo - brez njega kasnejši dostop do teh podatkov ne bo mogoč!`);
+    } else {
+        alert(`Intervencija "${dogodekId}" je bila zaključena ob ${new Date().toLocaleString('sl-SI')}.\n\n⚠️ Gesla za zaščito dogodka ni bilo mogoče shraniti na strežnik (povezava ni uspela) - dogodek trenutno NI zaščiten z geslom. Poskusite znova zaključiti intervencijo, ko bo povezava spet na voljo.`);
+    }
     naloziSporocila();
     nastaviStanjeGumba('zakljucena');
 }

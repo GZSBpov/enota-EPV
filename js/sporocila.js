@@ -5,6 +5,7 @@
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { map, narisaniSektorjiSloj, BARVE_HEX } from './map.js';
 import { formatirajCas } from './cas-pomoc.js';
+import { pridobiSejnoGeslo } from './geslo-dogodka.js';
 
 const STORAGE_PREBRANA = 'epv_prebrana_sporocila';
 
@@ -186,10 +187,13 @@ export async function naloziSporocila() {
     }
 
     try {
-        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(aktivniDogodekId)}&geslo=EPV2026`, { cache: 'no-store' });
+        // Geslo dogodka (če je zaščiten) je bilo že potrjeno ob izbiri dogodka (glej events.js
+        // naloziSektorjeDogodka) - tu ga samo tiho pošljemo naprej, brez ponovnega spraševanja.
+        const gesloHash = pridobiSejnoGeslo(aktivniDogodekId);
+        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(aktivniDogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
         if (!res.ok) return;
         const odgovor = await res.json();
-        if (odgovor.status !== 'success' || !Array.isArray(odgovor.data)) return;
+        if (odgovor.status !== 'success' || !Array.isArray(odgovor.data)) return; // vključno s "locked" - tiho brez sporočil
         izrisiSporocila(odgovor.data);
     } catch (err) {
         console.error('Napaka pri nalaganju sporočil s terena:', err);

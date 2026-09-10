@@ -6,6 +6,7 @@ import { GOOGLE_APPS_SCRIPT_URL, SLOVAR_BARV } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
 import { pridobiTrenutnoVidneEnote } from './units.js';
 import { formatirajCas as formatCas } from './cas-pomoc.js';
+import { pridobiSejnoGeslo, vprasajZaGesloDogodka } from './geslo-dogodka.js';
 
 const STORAGE_STEVILKA_TISKA = 'epv_stevilka_tiska';
 
@@ -85,10 +86,37 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     let sporocilaRes = { data: [] };
     let sporocilaStabRes = { data: [] };
 
+    // Sporočila najprej posebej (lahko zahteva geslo dogodka, če je zaključena intervencija
+    // zaščitena) - šele ko dostop uspe, nadaljujemo z ostalimi podatki za poročilo.
     try {
-        [lokacijeRes, sporocilaRes, sporocilaStabRes] = await Promise.all([
+        let gesloHash = pridobiSejnoGeslo(dogodekId);
+        let res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+        let odgovor = res.ok ? await res.json() : null;
+
+        if (odgovor && odgovor.status === 'locked') {
+            gesloHash = await vprasajZaGesloDogodka(dogodekId);
+            if (!gesloHash) {
+                if (tabelaEl) tabelaEl.innerHTML = '<p>Dostop zavrnjen - dogodek je zaščiten z geslom, ki ni bilo vneseno.</p>';
+                return;
+            }
+            res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+            odgovor = res.ok ? await res.json() : null;
+            if (!odgovor || odgovor.status === 'locked') {
+                if (tabelaEl) tabelaEl.innerHTML = '<p>Napačno geslo - dostop do podatkov tega dogodka je zavrnjen.</p>';
+                return;
+            }
+        }
+
+        sporocilaRes = odgovor || { data: [] };
+    } catch (err) {
+        console.error('Napaka pri pripravi podatkov za tiskanje:', err);
+        if (tabelaEl) tabelaEl.innerHTML = '<p>Napaka pri pripravi podatkov za tiskanje.</p>';
+        return;
+    }
+
+    try {
+        [lokacijeRes, sporocilaStabRes] = await Promise.all([
             fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()),
-            fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()),
             fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocilaStab&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ data: [] }))
         ]);
     } catch (err) {
