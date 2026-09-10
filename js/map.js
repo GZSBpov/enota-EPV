@@ -107,6 +107,48 @@ function dodajKontrolnikBarveRisanja() {
 }
 
 /**
+ * Gumb "✅ Zaključi risanje", ki se prikaže med risanjem črte/poligona - namesto da se je
+ * treba zanašati na dvoklik ali klik nazaj na zadnjo točko (na dotik/touch napravah nezanesljivo
+ * in pogosto pomotoma prekine risanje že po dveh točkah).
+ */
+function dodajKontrolnikZakljucekRisanja() {
+    const ZakljuciControl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd: function () {
+            const btn = L.DomUtil.create('a', 'leaflet-bar gumb-zakljuci-risanje');
+            btn.href = '#';
+            btn.title = 'Zaključi risanje';
+            btn.innerHTML = '✅';
+            btn.style.display = 'none';
+            btn.style.background = '#16a34a';
+            btn.style.color = '#fff';
+            btn.style.fontWeight = 'bold';
+            btn.style.textAlign = 'center';
+            btn.style.lineHeight = '30px';
+            btn.style.width = '30px';
+            btn.style.height = '30px';
+            btn.style.textDecoration = 'none';
+
+            L.DomEvent.disableClickPropagation(btn);
+            L.DomEvent.on(btn, 'click', L.DomEvent.stop);
+            L.DomEvent.on(btn, 'click', () => {
+                const aktivniNacin = drawControl?._toolbars?.draw?._activeMode;
+                if (aktivniNacin?.handler?.completeShape) {
+                    aktivniNacin.handler.completeShape();
+                }
+            });
+
+            this._btn = btn;
+            return btn;
+        },
+        pokazi: function () { if (this._btn) this._btn.style.display = 'block'; },
+        skrij: function () { if (this._btn) this._btn.style.display = 'none'; }
+    });
+
+    return new ZakljuciControl();
+}
+
+/**
  * Prevede vmesnik Leaflet.Draw (orodna vrstica, namigi, gumbi urejanja) v slovenščino -
  * privzeto je knjižnica v angleščini. Klicati je treba PRED ustvarjanjem L.Control.Draw.
  */
@@ -182,7 +224,20 @@ export function iniciirajZemljevid() {
     enoteMarkerjiSloj = new L.LayerGroup().addTo(map);
 
     dodajKontrolnikBarveRisanja();
+    const gumbZakljuciRisanje = dodajKontrolnikZakljucekRisanja();
+    map.addControl(gumbZakljuciRisanje);
     ustvariDrawControl();
+
+    // Med risanjem črte/poligona pokažemo gumb "✅ Zaključi risanje" - dvoklik/dvotap za
+    // zaključek ostane na voljo, a ni več edini način (na dotik pogosto nezanesljiv).
+    map.on(L.Draw.Event.DRAWSTART, (e) => {
+        if (e.layerType === 'polyline' || e.layerType === 'polygon') {
+            gumbZakljuciRisanje.pokazi();
+        }
+    });
+    map.on(L.Draw.Event.DRAWSTOP, () => {
+        gumbZakljuciRisanje.skrij();
+    });
 
     map.on(L.Draw.Event.CREATED, (e) => {
         const layer = e.layer;
