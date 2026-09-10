@@ -145,6 +145,7 @@ export async function naloziSeznamDogodkov() {
                 if (inputIme) inputIme.value = '';
                 osveziLokacijeEnot();
                 naloziSporocila();
+                osveziGumbZakljucka();
                 return;
             }
 
@@ -152,6 +153,7 @@ export async function naloziSeznamDogodkov() {
             await naloziSektorjeDogodka(imeDogodka);
             osveziLokacijeEnot();
             naloziSporocila();
+            osveziGumbZakljucka();
         });
     }
 }
@@ -199,11 +201,92 @@ export async function shraniDogodek(tiho = false) {
 }
 
 /**
+ * Pošlje sistemski zaznamek (npr. "Konec intervencije"/"Popravek intervencije") z lokacijo
+ * in trenutnim časom, preko istega mehanizma kot terenska sporočila. Enota "SISTEM:..." se
+ * v units.js izrecno izloči iz seznama enot, zato se v stranski vrstici/poročilu ne pojavi
+ * kot navidezna enota - ostane pa v dnevniku sporočil kot zaznamek.
+ */
+async function posljiZaznamekDogodka(dogodekId, besedilo) {
+    const center = map ? map.getCenter() : { lat: ZACETNE_KOORDINATE[0], lng: ZACETNE_KOORDINATE[1] };
+    try {
+        const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:' + besedilo + ':0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent(besedilo.toUpperCase())}`;
+        await fetch(url, { method: 'GET', mode: 'no-cors' });
+    } catch (err) {
+        console.warn(`Napaka pri beleženju zaznamka "${besedilo}":`, err);
+    }
+}
+
+/**
+ * Preveri, ali je dogodek trenutno v "zaključenem" stanju: zadnji zaznamek "konec intervencije"
+ * je novejši od zadnjega "popravek intervencije" (če popravka sploh ni bilo, zadostuje zaključek).
+ */
+async function jeDogodekZakljucen(dogodekId) {
+    try {
+        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' });
+        if (!res.ok) return false;
+        const odgovor = await res.json();
+        if (odgovor.status !== 'success' || !Array.isArray(odgovor.data)) return false;
+
+        const sporocila = odgovor.data.filter(s => s && s.sporocilo);
+        const zadnjiCasZa = (iskanaBeseda) => sporocila
+            .filter(s => (s.sporocilo || '').toLowerCase().includes(iskanaBeseda))
+            .map(s => s.cas || '')
+            .sort()
+            .pop();
+
+        const zadnjiZakljucek = zadnjiCasZa('konec intervencije');
+        if (!zadnjiZakljucek) return false;
+
+        const zadnjiPopravek = zadnjiCasZa('popravek intervencije');
+        return !(zadnjiPopravek && zadnjiPopravek > zadnjiZakljucek);
+    } catch (err) {
+        return false;
+    }
+}
+
+/**
+ * Neposredno nastavi videz/napis gumba (brez spraševanja strežnika) - uporabimo takoj po tem,
+ * ko SAMI ravnokar zaključimo/popravimo dogodek, saj takojšnje ponovno branje s strežnika lahko
+ * še ne odraža pravkar zapisanega sporočila (kratka zakasnitev pri Apps Scriptu).
+ */
+function nastaviStanjeGumba(stanje) {
+    const btn = document.getElementById('btn-zakljuci-dogodek');
+    if (!btn) return;
+
+    if (stanje === 'zakljucena') {
+        btn.textContent = '✏️ Popravek zaključene intervencije';
+        btn.style.backgroundColor = '#d97706';
+        btn.dataset.stanje = 'zakljucena';
+    } else {
+        btn.textContent = '🏁 Zaključi intervencijo';
+        btn.style.backgroundColor = '#dc2626';
+        btn.dataset.stanje = 'aktivna';
+    }
+}
+
+/**
+ * Osveži videz/napis gumba glede na to, ali je izbrani dogodek trenutno zaključen ali aktiven -
+ * kliče se ob preklopu dogodka, ko dejansko stanje ni (še) znano in ga je treba vprašati strežnik.
+ */
+export async function osveziGumbZakljucka() {
+    const selectEl = document.getElementById('select-dogodek');
+    const dogodekId = selectEl?.value || '';
+
+    if (!dogodekId || dogodekId === 'novy') {
+        nastaviStanjeGumba('aktivna');
+        return;
+    }
+
+    const zakljucen = await jeDogodekZakljucen(dogodekId);
+    nastaviStanjeGumba(zakljucen ? 'zakljucena' : 'aktivna');
+}
+
+/**
  * Zaključi trenutno izbrano intervencijo/dogodek: zabeleži čas zaključka (kot posebno
  * sporočilo "KONEC INTERVENCIJE", da se to prikaže v poročilu za tisk) in shrani trenutno
- * stanje sektorjev. Enkrat zaključena intervencija ostane v seznamu, le dodatno označena.
+ * stanje sektorjev.
  */
-export async function zakljuciIntervencijo() {
+async function zakljuciIntervencijo() {
     const selectEl = document.getElementById('select-dogodek');
     const dogodekId = selectEl?.value || '';
 
@@ -212,21 +295,46 @@ export async function zakljuciIntervencijo() {
         return;
     }
 
-    const potrdi = window.confirm(`Ali res želite zaključiti intervencijo "${dogodekId}"?\nTega dejanja ni mogoče razveljaviti.`);
+    const potrdi = window.confirm(`Ali res želite zaključiti intervencijo "${dogodekId}"?`);
     if (!potrdi) return;
 
-    const center = map ? map.getCenter() : { lat: ZACETNE_KOORDINATE[0], lng: ZACETNE_KOORDINATE[1] };
-
-    try {
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:Zaključek intervencije:0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent('KONEC INTERVENCIJE')}`;
-        await fetch(url, { method: 'GET', mode: 'no-cors' });
-    } catch (err) {
-        console.warn('Napaka pri beleženju zaključka intervencije:', err);
-    }
-
-    // Poskrbimo, da je trenutno stanje sektorjev shranjeno ob zaključku
+    await posljiZaznamekDogodka(dogodekId, 'Konec intervencije');
     await shraniDogodek(true);
 
     alert(`Intervencija "${dogodekId}" je bila zaključena ob ${new Date().toLocaleString('sl-SI')}.`);
     naloziSporocila();
+    nastaviStanjeGumba('zakljucena');
+}
+
+/**
+ * Znova odpre že zaključeno intervencijo za popravke - zabeleži zaznamek "popravek intervencije"
+ * (s tem gumb spet preklopi nazaj na "Zaključi"). Sektorje/podatke je treba po popravku shraniti
+ * ročno (💾 Shrani) ali z novim klikom na "Zaključi intervencijo".
+ */
+async function popraviIntervencijo() {
+    const selectEl = document.getElementById('select-dogodek');
+    const dogodekId = selectEl?.value || '';
+    if (!dogodekId || dogodekId === 'novy') return;
+
+    const potrdi = window.confirm(`Intervencija "${dogodekId}" je bila zaključena.\nAli želite popraviti podatke? Dogodek bo znova odprt za urejanje, dokler ga znova ne zaključite.`);
+    if (!potrdi) return;
+
+    await posljiZaznamekDogodka(dogodekId, 'Popravek intervencije');
+
+    alert('Dogodek je znova odprt za urejanje. Ko končate s popravki, ga shranite (💾 Shrani) ali znova zaključite.');
+    naloziSporocila();
+    nastaviStanjeGumba('aktivna');
+}
+
+/**
+ * Poslušalec gumba "🏁 Zaključi intervencijo" / "✏️ Popravek" - glede na trenutno stanje
+ * gumba (nastavi ga osveziGumbZakljucka) izvede ustrezno akcijo.
+ */
+export async function obravnavajGumbZakljucka() {
+    const btn = document.getElementById('btn-zakljuci-dogodek');
+    if (btn?.dataset.stanje === 'zakljucena') {
+        await popraviIntervencijo();
+    } else {
+        await zakljuciIntervencijo();
+    }
 }
