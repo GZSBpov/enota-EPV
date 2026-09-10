@@ -82,16 +82,21 @@ function dodajKontrolnikBarveRisanja() {
         onAdd: function () {
             const div = L.DomUtil.create('div', 'leaflet-bar barva-risanja-kontrolnik');
             div.style.background = '#fff';
-            div.style.padding = '5px 6px';
             div.style.borderRadius = '4px';
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.height = '30px';
+            div.style.padding = '0 4px';
 
             let opcije = '';
             for (const [kljuc, naziv] of Object.entries(SLOVAR_BARV)) {
                 opcije += `<option value="${kljuc}" ${kljuc === trenutnaBarvaRisanja ? 'selected' : ''}>${naziv}</option>`;
             }
+            // Kompakten, en-vrstičen kontrolnik (namesto ločenega napisa + celotnega izbirnega polja),
+            // da na majhnih zaslonih (telefon) ne "pojé" prostora, namenjenega gumboma Uredi/Izbriši.
             div.innerHTML = `
-                <label style="display:block; font-size:11px; font-weight:bold; color:#000; margin-bottom:2px;">Barva risanja sektorja:</label>
-                <select style="font-size:12px; padding:2px; width:100%;">${opcije}</select>
+                <label style="font-size:10px; font-weight:bold; color:#000; margin-right:3px; white-space:nowrap;">Barva risanja:</label>
+                <select style="font-size:11px; padding:1px; border:none; max-width:80px;">${opcije}</select>
             `;
 
             L.DomEvent.disableClickPropagation(div);
