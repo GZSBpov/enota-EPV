@@ -2,7 +2,7 @@
 // EPV - MODUL ZA TISKANJE POROČILA INTERVENCIJE
 // ==========================================
 
-import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
+import { GOOGLE_APPS_SCRIPT_URL, SLOVAR_BARV } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
 import { pridobiTrenutnoVidneEnote } from './units.js';
 import { formatirajCas as formatCas } from './cas-pomoc.js';
@@ -45,7 +45,9 @@ function pridobiSteviloTiska(imeDogodka) {
 }
 
 /**
- * Vrne Map: ime enote (malimi črkami) -> seznam barv sektorjev, ki so ji trenutno dodeljeni na zemljevidu
+ * Vrne Map: ime enote (malimi črkami) -> seznam { naziv, cas } sektorjev, ki so ji trenutno
+ * dodeljeni na zemljevidu (naziv, čas dodelitve). Če sektor nima vpisanega naziva, se namesto
+ * njega uporabi barva ("Sektor (Rdeča)"), da vrstica v poročilu ni prazna.
  */
 function pridobiDodeljitve() {
     const dodelitve = new Map();
@@ -53,11 +55,15 @@ function pridobiDodeljitve() {
 
     narisaniSektorjiSloj.eachLayer(layer => {
         const enote = layer.options?.dodeljeneEnote || [];
+        const casi = layer.options?.casDodelitve || {};
+        const naziv = (layer.options?.nazivSektorja || '').trim()
+            || `Sektor (${SLOVAR_BARV[layer.options?.barvaSektorja] || layer.options?.barvaSektorja || '?'})`;
+
         enote.forEach(enota => {
             const kljuc = enota.trim().toLowerCase();
             if (!kljuc) return;
             const seznam = dodelitve.get(kljuc) || [];
-            seznam.push(layer.options?.barvaSektorja || 'red');
+            seznam.push({ naziv, cas: casi[enota] || null });
             dodelitve.set(kljuc, seznam);
         });
     });
@@ -77,11 +83,13 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
 
     let lokacijeRes = { data: [] };
     let sporocilaRes = { data: [] };
+    let sporocilaStabRes = { data: [] };
 
     try {
-        [lokacijeRes, sporocilaRes] = await Promise.all([
+        [lokacijeRes, sporocilaRes, sporocilaStabRes] = await Promise.all([
             fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()),
-            fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json())
+            fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()),
+            fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocilaStab&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ data: [] }))
         ]);
     } catch (err) {
         console.error('Napaka pri pripravi podatkov za tiskanje:', err);
@@ -157,6 +165,9 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
                 const ime = imeIzPolnegaImena(kljucEnote);
                 const koncCas = koncOddaje.get(kljucEnote);
                 const dodeljeno = dodelitve.get(ime.trim().toLowerCase());
+                const dodeljenoBesedilo = dodeljeno
+                    ? dodeljeno.map(d => `${escapeHtml(d.naziv)}${d.cas ? ' (' + escapeHtml(formatCas(d.cas)) + ')' : ''}`).join('<br>')
+                    : '-';
 
                 html += `<tr>
                     <td>${escapeHtml(ime)}</td>
@@ -165,7 +176,7 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
                     <td>${escapeHtml(formatCas(info.prva))}</td>
                     <td>${escapeHtml(formatCas(info.zadnja))}</td>
                     <td>${koncCas ? escapeHtml(formatCas(koncCas)) : '-'}</td>
-                    <td>${dodeljeno ? `Da (${dodeljeno.length})` : '-'}</td>
+                    <td>${dodeljenoBesedilo}</td>
                 </tr>`;
             });
 
@@ -184,11 +195,37 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
 
         sporocila.slice().reverse().forEach(s => {
             const ime = imeIzPolnegaImena(s.enota);
+            const imaKoordinate = s.lat !== undefined && s.lon !== undefined && s.lat !== '' && s.lon !== '';
+            const lokacijaBesedilo = imaKoordinate
+                ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(s.lat)},${encodeURIComponent(s.lon)}" target="_blank" rel="noopener">${escapeHtml(s.lat)}, ${escapeHtml(s.lon)}</a>`
+                : '-';
             html += `<tr>
                 <td>${escapeHtml(formatCas(s.cas))}</td>
                 <td>${escapeHtml(ime)}</td>
                 <td>${escapeHtml(s.sporocilo)}</td>
-                <td>${escapeHtml(s.lat)}, ${escapeHtml(s.lon)}</td>
+                <td>${lokacijaBesedilo}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+    }
+
+    // --- Sporočila iz štaba enotam (poveljstvo -> teren) ---
+    const sporocilaStab = (sporocilaStabRes.data || []).filter(s => s && s.sporocilo);
+    html += `<h2>Sporočila iz štaba enotam (${sporocilaStab.length})</h2>`;
+
+    if (sporocilaStab.length === 0) {
+        html += '<p>Ni sporočil iz štaba za ta dogodek.</p>';
+    } else {
+        html += `<table class="tisk-tabela"><thead><tr>
+            <th>Čas</th><th>Cilj</th><th>Sporočilo</th>
+        </tr></thead><tbody>`;
+
+        sporocilaStab.slice().reverse().forEach(s => {
+            html += `<tr>
+                <td>${escapeHtml(formatCas(s.cas))}</td>
+                <td>${escapeHtml(s.cilj)}</td>
+                <td>${escapeHtml(s.sporocilo)}</td>
             </tr>`;
         });
 

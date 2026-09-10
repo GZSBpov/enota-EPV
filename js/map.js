@@ -305,6 +305,23 @@ export function posodobiIzgledSektorja(layer, barva) {
 }
 
 /**
+ * Prikaže (oz. umakne) stalno vidno oznako z nazivom sektorja na zemljevidu - da ni treba
+ * klikniti na sektor, da vidiš, kateri je kateri (npr. "Sektor Vzhod").
+ */
+export function posodobiOznakoSektorja(layer) {
+    const naziv = (layer.options.nazivSektorja || '').trim();
+    if (naziv) {
+        if (layer.getTooltip()) {
+            layer.setTooltipContent(naziv);
+        } else {
+            layer.bindTooltip(naziv, { permanent: true, direction: 'center', className: 'sektor-label-tooltip' });
+        }
+    } else if (layer.getTooltip()) {
+        layer.unbindTooltip();
+    }
+}
+
+/**
  * Ustvari okno (Popup) ob kliku na območje s padajočim menijem barv in izračunano mero
  */
 export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
@@ -336,6 +353,8 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
             <strong style="font-size: 1rem;">${jeTocka ? 'Označena točka' : 'Sektor / Območje'}</strong><br>
             <span style="font-size: 0.85rem; color: #475569;">${meroTekst}</span>
             ${navigacijaSmsGumbi}
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-top:8px;">${jeTocka ? 'Naziv točke:' : 'Naziv sektorja:'}</label>
+            <input type="text" class="popup-naziv-input" value="${pobegniAtribut(layer.options.nazivSektorja || '')}" placeholder="${jeTocka ? 'npr. Točka 1' : 'npr. Sektor Vzhod'}" style="width:100%; padding:4px; box-sizing:border-box; margin-top:2px;">
             <br>
             <label style="font-size:0.8rem; font-weight:bold;">${jeTocka ? 'Barva oznake:' : 'Barva sektorja:'}</label><br>
             <select class="popup-barva-select" style="width: 100%; padding: 4px; margin-top: 4px;">
@@ -377,6 +396,22 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
             });
         }
 
+        const nazivInput = popNode.querySelector('.popup-naziv-input');
+        if (nazivInput) {
+            const shraniNaziv = () => {
+                layer.options.nazivSektorja = nazivInput.value.trim();
+                posodobiOznakoSektorja(layer);
+            };
+            nazivInput.addEventListener('change', shraniNaziv);
+            nazivInput.addEventListener('keydown', (evt) => {
+                if (evt.key === 'Enter') {
+                    evt.preventDefault();
+                    shraniNaziv();
+                    nazivInput.blur();
+                }
+            });
+        }
+
         const seznamEl = popNode.querySelector('.popup-dodelitve-seznam');
         const inputEl = popNode.querySelector('.popup-dodelitev-input');
         const dodelitevSelectEl = popNode.querySelector('.popup-dodelitev-select');
@@ -394,6 +429,7 @@ export function nastaviPopupZaSektor(layer, izbranaBarva = "red") {
                 chip.querySelector('.popup-dodelitev-odstrani').addEventListener('click', () => {
                     const ime = chip.dataset.ime;
                     layer.options.dodeljeneEnote = (layer.options.dodeljeneEnote || []).filter(e2 => e2 !== ime);
+                    if (layer.options.casDodelitve) delete layer.options.casDodelitve[ime];
                     izrisiChipe();
                 });
             });
@@ -447,9 +483,11 @@ function dodajEnotoSektorju(ciljniLayer, ime, osveziChipe) {
         const potrdi = window.confirm(`Enota "${ime}" je že dodeljena drugemu sektorju.\nAli želite enoti dodeliti nov sektor?`);
         if (!potrdi) return; // Prekliči - enota ostane v prvotnem sektorju
         staraLayer.options.dodeljeneEnote = (staraLayer.options.dodeljeneEnote || []).filter(e => e.toLowerCase() !== imeMalo);
+        if (staraLayer.options.casDodelitve) delete staraLayer.options.casDodelitve[ime];
     }
 
     ciljniLayer.options.dodeljeneEnote = [...(ciljniLayer.options.dodeljeneEnote || []), ime];
+    ciljniLayer.options.casDodelitve = { ...(ciljniLayer.options.casDodelitve || {}), [ime]: new Date().toISOString() };
     osveziChipe();
 }
 
@@ -463,6 +501,8 @@ export function pridobiGeoJsonSektorjev() {
         geojson.properties = geojson.properties || {};
         geojson.properties.barvaSektorja = layer.options.barvaSektorja || "red";
         geojson.properties.dodeljenaEnota = (layer.options.dodeljeneEnote || []).join(', ');
+        geojson.properties.nazivSektorja = layer.options.nazivSektorja || '';
+        geojson.properties.casDodelitve = JSON.stringify(layer.options.casDodelitve || {});
 
         if (layer instanceof L.Marker) {
             geojson.properties.tipObmočja = "tocka";

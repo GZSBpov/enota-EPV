@@ -1,4 +1,4 @@
-import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, pridobiGeoJsonSektorjev, map } from './map.js';
+import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, posodobiOznakoSektorja, pridobiGeoJsonSektorjev, map } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 import { naloziSporocila } from './sporocila.js';
@@ -58,12 +58,19 @@ function narisiSektorje(sektorji) {
                 .split(',')
                 .map(ime => ime.trim())
                 .filter(Boolean);
+            layer.options.nazivSektorja = elem.properties?.nazivSektorja || '';
+            try {
+                layer.options.casDodelitve = JSON.parse(elem.properties?.casDodelitve || '{}');
+            } catch (e) {
+                layer.options.casDodelitve = {};
+            }
             narisaniSektorjiSloj.addLayer(layer);
             if (jeOkvarjenPodatek) {
                 layer.bindPopup('<div style="color:#000; font-family:sans-serif; font-size:0.85rem; max-width:220px;"><b>⚠️ Star/okvarjen podatek</b><br>Ta krog je bil narisan s staro različico aplikacije, ki ni shranila polmera. Prosimo, na novo ga nariši in znova shrani dogodek.</div>');
             } else {
                 posodobiIzgledSektorja(layer, barva);
                 nastaviPopupZaSektor(layer, barva);
+                posodobiOznakoSektorja(layer);
             }
         }
     });

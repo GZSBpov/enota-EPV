@@ -190,6 +190,59 @@ header h2 {
     50% { box-shadow: inset 0 0 0 2px #fbbf24, 0 0 8px 2px rgba(251, 191, 36, 0.7); }
 }
 
+/* POŠLJI SPOROČILO ENOTI / SEKTORJU (poveljstvo -> teren) */
+.stab-sporocilo-panel {
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    flex-shrink: 0;
+}
+
+.stab-sporocilo-vsebina {
+    padding: 8px 12px;
+}
+
+.stab-sporocilo-vsebina select,
+.stab-sporocilo-vsebina input {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 6px;
+    background: #0f172a;
+    color: #fff;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.stab-sporocilo-vsebina button {
+    width: 100%;
+    padding: 8px;
+    background-color: #7c3aed;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#stabSporociloStatus {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 4px;
+    min-height: 16px;
+}
+
+.btn-posljisporocilo-enoti {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
 /* VIDEO OKNO (OBS STREAM) */
 .video-panel {
     border-bottom: 1px solid #334155;
@@ -299,6 +352,21 @@ header h2 {
 }
 .status-zacka.aktiven { background: #10b981; color: #fff; }
 .status-zacka.neaktiven { background: #64748b; color: #fff; }
+
+/* Stalno vidna oznaka z nazivom sektorja na zemljevidu (glej posodobiOznakoSektorja v map.js) */
+.sektor-label-tooltip {
+    background: rgba(15, 23, 42, 0.85);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 2px 6px;
+    box-shadow: none;
+}
+.sektor-label-tooltip::before {
+    display: none;
+}
 
 /* ==========================================
    PRILAGODITEV ZA TISK (PRINT VIEW FIX)

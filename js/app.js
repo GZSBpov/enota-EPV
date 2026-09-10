@@ -7,6 +7,7 @@ import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
 import { shraniDogodek, naloziSeznamDogodkov, obravnavajGumbZakljucka } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
 import { naloziSporocila } from './sporocila.js';
+import { iniciirajStabSporocila } from './stab-sporocila.js';
 import { pripraviInNatisni } from './tisk.js';
 import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
 
@@ -26,6 +27,7 @@ async function naloziVsebinoAplikacije() {
 
     // Iniciacija modalnega okna za QR kodo
     iniciirajQRGenerator();
+    iniciirajStabSporocila();
 
     setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
     setInterval(naloziSporocila, OSVEZEVANJE_INTERVAL_MS);

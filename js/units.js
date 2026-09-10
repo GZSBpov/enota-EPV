@@ -6,6 +6,7 @@ import { map } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 import { registrirajEnoto } from './enote-register.js';
 import { formatirajCas } from './cas-pomoc.js';
+import { predizberiCiljEnote } from './stab-sporocila.js';
 
 export const enoteSloj = new L.FeatureGroup();
 export const slediSloj = new L.FeatureGroup();
@@ -228,8 +229,24 @@ export function osveziStranskoVrstico() {
         statusBadge.style.cssText = `font-size: 0.7rem; background: ${jeChecked ? '#059669' : '#64748b'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;`;
         statusBadge.textContent = jeChecked ? (podatki.status || 'Aktivna') : 'Skrito';
 
+        const desnaStran = document.createElement('div');
+        desnaStran.style.cssText = 'display: flex; align-items: center; gap: 4px; flex-shrink: 0;';
+
+        const msgBtn = document.createElement('button');
+        msgBtn.type = 'button';
+        msgBtn.className = 'btn-posljisporocilo-enoti';
+        msgBtn.textContent = '✉️';
+        msgBtn.title = 'Pošlji sporočilo tej enoti';
+        msgBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            predizberiCiljEnote(podatki.ime || podatki.naziv);
+        });
+
+        desnaStran.appendChild(msgBtn);
+        desnaStran.appendChild(statusBadge);
+
         kartica.appendChild(vsebina);
-        kartica.appendChild(statusBadge);
+        kartica.appendChild(desnaStran);
 
         chk.addEventListener('change', (e) => {
             vidnostEnot[id] = e.target.checked;
@@ -313,6 +330,7 @@ export async function osveziLokacijeEnot() {
 
                 zadnjeLokacijeEnot[kljucEnote] = {
                     id: kljucEnote,
+                    ime: ime,
                     naziv: `${ime} ${clanov}`.trim(),
                     tip: tip,
                     lat: parseFloat(lat),

@@ -96,6 +96,21 @@
                 <div id="seznamSporocil"></div>
             </div>
 
+            <!-- Pošlji sporočilo enoti / sektorju (poveljstvo -> teren) -->
+            <div id="stab-sporocilo-panel" class="stab-sporocilo-panel">
+                <div class="panel-glava">
+                    <span>✉️ Sporočilo enoti / sektorju</span>
+                </div>
+                <div class="stab-sporocilo-vsebina">
+                    <select id="stabCiljSelect">
+                        <option value="VSI">📢 Vsem enotam</option>
+                    </select>
+                    <input type="text" id="stabSporociloText" placeholder="Vpiši sporočilo ...">
+                    <button id="btnPosljiStabSporocilo">📤 Pošlji</button>
+                    <div id="stabSporociloStatus"></div>
+                </div>
+            </div>
+
             <!-- OBS Video Predvajalnik v živo -->
             <div id="video-stream-container" class="video-panel card-fullscreen-target">
                 <div class="video-header">

@@ -28,6 +28,16 @@
         #obvestiloNadaljevanje button { width: auto; flex: 1; margin: 0; padding: 10px; font-size: 14px; }
         #btnNadaljujOddajanje { background: #16a34a; }
         #btnOpustiNadaljevanje { background: #64748b; }
+        #stabSporocilaPanel { display:none; margin-top: 12px; text-align: left; background: #eef2ff; border: 1px solid #6366f1; border-radius: 6px; padding: 8px 10px; }
+        #stabSporocilaPanel label { font-weight: bold; display: block; margin-bottom: 4px; color: #3730a3; }
+        .stab-sporocilo-vrstica { font-size: 13px; padding: 5px 4px; border-bottom: 1px solid #c7d2fe; color: #1e1b4b; cursor: pointer; }
+        .stab-sporocilo-vrstica:last-child { border-bottom: none; }
+        .stab-sporocilo-cas { color: #4f46e5; font-weight: bold; margin-right: 6px; }
+        .stab-sporocilo-vrstica.novo { background: #fef3c7; border-radius: 4px; animation: stab-utripa 1.4s ease-in-out infinite; }
+        @keyframes stab-utripa {
+            0%, 100% { box-shadow: inset 0 0 0 2px #f59e0b; }
+            50% { box-shadow: inset 0 0 0 2px #f59e0b, 0 0 6px 2px rgba(245,158,11,0.6); }
+        }
     </style>
     <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL) -->
     <script src="js/shared-config.js"></script>
@@ -74,6 +84,11 @@
         <button type="button" id="btnOsveziSektor">🔄 Osveži sektor</button>
     </div>
     <div id="terenski-zemljevid"></div>
+
+    <div id="stabSporocilaPanel">
+        <label>📥 Sporočila iz štaba:</label>
+        <div id="stabSporocilaSeznam"></div>
+    </div>
 
     <div class="posoda-sporocila">
         <label>Pošlji sporočilo z lokacijo:</label>
@@ -230,7 +245,15 @@
 
         // Če enota svoje ime že pozna (npr. shranjeno iz prejšnje seje), takoj preverimo dodelitev
         document.getElementById('imeEnote').addEventListener('change', naloziDodeljenSektor);
+        document.getElementById('imeEnote').addEventListener('change', naloziSporocilaStaba);
         document.getElementById('btnOsveziSektor').addEventListener('click', naloziDodeljenSektor);
+        document.getElementById('btnOsveziSektor').addEventListener('click', naloziSporocilaStaba);
+
+        // Sporočila iz štaba naj bodo vidna takoj, tudi še preden enota pritisne "Začni oddajanje"
+        // (npr. ime je bilo obnovljeno iz shranjenega stanja te naprave).
+        if (document.getElementById('imeEnote').value.trim()) {
+            naloziSporocilaStaba();
+        }
     };
 
     function pripraviTerenskiZemljevid() {
@@ -427,6 +450,74 @@
         }, 100);
     }
 
+    // ==========================================
+    // SPOROČILA IZ ŠTABA (poveljstvo -> teren) - obratna smer od hitrih sporočil zgoraj
+    // ==========================================
+    const STORAGE_STAB_PREBRANA = 'epv_teren_stab_prebrana';
+
+    function pridobiStabPrebrana() {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(STORAGE_STAB_PREBRANA)) || []);
+        } catch (e) {
+            return new Set();
+        }
+    }
+
+    function oznaciStabPrebrano(id) {
+        const prebrana = pridobiStabPrebrana();
+        prebrana.add(id);
+        localStorage.setItem(STORAGE_STAB_PREBRANA, JSON.stringify(Array.from(prebrana).slice(-200)));
+    }
+
+    function stabSporociloId(s) {
+        return `${s.cas}|${s.cilj}|${s.sporocilo}`;
+    }
+
+    function izrisiSporocilaStaba(sporocila) {
+        const panel = document.getElementById('stabSporocilaPanel');
+        const kontejner = document.getElementById('stabSporocilaSeznam');
+        if (!panel || !kontejner) return;
+
+        const veljavna = (sporocila || []).filter(s => s && s.sporocilo);
+        if (veljavna.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.style.display = 'block';
+        const prebrana = pridobiStabPrebrana();
+        const razvrscena = veljavna.slice().sort((a, b) => (b.cas || '').localeCompare(a.cas || '')).slice(0, 15);
+
+        kontejner.innerHTML = razvrscena.map(s => {
+            const id = stabSporociloId(s);
+            const jeNovo = !prebrana.has(id);
+            return `<div class="stab-sporocilo-vrstica ${jeNovo ? 'novo' : ''}" data-id="${pobegniHtmlLokalno(id)}">
+                <span class="stab-sporocilo-cas">${pobegniHtmlLokalno(formatirajCasLokalno(s.cas))}</span>${pobegniHtmlLokalno(s.sporocilo)}
+            </div>`;
+        }).join('');
+
+        kontejner.querySelectorAll('.stab-sporocilo-vrstica').forEach(el => {
+            el.addEventListener('click', () => {
+                oznaciStabPrebrano(el.dataset.id);
+                el.classList.remove('novo');
+            });
+        });
+    }
+
+    function naloziSporocilaStaba() {
+        const ime = document.getElementById('imeEnote').value.trim();
+        if (!ime || !izbranDogodek) return;
+
+        fetch(`${SCRIPT_URL}?akcija=pridobiSporocilaStab&dogodek=${encodeURIComponent(izbranDogodek)}&cilj=${encodeURIComponent(ime)}&geslo=EPV2026`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(odgovor => {
+                if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
+                    izrisiSporocilaStaba(odgovor.data);
+                }
+            })
+            .catch(() => { /* tiho - sporočila iz štaba niso nujna za osnovno delovanje oddajanja */ });
+    }
+
     function naloziDodeljenSektor() {
         const ime = document.getElementById('imeEnote').value.trim();
         const oznakaEl = document.getElementById('oznakaDodeljenSektorTekst');
@@ -486,9 +577,14 @@
                 gpsOpcije
             );
 
-            // Preverimo dodeljen sektor takoj, nato pa občasno (če ga vodja med intervencijo spremeni)
+            // Preverimo dodeljen sektor in sporočila iz štaba takoj, nato pa občasno
+            // (če vodja med intervencijo kaj spremeni/pošlje)
             naloziDodeljenSektor();
-            dodeljenSektorIntervalId = setInterval(naloziDodeljenSektor, 30000);
+            naloziSporocilaStaba();
+            dodeljenSektorIntervalId = setInterval(() => {
+                naloziDodeljenSektor();
+                naloziSporocilaStaba();
+            }, 30000);
 
             zahtevajWakeLock();
 
