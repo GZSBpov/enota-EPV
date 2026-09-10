@@ -22,6 +22,12 @@
         .btn-sporocilo.sos { background: #b71c1c; }
         #statusSporocila { font-size: 13px; color: #555; margin-top: 6px; min-height: 18px; }
         .opozorilo-ozadje { font-size: 11px; color: #888; margin-top: 12px; text-align: left; line-height: 1.4; }
+        #obvestiloNadaljevanje { background: #fef3c7; border: 2px solid #d97706; border-radius: 6px; padding: 12px; margin-bottom: 12px; text-align: left; }
+        #obvestiloNadaljevanje b { display: block; margin-bottom: 6px; color: #92400e; }
+        #obvestiloNadaljevanje .gumbi-nadaljevanje { display: flex; gap: 6px; }
+        #obvestiloNadaljevanje button { width: auto; flex: 1; margin: 0; padding: 10px; font-size: 14px; }
+        #btnNadaljujOddajanje { background: #16a34a; }
+        #btnOpustiNadaljevanje { background: #64748b; }
     </style>
     <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL) -->
     <script src="js/shared-config.js"></script>
@@ -33,7 +39,9 @@
 
 <div class="posoda">
     <h2>EPV Terenska Prijava</h2>
-    
+
+    <div id="obvestiloNadaljevanje" style="display:none;"></div>
+
     <div id="prikazDogodka" class="zacka-dogodek">Dogodek: Splošno</div>
      
     <label for="imeEnote">Ime enote (npr. Slb 1, Vodja 2):</label>
@@ -119,6 +127,66 @@
         }
     });
 
+    // ==========================================
+    // OKREVANJE PO NEHOTENEM ZAPIRANJU OKNA/ZAVIHKA
+    // Če se stran zapre (po pomoti), medtem ko je enota aktivno oddajala, JS spremenljivke
+    // (watchId, ime enote ...) izginejo. Podatke zato shranjujemo v localStorage na tej NAPRAVI,
+    // da lahko enota ob ponovnem odprtju te strani takoj nadaljuje oddajanje - brez ponovnega
+    // vpisovanja imena/tipa/dogodka in brez iskanja QR kode.
+    // ==========================================
+    const STORAGE_TEREN_STANJE = 'epv_teren_stanje';
+
+    function shraniStanjeObrazca(aktivnoOddaja) {
+        try {
+            localStorage.setItem(STORAGE_TEREN_STANJE, JSON.stringify({
+                ime: document.getElementById('imeEnote').value.trim(),
+                tip: document.getElementById('tipEnote').value,
+                clanov: document.getElementById('stClanov').value,
+                dogodek: izbranDogodek,
+                oddaja: aktivnoOddaja
+            }));
+        } catch (e) {}
+    }
+
+    function nalozizStanjeObrazca() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_TEREN_STANJE)) || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function prikaziPozivZaNadaljevanje(shranjeno) {
+        const obvestilo = document.getElementById('obvestiloNadaljevanje');
+        obvestilo.style.display = 'block';
+        obvestilo.innerHTML = `
+            <b>⚠️ Oddajanje je bilo prekinjeno (npr. zaprto okno) za enoto "${pobegniHtmlLokalno(shranjeno.ime)}".</b>
+            <div class="gumbi-nadaljevanje">
+                <button type="button" id="btnNadaljujOddajanje">▶️ Nadaljuj oddajanje</button>
+                <button type="button" id="btnOpustiNadaljevanje">Prezri</button>
+            </div>
+        `;
+
+        document.getElementById('btnNadaljujOddajanje').addEventListener('click', () => {
+            obvestilo.style.display = 'none';
+            preklopiOddajanje(); // watchId je še null, torej to zažene oddajanje s trenutno izpolnjenim obrazcem
+        });
+        document.getElementById('btnOpustiNadaljevanje').addEventListener('click', () => {
+            obvestilo.style.display = 'none';
+            shraniStanjeObrazca(false);
+        });
+    }
+
+    // Opozorimo (kjer brskalnik to podpira), če uporabnik med aktivnim oddajanjem poskusi
+    // zapreti/zapustiti stran - da do zaprtja po pomoti sploh ne pride. (Na iOS Safari to
+    // ni vedno zanesljivo - to je omejitev sistema, ne te strani.)
+    window.addEventListener('beforeunload', (e) => {
+        if (watchId !== null) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
     // Avtomatsko branje nastavitev iz QR kode ob zagonu
     window.onload = function() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -126,12 +194,31 @@
         const clanov = urlParams.get('clanov');
         const dogodek = urlParams.get('dogodek');
 
+        // Najprej obnovimo iz lokalno shranjenega stanja te naprave (če obstaja) ...
+        const shranjeno = nalozizStanjeObrazca();
+        if (shranjeno) {
+            if (shranjeno.ime) document.getElementById('imeEnote').value = shranjeno.ime;
+            if (shranjeno.tip) document.getElementById('tipEnote').value = shranjeno.tip;
+            if (shranjeno.clanov) document.getElementById('stClanov').value = shranjeno.clanov;
+            if (shranjeno.dogodek) {
+                izbranDogodek = shranjeno.dogodek;
+                document.getElementById('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
+            }
+        }
+
+        // ... nato preglasimo z URL parametri, če so podani (npr. sveže poskeniran QR za nov dogodek)
         if (tip) document.getElementById('tipEnote').value = tip;
         if (clanov) document.getElementById('stClanov').value = clanov;
 
         if (dogodek) {
             izbranDogodek = decodeURIComponent(dogodek);
             document.getElementById('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
+        }
+
+        // Če je bilo oddajanje aktivno, ko se je stran nazadnje zaprla (ni bilo pravilno ustavljeno
+        // z gumbom), ponudimo takojšnjo nadaljevanje - eno tipko, brez ponovnega vpisovanja.
+        if (shranjeno?.oddaja && shranjeno?.ime) {
+            prikaziPozivZaNadaljevanje(shranjeno);
         }
 
         // Če enota svoje ime že pozna (npr. shranjeno iz prejšnje seje), takoj preverimo dodelitev
@@ -397,6 +484,10 @@
             dodeljenSektorIntervalId = setInterval(naloziDodeljenSektor, 30000);
 
             zahtevajWakeLock();
+
+            // Shranimo stanje LOKALNO na to napravo - če se stran po pomoti zapre, jo lahko
+            // ob ponovnem odprtju takoj nadaljujemo (glej prikaziPozivZaNadaljevanje).
+            shraniStanjeObrazca(true);
         } else {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
@@ -410,6 +501,9 @@
             }
 
             sprostiWakeLock();
+
+            // Namerno ustavljeno (ne nehoten izhod) - ne ponujaj več samodejnega nadaljevanja
+            shraniStanjeObrazca(false);
 
             // Pošljemo eksplicitno "Konec oddajanja" - da ima poveljstvo pravi čas zaključka
             // enote, ne le čas zadnjega utripa pred tišino (npr. izklop telefona).
