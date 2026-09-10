@@ -90,6 +90,7 @@ function pripraviPopupVsebino(enota, barva) {
             <b style="color: ${barva};">${escapeHtml(enota.naziv)}</b><br>
             Tip: ${escapeHtml(enota.tip || 'Splošno')}<br>
             Status: ${escapeHtml(enota.status || 'Aktivna')}<br>
+            ${enota.vozilaStevilo ? `Vozil: ${enota.vozilaStevilo}<br>` : ''}
             Zadnji čas: ${escapeHtml(formatirajCas(enota.cas))}<br>
             Koordinate: ${enota.lat.toFixed(5)}, ${enota.lng.toFixed(5)}
             <div style="display:flex; gap:6px; margin-top:8px;">
@@ -217,7 +218,7 @@ export function osveziStranskoVrstico() {
                 <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${barva}; margin-right:4px;"></span>
                 ${podatki.naziv}
             </div>
-            <div style="font-size: 0.72rem; color: #94a3b8;">${podatki.cas ? 'Čas: ' + formatirajCas(podatki.cas, true) : 'Tip: ' + (podatki.tip || 'Enota')}</div>
+            <div style="font-size: 0.72rem; color: #94a3b8;">${podatki.cas ? 'Čas: ' + formatirajCas(podatki.cas, true) : 'Tip: ' + (podatki.tip || 'Enota')}${podatki.vozilaStevilo ? ' · Vozil: ' + podatki.vozilaStevilo : ''}</div>
         `;
 
         vsebina.appendChild(chk);
@@ -298,19 +299,28 @@ export async function osveziLokacijeEnot() {
 
                 const ime = deli[1] || enotaPolno;
                 const clanovStevilo = parseInt(deli[2], 10) || 0;
+                const vozilaStevilo = parseInt(deli[3], 10) || 0;
                 const clanov = deli[2] ? `(${deli[2]} članov)` : '';
 
                 registrirajEnoto(ime);
 
-                zadnjeLokacijeEnot[enotaPolno] = {
-                    id: enotaPolno,
+                // POMEMBNO: identiteta enote je TIP:IME - namerno BREZ števila članov/vozil. Če
+                // se to med intervencijo spremeni (nekdo se pridruži/odide, vozilo se doda), gre
+                // še vedno za isto enoto (ista sled, ista zgodovina) - samo prikazano število se
+                // posodobi na najnovejšo vrednost. Prej je bilo število članov del identitete,
+                // zato je vsaka sprememba pomotoma ustvarila navidezno "novo" enoto.
+                const kljucEnote = `${tip}:${ime}`;
+
+                zadnjeLokacijeEnot[kljucEnote] = {
+                    id: kljucEnote,
                     naziv: `${ime} ${clanov}`.trim(),
                     tip: tip,
                     lat: parseFloat(lat),
                     lng: parseFloat(lon),
                     status: 'Aktivna',
                     cas: cas,
-                    clanovStevilo: clanovStevilo
+                    clanovStevilo: clanovStevilo,
+                    vozilaStevilo: vozilaStevilo
                 };
             }
 

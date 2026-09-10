@@ -59,6 +59,9 @@
     <label for="stClanov">Število članov v enoti:</label>
     <input type="number" id="stClanov" value="1" min="1">
 
+    <label for="stVozil">Število vozil:</label>
+    <input type="number" id="stVozil" value="0" min="0">
+
     <button id="gumbOddaja" onclick="preklopiOddajanje()">ZAČNI ODDAJANJE LOKACIJE</button>
     <div class="status" id="statusPolje">Status: Pripravljen</div>
 
@@ -142,6 +145,7 @@
                 ime: document.getElementById('imeEnote').value.trim(),
                 tip: document.getElementById('tipEnote').value,
                 clanov: document.getElementById('stClanov').value,
+                vozila: document.getElementById('stVozil').value,
                 dogodek: izbranDogodek,
                 oddaja: aktivnoOddaja
             }));
@@ -192,6 +196,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const tip = urlParams.get('tip');
         const clanov = urlParams.get('clanov');
+        const vozila = urlParams.get('vozila');
         const dogodek = urlParams.get('dogodek');
 
         // Najprej obnovimo iz lokalno shranjenega stanja te naprave (če obstaja) ...
@@ -200,6 +205,7 @@
             if (shranjeno.ime) document.getElementById('imeEnote').value = shranjeno.ime;
             if (shranjeno.tip) document.getElementById('tipEnote').value = shranjeno.tip;
             if (shranjeno.clanov) document.getElementById('stClanov').value = shranjeno.clanov;
+            if (shranjeno.vozila !== undefined && shranjeno.vozila !== '') document.getElementById('stVozil').value = shranjeno.vozila;
             if (shranjeno.dogodek) {
                 izbranDogodek = shranjeno.dogodek;
                 document.getElementById('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
@@ -209,6 +215,7 @@
         // ... nato preglasimo z URL parametri, če so podani (npr. sveže poskeniran QR za nov dogodek)
         if (tip) document.getElementById('tipEnote').value = tip;
         if (clanov) document.getElementById('stClanov').value = clanov;
+        if (vozila) document.getElementById('stVozil').value = vozila;
 
         if (dogodek) {
             izbranDogodek = decodeURIComponent(dogodek);
@@ -532,10 +539,11 @@
         navigator.geolocation.getCurrentPosition(function(position) {
             const tip = document.getElementById('tipEnote').value;
             const clanov = document.getElementById('stClanov').value;
+            const vozila = document.getElementById('stVozil').value;
             const lat = position.coords.latitude;
             const lon = position.coords.longitude;
             const acc = Math.round(position.coords.accuracy);
-            const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}`;
+            const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}:${vozila}`;
 
             const url = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}&dogodek=${encodeURIComponent(izbranDogodek)}&sporocilo=${encodeURIComponent(besedilo)}`;
 
@@ -570,6 +578,7 @@
         const ime = document.getElementById('imeEnote').value.trim();
         const tip = document.getElementById('tipEnote').value;
         const clanov = document.getElementById('stClanov').value;
+        const vozila = document.getElementById('stVozil').value;
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
         const acc = Math.round(position.coords.accuracy);
@@ -578,7 +587,7 @@
 
         document.getElementById('statusPolje').innerText = `Pošiljam... Natančnost: ${acc}m`;
 
-        const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}`;
+        const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}:${vozila}`;
 
         // POPRAVEK ZA iOS: Pošiljanje parametrov vključno z dogodkom preko GET zahteve
         const urlZParametri = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}&dogodek=${encodeURIComponent(izbranDogodek)}`;

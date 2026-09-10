@@ -21,6 +21,16 @@ function imeIzPolnegaImena(polnoIme) {
 }
 
 /**
+ * Enaka identiteta enote kot v units.js: TIP:IME, namerno BREZ števila članov - če se to
+ * med intervencijo spremeni, gre še vedno za isto enoto, ne novo. Uporabimo jo za ujemanje
+ * s trenutno odkljukanimi enotami (ki jih units.js prav tako identificira na ta način).
+ */
+function kljucEnoteIzPolnegaImena(polnoIme) {
+    const deli = (polnoIme || '').split(':');
+    return `${deli[0] || ''}:${deli[1] || polnoIme || ''}`;
+}
+
+/**
  * Vrne (in poveča) zaporedno številko izpisa za ta dogodek - vsak klik na "Tisk" za isti
  * dogodek dobi svojo zaporedno številko (koristno, če se med intervencijo tiska večkrat).
  */
@@ -63,6 +73,7 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     const vidneEnote = pridobiTrenutnoVidneEnote();
     const vidniIdji = new Set(vidneEnote.map(e => e.id));
     const clanovPoEnoti = new Map(vidneEnote.map(e => [e.id, e.clanovStevilo || 0]));
+    const vozilPoEnoti = new Map(vidneEnote.map(e => [e.id, e.vozilaStevilo || 0]));
 
     let lokacijeRes = { data: [] };
     let sporocilaRes = { data: [] };
@@ -85,10 +96,13 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     vrstice.forEach(v => {
         const [cas, enotaPolno, lat, lon, acc, dId] = v;
         if (!enotaPolno || dId !== dogodekId) return;
-        if (!vidniIdji.has(enotaPolno)) return; // samo trenutno odkljukane enote
-        const obstojeca = enote.get(enotaPolno);
+
+        const kljucEnote = kljucEnoteIzPolnegaImena(enotaPolno);
+        if (!vidniIdji.has(kljucEnote)) return; // samo trenutno odkljukane enote
+
+        const obstojeca = enote.get(kljucEnote);
         if (!obstojeca) {
-            enote.set(enotaPolno, { prva: cas, zadnja: cas });
+            enote.set(kljucEnote, { prva: cas, zadnja: cas });
         } else {
             if (cas < obstojeca.prva) obstojeca.prva = cas;
             if (cas > obstojeca.zadnja) obstojeca.zadnja = cas;
@@ -100,11 +114,12 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
 
     // "Konec oddajanja" štejemo kot uraden čas zaključka enote - enota lahko oddajanje večkrat
     // ustavi in znova začne, zato štejemo samo NAJKASNEJŠI (zadnji) zabeležen čas konca.
-    const koncOddaje = new Map(); // polnoIme -> zadnji zabeležen čas konca
+    const koncOddaje = new Map(); // ključ enote (TIP:IME) -> zadnji zabeležen čas konca
     sporocila.forEach(s => {
         if ((s.sporocilo || '').toLowerCase().includes('konec oddajanja')) {
-            const obstojeci = koncOddaje.get(s.enota);
-            if (!obstojeci || s.cas > obstojeci) koncOddaje.set(s.enota, s.cas);
+            const kljucEnote = kljucEnoteIzPolnegaImena(s.enota);
+            const obstojeci = koncOddaje.get(kljucEnote);
+            if (!obstojeci || s.cas > obstojeci) koncOddaje.set(kljucEnote, s.cas);
         }
     });
 
@@ -116,13 +131,15 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
 
     const dodelitve = pridobiDodeljitve();
 
-    // Skupni seštevek enot in članov (samo trenutno odkljukanih, ki so dejansko poročale za ta dogodek)
+    // Skupni seštevek enot, članov in vozil (samo trenutno odkljukanih, ki so dejansko poročale za ta dogodek)
     let steviloClanov = 0;
-    enote.forEach((info, polnoIme) => {
-        steviloClanov += clanovPoEnoti.get(polnoIme) || 0;
+    let steviloVozil = 0;
+    enote.forEach((info, kljucEnote) => {
+        steviloClanov += clanovPoEnoti.get(kljucEnote) || 0;
+        steviloVozil += vozilPoEnoti.get(kljucEnote) || 0;
     });
 
-    let html = `<p style="font-size:1rem;"><b>Skupno enot: ${enote.size}</b> &nbsp;|&nbsp; <b>Skupno članov: ${steviloClanov}</b></p>`;
+    let html = `<p style="font-size:1rem;"><b>Skupno enot: ${enote.size}</b> &nbsp;|&nbsp; <b>Skupno članov: ${steviloClanov}</b> &nbsp;|&nbsp; <b>Skupno vozil: ${steviloVozil}</b></p>`;
 
     // --- Tabela enot (razvrščene KRONOLOŠKO po prvi prijavi - prva zgoraj) ---
     html += `<h2>Enote na dogodku (${enote.size})</h2>`;
@@ -131,19 +148,20 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         html += '<p>Ni odkljukanih enot za ta dogodek.</p>';
     } else {
         html += `<table class="tisk-tabela"><thead><tr>
-            <th>Enota</th><th>Članov</th><th>Prva prijava</th><th>Zadnja znana lokacija</th><th>Konec oddajanja</th><th>Dodeljen sektor</th>
+            <th>Enota</th><th>Članov</th><th>Vozil</th><th>Prva prijava</th><th>Zadnja znana lokacija</th><th>Konec oddajanja</th><th>Dodeljen sektor</th>
         </tr></thead><tbody>`;
 
         Array.from(enote.entries())
             .sort((a, b) => (a[1].prva || '').localeCompare(b[1].prva || ''))
-            .forEach(([polnoIme, info]) => {
-                const ime = imeIzPolnegaImena(polnoIme);
-                const koncCas = koncOddaje.get(polnoIme);
+            .forEach(([kljucEnote, info]) => {
+                const ime = imeIzPolnegaImena(kljucEnote);
+                const koncCas = koncOddaje.get(kljucEnote);
                 const dodeljeno = dodelitve.get(ime.trim().toLowerCase());
 
                 html += `<tr>
                     <td>${escapeHtml(ime)}</td>
-                    <td>${clanovPoEnoti.get(polnoIme) || 0}</td>
+                    <td>${clanovPoEnoti.get(kljucEnote) || 0}</td>
+                    <td>${vozilPoEnoti.get(kljucEnote) || 0}</td>
                     <td>${escapeHtml(formatCas(info.prva))}</td>
                     <td>${escapeHtml(formatCas(info.zadnja))}</td>
                     <td>${koncCas ? escapeHtml(formatCas(koncCas)) : '-'}</td>
