@@ -17,10 +17,10 @@ export const ZACETNE_KOORDINATE = [46.3934, 15.5746];
 export const ZACETNI_ZOOM = 14;
 
 export const SLOVAR_BARV = {
-    "red": "Rdeča (Gasilci)",
-    "blue": "Modra (Policija)",
-    "green": "Zelena (Reševalci)",
-    "gold": "Rumena/Zlata",
+    "red": "Rdeča",
+    "blue": "Modra",
+    "green": "Zelena",
+    "gold": "Rumena",
     "orange": "Oranžna",
     "purple": "Vijolična"
 };

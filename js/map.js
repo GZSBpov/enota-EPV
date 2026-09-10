@@ -77,7 +77,8 @@ function ustvariDrawControl() {
  */
 function dodajKontrolnikBarveRisanja() {
     const BarvniControl = L.Control.extend({
-        options: { position: 'topright' },
+        // "topleft" - poleg orodij za risanje (poligon/črta/krog ...), ne pri stikalu Satelit/Ceste
+        options: { position: 'topleft' },
         onAdd: function () {
             const div = L.DomUtil.create('div', 'leaflet-bar barva-risanja-kontrolnik');
             div.style.background = '#fff';
@@ -105,7 +106,60 @@ function dodajKontrolnikBarveRisanja() {
     map.addControl(new BarvniControl());
 }
 
+/**
+ * Prevede vmesnik Leaflet.Draw (orodna vrstica, namigi, gumbi urejanja) v slovenščino -
+ * privzeto je knjižnica v angleščini. Klicati je treba PRED ustvarjanjem L.Control.Draw.
+ */
+function nastaviSlovenscinoRisanja() {
+    if (!L.drawLocal) return;
+
+    L.drawLocal.draw.toolbar.actions = { title: 'Prekliči risanje', text: 'Prekliči' };
+    L.drawLocal.draw.toolbar.finish = { title: 'Zaključi risanje', text: 'Zaključi' };
+    L.drawLocal.draw.toolbar.undo = { title: 'Izbriši zadnjo narisano točko', text: 'Izbriši zadnjo točko' };
+    L.drawLocal.draw.toolbar.buttons = {
+        polyline: 'Nariši črto',
+        polygon: 'Nariši poligon',
+        rectangle: 'Nariši pravokotnik',
+        circle: 'Nariši krog',
+        marker: 'Označi točko',
+        circlemarker: 'Nariši krožno oznako'
+    };
+
+    L.drawLocal.draw.handlers.circle.tooltip.start = 'Kliknite in povlecite za risanje kroga.';
+    L.drawLocal.draw.handlers.circle.radius = 'Polmer';
+    L.drawLocal.draw.handlers.circlemarker.tooltip.start = 'Kliknite na zemljevid za postavitev krožne oznake.';
+    L.drawLocal.draw.handlers.marker.tooltip.start = 'Kliknite na zemljevid za postavitev oznake.';
+    L.drawLocal.draw.handlers.polygon.tooltip.start = 'Kliknite za začetek risanja oblike.';
+    L.drawLocal.draw.handlers.polygon.tooltip.cont = 'Kliknite za nadaljevanje risanja oblike.';
+    L.drawLocal.draw.handlers.polygon.tooltip.end = 'Kliknite na prvo točko za zaključek oblike.';
+    L.drawLocal.draw.handlers.polyline.error = '<strong>Napaka:</strong> robovi oblike se ne smejo sekati!';
+    L.drawLocal.draw.handlers.polyline.tooltip.start = 'Kliknite za začetek risanja črte.';
+    L.drawLocal.draw.handlers.polyline.tooltip.cont = 'Kliknite za nadaljevanje risanja črte.';
+    L.drawLocal.draw.handlers.polyline.tooltip.end = 'Kliknite zadnjo točko za zaključek črte.';
+    L.drawLocal.draw.handlers.rectangle.tooltip.start = 'Kliknite in povlecite za risanje pravokotnika.';
+    L.drawLocal.draw.handlers.simpleshape.tooltip.end = 'Spustite miškin gumb za zaključek risanja.';
+
+    L.drawLocal.edit.toolbar.actions = {
+        save: { title: 'Shrani spremembe', text: 'Shrani' },
+        cancel: { title: 'Prekliči urejanje, zavrzi vse spremembe', text: 'Prekliči' },
+        clearAll: { title: 'Izbriši vse sloje', text: 'Izbriši vse' }
+    };
+    L.drawLocal.edit.toolbar.buttons = {
+        edit: 'Uredi sloje',
+        editDisabled: 'Ni slojev za urejanje',
+        remove: 'Izbriši sloje',
+        removeDisabled: 'Ni slojev za brisanje'
+    };
+    L.drawLocal.edit.handlers.edit.tooltip = {
+        text: 'Povlecite oglišča ali oznake za urejanje elementa.',
+        subtext: 'Kliknite Prekliči za razveljavitev sprememb.'
+    };
+    L.drawLocal.edit.handlers.remove.tooltip = { text: 'Kliknite na element za brisanje.' };
+}
+
 export function iniciirajZemljevid() {
+    nastaviSlovenscinoRisanja();
+
     // Dva podlagna sloja (kot v V1): satelitski posnetki (Esri) in navadna cestna karta (OSM)
     const satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
