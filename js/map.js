@@ -81,27 +81,22 @@ function dodajKontrolnikBarveRisanja() {
         options: { position: 'topleft' },
         onAdd: function () {
             const div = L.DomUtil.create('div', 'leaflet-bar barva-risanja-kontrolnik');
-            div.style.background = '#fff';
             div.style.borderRadius = '4px';
-            div.style.display = 'flex';
-            div.style.alignItems = 'center';
-            div.style.height = '30px';
-            div.style.padding = '0 4px';
 
             let opcije = '';
             for (const [kljuc, naziv] of Object.entries(SLOVAR_BARV)) {
-                opcije += `<option value="${kljuc}" ${kljuc === trenutnaBarvaRisanja ? 'selected' : ''}>${naziv}</option>`;
+                opcije += `<option value="${kljuc}" style="color:#000;" ${kljuc === trenutnaBarvaRisanja ? 'selected' : ''}>${naziv}</option>`;
             }
-            // Kompakten, en-vrstičen kontrolnik (namesto ločenega napisa + celotnega izbirnega polja),
-            // da na majhnih zaslonih (telefon) ne "pojé" prostora, namenjenega gumboma Uredi/Izbriši.
+            // Samo majhen kvadratek v izbrani barvi (brez napisa) - klik odpre izbiro med imeni barv.
             div.innerHTML = `
-                <label style="font-size:10px; font-weight:bold; color:#000; margin-right:3px; white-space:nowrap;">Barva risanja:</label>
-                <select style="font-size:11px; padding:1px; border:none; max-width:80px;">${opcije}</select>
+                <select class="barva-risanja-select" title="Barva risanja - klikni za spremembo" style="width:30px; height:30px; padding:0; border:2px solid #fff; border-radius:4px; cursor:pointer; color:transparent; background-color:${BARVE_HEX[trenutnaBarvaRisanja]};">${opcije}</select>
             `;
 
             L.DomEvent.disableClickPropagation(div);
-            div.querySelector('select').addEventListener('change', (e) => {
+            const selectEl = div.querySelector('select');
+            selectEl.addEventListener('change', (e) => {
                 trenutnaBarvaRisanja = e.target.value;
+                selectEl.style.backgroundColor = BARVE_HEX[trenutnaBarvaRisanja];
                 ustvariDrawControl();
             });
 

@@ -119,8 +119,10 @@ export function posodobiEnoto(enota) {
             title: enota.naziv
         });
 
+        // Namig NI stalen - pri več bližnjih enotah bi se napisi prekrivali. Prikaže se
+        // le ob lebdenju z miško (na dotik klik itak odpre pojavno okno s polnimi podatki).
         marker.bindTooltip(enota.naziv, {
-            permanent: true,
+            permanent: false,
             direction: 'top',
             offset: [0, -28]
         });
