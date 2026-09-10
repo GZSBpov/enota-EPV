@@ -41,6 +41,70 @@ export let map;
 export let narisaniSektorjiSloj;
 export let enoteMarkerjiSloj;
 
+let drawControl = null;
+let trenutnaBarvaRisanja = "red";
+
+function pridobiSlogZaBarvo(barva) {
+    const hex = BARVE_HEX[barva] || "#ef4444";
+    return { color: hex, fillColor: hex, fillOpacity: 0.35, weight: 3 };
+}
+
+/**
+ * Zgradi (oz. zamenja) orodja za risanje, tako da nova oblika takoj med risanjem
+ * uporabi trenutno izbrano barvo - ne rišemo več vedno v privzeti (modri) barvi Leafleta.
+ */
+function ustvariDrawControl() {
+    if (drawControl) map.removeControl(drawControl);
+
+    const slog = pridobiSlogZaBarvo(trenutnaBarvaRisanja);
+    drawControl = new L.Control.Draw({
+        edit: { featureGroup: narisaniSektorjiSloj },
+        draw: {
+            polygon: { allowIntersection: false, showArea: true, shapeOptions: slog },
+            polyline: { shapeOptions: { color: slog.color, weight: 4 } },
+            rectangle: { shapeOptions: slog },
+            circle: { shapeOptions: slog },
+            marker: true,
+            circlemarker: false
+        }
+    });
+    map.addControl(drawControl);
+}
+
+/**
+ * Dodaten kontrolnik na zemljevidu za izbiro barve, s katero se bo narisal NASLEDNJI sektor.
+ * Ločeno od barv enot - te barve so namenjene sektorjem/območjem in točkam.
+ */
+function dodajKontrolnikBarveRisanja() {
+    const BarvniControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function () {
+            const div = L.DomUtil.create('div', 'leaflet-bar barva-risanja-kontrolnik');
+            div.style.background = '#fff';
+            div.style.padding = '5px 6px';
+            div.style.borderRadius = '4px';
+
+            let opcije = '';
+            for (const [kljuc, naziv] of Object.entries(SLOVAR_BARV)) {
+                opcije += `<option value="${kljuc}" ${kljuc === trenutnaBarvaRisanja ? 'selected' : ''}>${naziv}</option>`;
+            }
+            div.innerHTML = `
+                <label style="display:block; font-size:11px; font-weight:bold; color:#000; margin-bottom:2px;">Barva risanja sektorja:</label>
+                <select style="font-size:12px; padding:2px; width:100%;">${opcije}</select>
+            `;
+
+            L.DomEvent.disableClickPropagation(div);
+            div.querySelector('select').addEventListener('change', (e) => {
+                trenutnaBarvaRisanja = e.target.value;
+                ustvariDrawControl();
+            });
+
+            return div;
+        }
+    });
+    map.addControl(new BarvniControl());
+}
+
 export function iniciirajZemljevid() {
     // Dva podlagna sloja (kot v V1): satelitski posnetki (Esri) in navadna cestna karta (OSM)
     const satelitskaMapa = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -63,30 +127,19 @@ export function iniciirajZemljevid() {
     narisaniSektorjiSloj = new L.FeatureGroup().addTo(map);
     enoteMarkerjiSloj = new L.LayerGroup().addTo(map);
 
-    const drawControl = new L.Control.Draw({
-        edit: { featureGroup: narisaniSektorjiSloj },
-        draw: {
-            polygon: { allowIntersection: false, showArea: true },
-            polyline: true,
-            rectangle: true,
-            circle: true,
-            marker: true,
-            circlemarker: false
-        }
-    });
-    map.addControl(drawControl);
+    dodajKontrolnikBarveRisanja();
+    ustvariDrawControl();
 
     map.on(L.Draw.Event.CREATED, (e) => {
         const layer = e.layer;
         const type = e.layerType;
 
-        // Nastavimo privzeto barvo (rdeča)
-        layer.options.barvaSektorja = "red";
+        layer.options.barvaSektorja = trenutnaBarvaRisanja;
         layer.options.geometrijaTip = type;
 
         narisaniSektorjiSloj.addLayer(layer);
-        posodobiIzgledSektorja(layer, "red");
-        nastaviPopupZaSektor(layer, "red");
+        posodobiIzgledSektorja(layer, trenutnaBarvaRisanja);
+        nastaviPopupZaSektor(layer, trenutnaBarvaRisanja);
     });
 }
 
@@ -137,13 +190,7 @@ export function posodobiIzgledSektorja(layer, barva) {
     if (layer instanceof L.Marker) {
         layer.setIcon(ustvariTockaIkono(barva));
     } else if (layer.setStyle) {
-        const hex = BARVE_HEX[barva] || "#ef4444";
-        layer.setStyle({
-            color: hex,
-            fillColor: hex,
-            fillOpacity: 0.35,
-            weight: 3
-        });
+        layer.setStyle(pridobiSlogZaBarvo(barva));
     }
     layer.options.barvaSektorja = barva;
 }
