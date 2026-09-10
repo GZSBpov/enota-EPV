@@ -2,7 +2,7 @@ import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, pos
 import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE } from './config.js';
 import { osveziLokacijeEnot } from './units.js';
 import { naloziSporocila } from './sporocila.js';
-import { pridobiSejnoGeslo, vprasajZaGesloDogodka, generirajGesloDogodka, sha256Hex, shraniGesloDogodkaNaStreznik, shraniSejnoGeslo } from './geslo-dogodka.js';
+import { pridobiSejnoGeslo, vprasajZaGesloDogodka, generirajGesloDogodka, sha256Hex, shraniGesloDogodkaNaStreznik, shraniSejnoGeslo, ponastaviGesloDogodka } from './geslo-dogodka.js';
 
 // Lokalna varnostna kopija dogodkov, ker Google Apps Script ni vedno dosegljiv.
 // Dogodek je identificiran po IMENU (tako ga hrani tudi Apps Script - glej list "Dogodki").
@@ -101,9 +101,23 @@ async function naloziSektorjeDogodka(imeDogodka) {
             } else {
                 res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
                 odgovor = res.ok ? await res.json() : null;
+
                 if (odgovor && odgovor.status === 'locked') {
-                    dostopUspel = false;
-                    alert('Napačno geslo - dostop do tega dogodka zavrnjen.');
+                    // Napačno geslo - ponudimo ponastavitev za primer, da je bilo pozabljeno.
+                    // Ponastavitev zahteva samo splošno geslo aplikacije (ki ga uporabnik že ima,
+                    // saj brez njega sploh ne bi mogel priti do te točke).
+                    const zeliPonastaviti = window.confirm(`Napačno geslo za dogodek "${imeDogodka}".\n\nAli želite geslo PONASTAVITI? Staro geslo bo prenehalo veljati, prikazano bo novo.`);
+                    if (zeliPonastaviti) {
+                        gesloHash = await ponastaviGesloDogodka(imeDogodka);
+                        if (gesloHash) {
+                            res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+                            odgovor = res.ok ? await res.json() : null;
+                        }
+                    }
+                    if (!odgovor || odgovor.status === 'locked') {
+                        dostopUspel = false;
+                        alert('Napačno geslo - dostop do tega dogodka zavrnjen.');
+                    }
                 }
             }
         }
@@ -234,6 +248,15 @@ export async function shraniDogodek(tiho = false) {
         const gesloHash = await vprasajZaGesloDogodka(imeDogodka);
         if (gesloHash) {
             uspesnoShranjeno = await posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, gesloHash);
+        }
+        if (!uspesnoShranjeno) {
+            const zeliPonastaviti = window.confirm(`Geslo za dogodek "${imeDogodka}" ni pravilno, zato shranjevanje ni uspelo.\n\nAli želite geslo PONASTAVITI? Staro geslo bo prenehalo veljati, prikazano bo novo, nato bo shranjevanje ponovljeno.`);
+            if (zeliPonastaviti) {
+                const novGesloHash = await ponastaviGesloDogodka(imeDogodka);
+                if (novGesloHash) {
+                    uspesnoShranjeno = await posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, novGesloHash);
+                }
+            }
         }
         if (!uspesnoShranjeno) {
             alert(`Shranjevanje na strežnik ni uspelo - dogodek "${imeDogodka}" je zaščiten in vneseno geslo ni pravilno. Sektorji so shranjeni samo lokalno na tej napravi.`);

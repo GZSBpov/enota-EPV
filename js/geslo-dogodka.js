@@ -83,3 +83,25 @@ export async function shraniGesloDogodkaNaStreznik(imeDogodka, gesloHash) {
         return false;
     }
 }
+
+/**
+ * PONASTAVITEV POZABLJENEGA GESLA: kdorkoli ima splošno geslo aplikacije (EPV2026 - ki ga
+ * mora poznati vsak, ki sploh uporablja mapeEPV.html), lahko za dogodek nastavi povsem NOVO
+ * geslo, ne da bi poznal staro - staro takoj preneha veljati. Namenoma ni ločene "admin" prijave:
+ * v tej aplikaciji je splošno geslo aplikacije edina obstoječa raven administratorskih pravic.
+ * Vrne zgoščeno vrednost novega gesla, ali null, če shranjevanje na strežnik ni uspelo.
+ */
+export async function ponastaviGesloDogodka(imeDogodka) {
+    const novoGeslo = generirajGesloDogodka();
+    const novGesloHash = await sha256Hex(novoGeslo);
+    const uspesno = await shraniGesloDogodkaNaStreznik(imeDogodka, novGesloHash);
+
+    if (!uspesno) {
+        alert('Ponastavitev gesla ni uspela (povezava s strežnikom ni uspela). Poskusite znova.');
+        return null;
+    }
+
+    shraniSejnoGeslo(imeDogodka, novGesloHash);
+    alert(`Geslo za dogodek "${imeDogodka}" je bilo ponastavljeno.\n\n🔑 NOVO GESLO: ${novoGeslo}\n\nShranite/zapišite si ga - staro geslo od zdaj ne velja več.`);
+    return novGesloHash;
+}

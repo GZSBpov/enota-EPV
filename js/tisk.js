@@ -6,7 +6,7 @@ import { GOOGLE_APPS_SCRIPT_URL, SLOVAR_BARV } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
 import { pridobiTrenutnoVidneEnote } from './units.js';
 import { formatirajCas as formatCas } from './cas-pomoc.js';
-import { pridobiSejnoGeslo, vprasajZaGesloDogodka } from './geslo-dogodka.js';
+import { pridobiSejnoGeslo, vprasajZaGesloDogodka, ponastaviGesloDogodka } from './geslo-dogodka.js';
 
 const STORAGE_STEVILKA_TISKA = 'epv_stevilka_tiska';
 
@@ -101,6 +101,18 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
             }
             res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
             odgovor = res.ok ? await res.json() : null;
+
+            if (odgovor && odgovor.status === 'locked') {
+                const zeliPonastaviti = window.confirm(`Napačno geslo za dogodek "${dogodekId}".\n\nAli želite geslo PONASTAVITI? Staro geslo bo prenehalo veljati, prikazano bo novo.`);
+                if (zeliPonastaviti) {
+                    gesloHash = await ponastaviGesloDogodka(dogodekId);
+                    if (gesloHash) {
+                        res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+                        odgovor = res.ok ? await res.json() : null;
+                    }
+                }
+            }
+
             if (!odgovor || odgovor.status === 'locked') {
                 if (tabelaEl) tabelaEl.innerHTML = '<p>Napačno geslo - dostop do podatkov tega dogodka je zavrnjen.</p>';
                 return;
