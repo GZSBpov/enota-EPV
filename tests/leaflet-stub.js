@@ -48,7 +48,10 @@
             setPopupContent: (c) => { if (self.popup) self.popup.content = c; return proxy; },
             openPopup: () => {
                 self.popupOdprt = true;
+                document.querySelectorAll('.stub-popup').forEach(n => n.remove());
                 const el = document.createElement('div');
+                el.className = 'stub-popup';
+                document.body.appendChild(el);
                 const vsebina = self.popup ? (typeof self.popup.content === 'function' ? self.popup.content() : self.popup.content) : '';
                 el.innerHTML = vsebina;
                 window.__L.popupOpens.push({ vsebina: vsebina });
@@ -60,6 +63,7 @@
             toGeoJSON: () => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [self.latlng[1], self.latlng[0]] } }),
             flyTo: () => proxy, setView: () => proxy, fitBounds: () => proxy, invalidateSize: () => proxy,
             getCenter: () => ({ lat: 46.39, lng: 15.57 }),
+            getContainer: () => (self.vsebnik = self.vsebnik || document.createElement('div')),
             addControl: () => proxy, removeControl: () => proxy
         };
         proxy = new Proxy(self, {
@@ -81,7 +85,7 @@
     const L = {
         Marker: Marker, Circle: Circle, Polygon: Polygon, Polyline: Polyline, Rectangle: Rectangle, FeatureGroup: FeatureGroup,
         LayerGroup: FeatureGroup,
-        map: function () { return ustvari(null, arguments, 'Map'); },
+        map: function () { const m = ustvari(null, arguments, 'Map'); window.__L.map = m; return m; },
         tileLayer: function () { return ustvari(null, arguments, 'TileLayer'); },
         marker: function () { const m = ustvari(Marker, arguments, 'Marker'); window.__L.markers.push(m); return m; },
         circle: function () { const c = ustvari(Circle, arguments, 'Circle'); window.__L.circles.push(c); return c; },

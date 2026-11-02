@@ -250,6 +250,58 @@ try:
             pri('tisk: čas SOS je v lokalnem času Ljubljane (brez +2 h napake)', pricakovan in tisk, (pricakovan, tisk[:500]))
         pri('tisk: naslov V2', 'V2' in H.inner_text('#print-naslov'))
 
+        # ----- izbira točke s klikom na zemljevid -----
+        H.click('#btn-tocka-odpri')
+        H.click('#btn-tocka-klik')
+        pri('klik na zemljevid: obrazec se zapre, pasica se pokaže', (not H.is_visible('#tocka-modal')) and H.is_visible('#tocka-klik-pasica'))
+        H.keyboard.press('Escape')
+        pri('klik na zemljevid: Esc prekliče in znova odpre obrazec', H.is_visible('#tocka-modal') and not H.is_visible('#tocka-klik-pasica'))
+        H.click('#btn-tocka-klik')
+        H.evaluate("window.__L.map.handlers.click.slice(-1)[0]({ latlng: { lat: 46.40, lng: 15.60 } })")
+        pri('klik na zemljevid: koordinate v obrazcu', H.is_visible('#tocka-modal') and H.input_value('#tocka-vnos') == '46.40000, 15.60000', H.input_value('#tocka-vnos'))
+        pri('klik na zemljevid: pasica izgine', not H.is_visible('#tocka-klik-pasica'))
+        H.fill('#tocka-naziv', 'Klik točka')
+        H.select_option('#tocka-cilj', '')
+        H.click('#btn-tocka-prikazi')
+        pri('klik na zemljevid: točka shranjena (samo štab)', cakaj(lambda: any(v[4] == 'Klik točka' and abs(v[5] - 46.4) < 1e-9 and abs(v[6] - 15.6) < 1e-9 and v[3] == '' for v in sheet('Tocke')[1:]), 10), sheet('Tocke')[-1:])
+
+        # ----- umik točke: čas umika v seznamu in poročilu -----
+        pri('umik: gumb v oknu točke', cakaj(lambda: H.is_visible('.stub-popup .tp-izbrisi'), 10))
+        H.click('.stub-popup .tp-izbrisi')
+        pri('umik: strežnik zapiše status in čas umika', cakaj(lambda: any(v[4] == 'Klik točka' and v[9] == 'umaknjena' and v[11] not in ('', None) for v in sheet('Tocke')[1:]), 10), sheet('Tocke')[-1:])
+        pri('umik: seznam kaže umaknjeno točko', cakaj(lambda: 'umaknjena ob' in H.inner_text('#tocke-seznam'), 10), H.inner_text('#tocke-seznam'))
+        pri('umik: točka ni več med aktivnimi', H.evaluate("window.__L.markers.length") >= 1)
+
+        def natisni():
+            H.evaluate("document.getElementById('print-tabela').innerHTML = ''")
+            H.click('#btn-tisk')
+            cakaj(lambda: 'Točke iz koordinat' in H.inner_text('#print-tabela') and 'Sporočila' in H.inner_text('#print-tabela'), 25)
+            return H.inner_text('#print-tabela')
+
+        tisk1 = natisni()
+        vr_umik = [v for v in sheet('Tocke')[1:] if v[4] == 'Klik točka'][0]
+        cas_umika = datetime.fromisoformat(vr_umik[11].replace('Z', '+00:00')).astimezone(LJ).strftime('%Y-%m-%d %H:%M:%S')
+        pri('tisk: umaknjena točka je v poročilu', 'Klik točka' in tisk1 and 'Umaknjena ob' in tisk1, tisk1[:600])
+        pri('tisk: čas umika točke', cas_umika in tisk1, (cas_umika, tisk1[:900]))
+        pri('tisk: aktivna točka ima stanje Aktivna', 'Aktivna' in tisk1)
+        pri('tisk: sporočili pred izklopom sta v poročilu', 'Najdena oseba' in tisk1 and 'Vsi na zbirno mesto' in tisk1)
+
+        # ----- potrditvena polja: odkljukano = ni v poročilu -----
+        H.uncheck('#tocke-seznam .tocka-vrstica.umaknjena .chk-tisk')
+        H.uncheck('#seznamSporocil .sporocilo-vrstica:has-text("Najdena oseba") .chk-tisk')
+        H.uncheck('#stabLog .stab-log-vrstica:has-text("Vsi na zbirno mesto") .chk-tisk')
+        tisk2 = natisni()
+        pri('tisk: odkljukana točka je izpuščena', 'Klik točka' not in tisk2, tisk2[:600])
+        pri('tisk: odkljukano sporočilo s terena je izpuščeno', 'Najdena oseba' not in tisk2)
+        pri('tisk: odkljukano sporočilo iz štaba je izpuščeno', 'Vsi na zbirno mesto' not in tisk2)
+        pri('tisk: ostale točke so še v poročilu', 'Klic - oseba' in tisk2)
+        pri('tisk: opomba o izpuščenem', 'izpuščeno' in tisk2 and 'točk: 1' in tisk2 and 'sporočil s terena: 1' in tisk2 and 'sporočil iz štaba: 1' in tisk2, tisk2[-400:])
+        izbor = H.evaluate("JSON.parse(localStorage.getItem('epv2_tisk_izkljuceno'))['Rogla']")
+        pri('izbor se shrani na napravi po dogodku', len(izbor.get('tocka', [])) == 1 and len(izbor.get('sporocilo', [])) == 1 and len(izbor.get('stab', [])) == 1, izbor)
+        H.check('#tocke-seznam .tocka-vrstica.umaknjena .chk-tisk')
+        tisk3 = natisni()
+        pri('tisk: ponovna kljukica vrne točko v poročilo', 'Klik točka' in tisk3 and 'točk: 1' not in tisk3)
+
         # ----- zaključek intervencije: ni dvojnika -----
         H.click('#btn-zakljuci-dogodek', click_count=2, delay=50)
         pri('zaključek: en sam zaznamek KONEC INTERVENCIJE', cakaj(lambda: sum(1 for v in sheet('Sporocila')[1:] if v[3] == 'KONEC INTERVENCIJE') >= 1, 20)

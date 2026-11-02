@@ -7,6 +7,7 @@ import { narisaniSektorjiSloj } from './map.js';
 import { pridobiTrenutnoVidneEnote } from './units.js';
 import { formatirajCas as formatCas, casVMs } from './cas-pomoc.js';
 import { apiGet } from './api.js';
+import { jeIzkljuceno } from './tisk-izbor.js';
 import { pridobiSejnoGeslo, vprasajZaGesloDogodka, ponastaviGesloDogodka } from './geslo-dogodka.js';
 
 const STORAGE_STEVILKA_TISKA = 'epv2_stevilka_tiska';
@@ -229,17 +230,19 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         html += '</tbody></table>';
     }
 
-    // --- Tabela sporočil ---
-    html += `<h2>Sporočila (${sporocila.length})</h2>`;
+    // --- Tabela sporočil (samo tista s kljukico; čas konca oddajanja in zaključka zgoraj upošteva vsa) ---
+    const sporocilaZaTabelo = sporocila.filter(s => !jeIzkljuceno(dogodekId, 'sporocilo', s.id));
+    const izpuscenaSporocila = sporocila.length - sporocilaZaTabelo.length;
+    html += `<h2>Sporočila (${sporocilaZaTabelo.length})</h2>`;
 
-    if (sporocila.length === 0) {
+    if (sporocilaZaTabelo.length === 0) {
         html += '<p>Ni sporočil za ta dogodek.</p>';
     } else {
         html += `<table class="tisk-tabela"><thead><tr>
             <th>Čas</th><th>Enota</th><th>Sporočilo</th><th>Lokacija</th>
         </tr></thead><tbody>`;
 
-        sporocila.slice().reverse().forEach(s => {
+        sporocilaZaTabelo.slice().reverse().forEach(s => {
             const ime = imeIzPolnegaImena(s.enota);
             const imaKoordinate = s.lat !== undefined && s.lon !== undefined && s.lat !== '' && s.lon !== '';
             const lokacijaBesedilo = imaKoordinate
@@ -257,7 +260,9 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     }
 
     // --- Sporočila iz štaba enotam (poveljstvo -> teren) ---
-    const sporocilaStab = (sporocilaStabRes.data || []).filter(s => s && s.sporocilo);
+    const sporocilaStabVsa = (sporocilaStabRes.data || []).filter(s => s && s.sporocilo);
+    const sporocilaStab = sporocilaStabVsa.filter(s => !jeIzkljuceno(dogodekId, 'stab', s.id));
+    const izpuscenaStab = sporocilaStabVsa.length - sporocilaStab.length;
     html += `<h2>Sporočila iz štaba enotam (${sporocilaStab.length})</h2>`;
 
     if (sporocilaStab.length === 0) {
@@ -281,8 +286,10 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         html += '</tbody></table>';
     }
 
-    // --- Točke iz koordinat (štab -> teren) ---
-    const tocke = (tockeRes.data || []).filter(t => t && t.status !== 'umaknjena');
+    // --- Točke iz koordinat (štab -> teren): aktivne in umaknjene (s časom umika); samo tiste s kljukico ---
+    const tockeVse = (tockeRes.data || []).filter(t => t);
+    const tocke = tockeVse.filter(t => !jeIzkljuceno(dogodekId, 'tocka', t.id));
+    const izpuscenaTocke = tockeVse.length - tocke.length;
     const potrditve = (potrditveRes.data || []);
     html += `<h2>Točke iz koordinat (${tocke.length})</h2>`;
     if (tocke.length === 0) {
@@ -290,19 +297,23 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     } else {
         const K = window.EPVKoordinate;
         html += `<table class="tisk-tabela"><thead><tr>
-            <th>Naziv</th><th>Koordinate</th><th>Opomba</th><th>Poslano</th><th>Potrdili prejem</th>
+            <th>Naziv</th><th>Koordinate</th><th>Opomba</th><th>Poslano</th><th>Potrdili prejem</th><th>Stanje</th>
         </tr></thead><tbody>`;
-        tocke.forEach(t => {
+        tocke.slice().sort((a, b) => casVMs(a.cas) - casVMs(b.cas)).forEach(t => {
             const lat = parseFloat(t.lat), lon = parseFloat(t.lon);
             const f = (K && !isNaN(lat) && !isNaN(lon)) ? K.oblikuj(lat, lon) : null;
             const prejeli = potrditve.filter(p => p.tip === 'tocka' && p.ref === `${t.id}|${t.ver}`);
             const cilj = !t.cilj ? 'samo štab' : (String(t.cilj).toLowerCase() === 'vsi' ? 'vse enote' : String(t.cilj).split('|').join(', '));
+            const umaknjena = t.status === 'umaknjena';
+            // pri starejši skripti čas umika ni v svojem stolpcu - takrat ga je nadomestil čas zadnje spremembe (ver)
+            const casUmika = t.umaknjeno || t.ver;
             html += `<tr>
                 <td>${escapeHtml(t.naziv)}</td>
                 <td>${f ? escapeHtml(f.decimalno) + '<br>D96/TM: ' + escapeHtml(f.d96) : '-'}${t.polmer ? '<br>±' + escapeHtml(Math.round(t.polmer)) + ' m' : ''}</td>
                 <td>${escapeHtml(t.opomba || '')}</td>
                 <td>${escapeHtml(cilj)}${t.ver ? '<br>' + escapeHtml(formatCas(t.ver)) : ''}</td>
                 <td>${prejeli.length ? prejeli.map(p => escapeHtml(p.enota) + ' (' + escapeHtml(formatCas(p.cas, true)) + ')').join('<br>') : '-'}</td>
+                <td>${umaknjena ? 'Umaknjena ob<br><b>' + escapeHtml(formatCas(casUmika)) + '</b>' : 'Aktivna'}</td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -311,6 +322,14 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     // --- Zaključek intervencije (če je bila zaključena) - na koncu poročila ---
     if (zakljucek) {
         html += `<h2>🏁 Zaključek intervencije</h2><p style="font-size:1rem;"><b>${escapeHtml(formatCas(zakljucek.cas))}</b></p>`;
+    }
+
+    const izpuscenoDeli = [];
+    if (izpuscenaTocke) izpuscenoDeli.push(`točk: ${izpuscenaTocke}`);
+    if (izpuscenaSporocila) izpuscenoDeli.push(`sporočil s terena: ${izpuscenaSporocila}`);
+    if (izpuscenaStab) izpuscenoDeli.push(`sporočil iz štaba: ${izpuscenaStab}`);
+    if (izpuscenoDeli.length) {
+        html += `<p style="font-size:0.8rem; color:#64748b; margin-top:14px;"><i>Iz tega izpisa je izpuščeno (odkljukano pred izpisom): ${izpuscenoDeli.join(', ')}.</i></p>`;
     }
 
     html += `<p style="font-size:0.75rem; color:#64748b; margin-top:20px;">Izpis št. ${stevilkaTiska} - natisnjeno ${escapeHtml(formatCas(new Date().toISOString()))}</p>`;

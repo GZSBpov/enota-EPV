@@ -11,12 +11,14 @@
 import { map } from './map.js';
 import { apiGet, novId } from './api.js';
 import { formatirajCas } from './cas-pomoc.js';
+import { jeIzkljuceno, nastaviIzkljuceno } from './tisk-izbor.js';
 import { pridobiVseEnote } from './units.js';
 import { pridobiPotrditve } from './enote-register.js';
 import { zgradiCiljeOptionsHtml, razresiCilj } from './stab-sporocila.js';
 
 const K = window.EPVKoordinate;
 const tocke = new Map(); // id -> { podatki, marker, krog }
+let umaknjene = []; // umaknjene točke dogodka (samo podatki): ostanejo v seznamu, da je v poročilu videti čas umika
 let sloj = null;
 let osvezujem = false;
 
@@ -161,7 +163,7 @@ function pripniPopup(vozlisce, id) {
     izbrisi?.addEventListener('click', async () => {
         if (!window.confirm('Umakniti točko z zemljevida štaba in s terena?')) return;
         const odgovor = await apiGet({ akcija: 'umakniTocko', dogodek: trenutniDogodek(), id });
-        if (odgovor.status === 'success') odstraniLokalno(id);
+        if (odgovor.status === 'success') { odstraniLokalno(id); osveziTocke(); }
         else if (statusEl) statusEl.textContent = '⚠️ Umik ni uspel: ' + (odgovor.message || '');
         osveziSeznam();
     });
@@ -191,19 +193,35 @@ async function posljiTockoNaStrezniku(t, vrednostCilja, zamenjaj) {
 function osveziSeznam() {
     const el = document.getElementById('tocke-seznam');
     if (!el) return;
-    const vse = Array.from(tocke.values()).map(e => e.podatki);
-    if (vse.length === 0) {
+    const dogodek = trenutniDogodek();
+    const aktivne = Array.from(tocke.values()).map(e => e.podatki);
+    if (aktivne.length === 0 && umaknjene.length === 0) {
         el.innerHTML = '<div class="tocke-prazno">Ni točk. Dodaj jih z gumbom »Točka iz koordinat«.</div>';
         return;
     }
-    el.innerHTML = vse.map(t => {
+    const kljukica = (t) => `<input type="checkbox" class="chk-tisk" title="Vključeno v poročilo (tisk)" data-id="${escapeAtribut(t.id)}" ${jeIzkljuceno(dogodek, 'tocka', t.id) ? '' : 'checked'}>`;
+
+    const vrsticeAktivne = aktivne.map(t => {
         const prejeli = t.ver ? potrditveTocke(t) : [];
-        return `<div class="tocka-vrstica" data-id="${escapeAtribut(t.id)}">
-            <div class="tocka-vrstica-glava"><span>🎯 ${escapeHtml(t.naziv || 'Točka')}</span><span class="tocka-vrstica-cilj">${escapeHtml(ciljVBesedilo(t.cilj))}</span></div>
+        return `<div class="tocka-vrstica ${jeIzkljuceno(dogodek, 'tocka', t.id) ? 'izkljuceno' : ''}" data-id="${escapeAtribut(t.id)}">
+            <div class="tocka-vrstica-glava"><span>${kljukica(t)} 🎯 ${escapeHtml(t.naziv || 'Točka')}</span><span class="tocka-vrstica-cilj">${escapeHtml(ciljVBesedilo(t.cilj))}</span></div>
             <div class="tocka-vrstica-koordinate">${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}${t.ver ? (prejeli.length ? ' · ✔ ' + prejeli.length + ' potrdilo' : ' · ⏳') : ''}</div>
         </div>`;
-    }).join('');
-    el.querySelectorAll('.tocka-vrstica').forEach(v => {
+    });
+    const vrsticeUmaknjene = umaknjene.map(t => `<div class="tocka-vrstica umaknjena ${jeIzkljuceno(dogodek, 'tocka', t.id) ? 'izkljuceno' : ''}" data-id="${escapeAtribut(t.id)}">
+            <div class="tocka-vrstica-glava"><span>${kljukica(t)} 🎯 ${escapeHtml(t.naziv || 'Točka')}</span><span class="tocka-vrstica-cilj">umaknjena ob ${escapeHtml(formatirajCas(t.umaknjeno, true) || '?')}</span></div>
+            <div class="tocka-vrstica-koordinate">${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}</div>
+        </div>`);
+    el.innerHTML = vrsticeAktivne.concat(vrsticeUmaknjene).join('');
+
+    el.querySelectorAll('.chk-tisk').forEach(chk => {
+        chk.addEventListener('click', (e) => e.stopPropagation());
+        chk.addEventListener('change', () => {
+            nastaviIzkljuceno(dogodek, 'tocka', chk.dataset.id, !chk.checked);
+            chk.closest('.tocka-vrstica').classList.toggle('izkljuceno', !chk.checked);
+        });
+    });
+    el.querySelectorAll('.tocka-vrstica:not(.umaknjena)').forEach(v => {
         v.addEventListener('click', () => {
             const e = tocke.get(v.dataset.id);
             if (!e) return;
@@ -219,7 +237,7 @@ export async function osveziTocke() {
     if (osvezujem || !sloj) return;
     const dogodek = trenutniDogodek();
     if (!dogodek || dogodek === 'novy') {
-        if (tocke.size) { pocistiVse(); osveziSeznam(); }
+        if (tocke.size || umaknjene.length) { pocistiVse(); umaknjene = []; osveziSeznam(); }
         return;
     }
     osvezujem = true;
@@ -229,9 +247,14 @@ export async function osveziTocke() {
         if (trenutniDogodek() !== dogodek) return;
 
         const aktivne = new Set();
+        const novoUmaknjene = [];
         odgovor.data.forEach(r => {
             const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
-            if (r.status === 'umaknjena' || isNaN(lat) || isNaN(lon)) return;
+            if (isNaN(lat) || isNaN(lon)) return;
+            if (r.status === 'umaknjena') {
+                novoUmaknjene.push({ id: r.id, naziv: r.naziv, lat, lon, umaknjeno: r.umaknjeno || r.ver || '' });
+                return;
+            }
             aktivne.add(r.id);
             narisi({
                 id: r.id, naziv: r.naziv, lat, lon, polmer: parseFloat(r.polmer) || 0,
@@ -239,6 +262,7 @@ export async function osveziTocke() {
             });
         });
         Array.from(tocke.keys()).forEach(id => { if (!aktivne.has(id)) odstraniLokalno(id); });
+        umaknjene = novoUmaknjene.sort((a, b) => Date.parse(b.umaknjeno) - Date.parse(a.umaknjeno));
         osveziSeznam();
     } finally {
         osvezujem = false;
@@ -248,6 +272,7 @@ export async function osveziTocke() {
 /** Ob zamenjavi dogodka: pozabi točke prejšnjega dogodka. */
 export function ponastaviTocke() {
     if (sloj) pocistiVse();
+    umaknjene = [];
     osveziSeznam();
 }
 
@@ -305,6 +330,43 @@ function odpriModal() {
     if (opoz) opoz.style.display = (!dogodek || dogodek === 'novy') ? 'block' : 'none';
     prikaziPredogled();
     setTimeout(() => document.getElementById('tocka-vnos')?.focus(), 50);
+}
+
+let izborNaZemljevidu = null; // { obdelaj, tipka }
+
+function koncajIzborNaZemljevidu(odpriZnova) {
+    if (!izborNaZemljevidu) return;
+    map.off('click', izborNaZemljevidu.obdelaj);
+    document.removeEventListener('keydown', izborNaZemljevidu.tipka, true);
+    try { map.getContainer().style.cursor = ''; } catch (e) { /* ni vsebnika */ }
+    izborNaZemljevidu = null;
+    const pasica = document.getElementById('tocka-klik-pasica');
+    if (pasica) pasica.style.display = 'none';
+    if (odpriZnova) {
+        const modal = document.getElementById('tocka-modal');
+        if (modal) modal.style.display = 'flex';
+        prikaziPredogled();
+    }
+}
+
+/** Zapre obrazec, počaka na klik na zemljevidu in koordinate klika vpiše v obrazec (ki se znova odpre). */
+function zacniIzborNaZemljevidu() {
+    if (!map || izborNaZemljevidu) return;
+    zapriModal();
+    const obdelaj = (e) => {
+        const lat = e.latlng.lat, lon = e.latlng.lng;
+        koncajIzborNaZemljevidu(true);
+        const vnos = document.getElementById('tocka-vnos');
+        if (vnos) vnos.value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        prikaziPredogled();
+    };
+    const tipka = (e) => { if (e.key === 'Escape') { e.stopPropagation(); koncajIzborNaZemljevidu(true); } };
+    izborNaZemljevidu = { obdelaj, tipka };
+    map.on('click', obdelaj);
+    document.addEventListener('keydown', tipka, true);
+    try { map.getContainer().style.cursor = 'crosshair'; } catch (e) { /* ni vsebnika */ }
+    const pasica = document.getElementById('tocka-klik-pasica');
+    if (pasica) pasica.style.display = 'flex';
 }
 
 function zapriModal() {
@@ -369,6 +431,8 @@ export function iniciirajTocke() {
     sloj = L.layerGroup().addTo(map);
     document.getElementById('btn-tocka-odpri')?.addEventListener('click', odpriModal);
     document.getElementById('btn-tocka-zapri')?.addEventListener('click', zapriModal);
+    document.getElementById('btn-tocka-klik')?.addEventListener('click', zacniIzborNaZemljevidu);
+    document.getElementById('btn-tocka-klik-preklic')?.addEventListener('click', () => koncajIzborNaZemljevidu(true));
     document.getElementById('tocka-vnos')?.addEventListener('input', prikaziPredogled);
     document.getElementById('btn-tocka-prikazi')?.addEventListener('click', () => ustvariTocko(false));
     document.getElementById('btn-tocka-poslji')?.addEventListener('click', () => ustvariTocko(true));

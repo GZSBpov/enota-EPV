@@ -31,7 +31,7 @@ var GLAVE = {
   Lokacije: ["Čas", "Enota", "Latitude", "Longitude", "Natančnost", "Dogodek", "ID"],
   Sporocila: ["Čas", "Enota", "Dogodek", "Sporočilo", "Latitude", "Longitude", "ID"],
   SporocilaStab: ["Cas", "Dogodek", "Cilj", "Sporocilo", "ID"],
-  Tocke: ["Cas", "Dogodek", "ID", "Cilj", "Naziv", "Lat", "Lon", "Polmer", "Opomba", "Status", "Ver"],
+  Tocke: ["Cas", "Dogodek", "ID", "Cilj", "Naziv", "Lat", "Lon", "Polmer", "Opomba", "Status", "Ver", "Umaknjeno"],
   Potrditve: ["Cas", "Dogodek", "Enota", "Tip", "Ref"],
   Dogodki: ["dogodek", "tip", "podatki", "dodeljenaEnota"],
   DogodekGesla: ["Dogodek", "GesloHash", "Cas"]
@@ -452,6 +452,7 @@ function posljiTocko(p) {
         ciljNov = String(obstojeca[3] || "");
       }
       var nova = obstojeca.slice();
+      while (nova.length < GLAVE.Tocke.length) nova.push("");
       nova[3] = varno(ciljNov);
       if (p.naziv !== undefined) nova[4] = varno(String(p.naziv));
       nova[5] = lat; nova[6] = lon;
@@ -459,11 +460,12 @@ function posljiTocko(p) {
       if (p.opomba !== undefined) nova[8] = varno(String(p.opomba));
       nova[9] = "aktivna";
       nova[10] = cilj ? zdaj : obstojeca[10];
+      nova[11] = ""; // točka je spet aktivna - čas umika se pobriše
       sheet.getRange(vrsta, 1, 1, nova.length).setValues([nova]);
       return vrniJson({ status: "success", ver: nova[10], cilj: ciljNov });
     }
     var ver = cilj ? zdaj : "";
-    sheet.appendRow([zdaj, varno(dogodek), id, varno(cilj), varno(String(p.naziv || "Točka")), lat, lon, polmer === null ? "" : polmer, varno(String(p.opomba || "")), "aktivna", ver]);
+    sheet.appendRow([zdaj, varno(dogodek), id, varno(cilj), varno(String(p.naziv || "Točka")), lat, lon, polmer === null ? "" : polmer, varno(String(p.opomba || "")), "aktivna", ver, ""]);
     return vrniJson({ status: "success", ver: ver, cilj: cilj });
   });
 }
@@ -479,7 +481,8 @@ function umakniTocko(p) {
       var podatki = sheet.getRange(2, 1, zadnja - 1, GLAVE.Tocke.length).getValues();
       for (var i = 0; i < podatki.length; i++) {
         if (String(podatki[i][2]) === id && String(podatki[i][1]) === dogodek) {
-          sheet.getRange(i + 2, 10, 1, 2).setValues([["umaknjena", new Date()]]);
+          // Ver (čas zadnjega pošiljanja) ostane; čas umika gre v svoj stolpec - poročilo kaže oboje
+          sheet.getRange(i + 2, 10, 1, 3).setValues([["umaknjena", podatki[i][10], new Date()]]);
           return vrniJson({ status: "success" });
         }
       }
@@ -502,7 +505,7 @@ function pridobiTocke(p) {
     }
     rezultat.push({
       cas: v[i][0], dogodek: v[i][1], id: v[i][2], cilj: v[i][3], naziv: v[i][4],
-      lat: v[i][5], lon: v[i][6], polmer: v[i][7], opomba: v[i][8], status: v[i][9], ver: v[i][10]
+      lat: v[i][5], lon: v[i][6], polmer: v[i][7], opomba: v[i][8], status: v[i][9], ver: v[i][10], umaknjeno: v[i][11] || ""
     });
   }
   return vrniJson({ status: "success", data: rezultat });
@@ -583,7 +586,7 @@ function pripraviListe() {
   Object.keys(GLAVE).forEach(function (ime) {
     var sheet = pridobiSheet(ime);
     sheet.getRange(1, 1, 1, GLAVE[ime].length).setValues([GLAVE[ime]]); // dopolni glavo (npr. stolpec ID)
-    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11], Potrditve: [1], DogodekGesla: [3] }[ime] || [];
+    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3] }[ime] || [];
     casStolpci.forEach(function (c) {
       sheet.getRange(2, c, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
     });

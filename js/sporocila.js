@@ -14,6 +14,7 @@ import { formatirajCas, casVMs } from './cas-pomoc.js';
 import { pridobiSejnoGeslo } from './geslo-dogodka.js';
 import { apiGet } from './api.js';
 import { zabeleziKonecOddajanja } from './enote-register.js';
+import { jeIzkljuceno, nastaviIzkljuceno } from './tisk-izbor.js';
 
 const Zvok = window.EPVZvok;
 const STORAGE_PREBRANA = 'epv2_prebrana_sporocila';
@@ -151,7 +152,8 @@ function izrisiSporocila(sporocila) {
     }
 
     const prebrana = pridobiPrebrana();
-    const prikazana = veljavna.slice(0, 20);
+    const prikazana = veljavna.slice(0, 300);
+    const dogodekIzbran = document.getElementById('select-dogodek')?.value || '';
     let imaSOS = false;
 
     kontejner.innerHTML = prikazana.map((s, idx) => {
@@ -163,6 +165,8 @@ function izrisiSporocila(sporocila) {
         let razredi = 'sporocilo-vrstica';
         if (sos) razredi += ' sos';
         if (jeNovo) razredi += ' novo';
+        const vkljuceno = !jeIzkljuceno(dogodekIzbran, 'sporocilo', sporociloId(s));
+        if (!vkljuceno) razredi += ' izkljuceno';
 
         let okvirSlog;
         if (sos) {
@@ -176,7 +180,7 @@ function izrisiSporocila(sporocila) {
         return `
             <div class="${razredi}" style="${okvirSlog}" data-idx="${idx}" title="Klikni za lokacijo na zemljevidu">
                 <div class="sporocilo-glava">
-                    <span>${sos ? '🆘 ' : ''}${escapeHtml(s.enota)}</span>
+                    <span><input type="checkbox" class="chk-tisk" title="Vključeno v poročilo (tisk)" data-id="${escapeHtml(sporociloId(s))}" ${vkljuceno ? 'checked' : ''}> ${sos ? '🆘 ' : ''}${escapeHtml(s.enota)}</span>
                     <span class="sporocilo-cas">${escapeHtml(kratekCas)}</span>
                 </div>
                 <div class="sporocilo-besedilo">${escapeHtml(s.sporocilo)}</div>
@@ -184,6 +188,14 @@ function izrisiSporocila(sporocila) {
     }).join('');
 
     if (panel) panel.classList.toggle('ima-sos', imaSOS);
+
+    kontejner.querySelectorAll('.chk-tisk').forEach(chk => {
+        chk.addEventListener('click', (e) => e.stopPropagation());
+        chk.addEventListener('change', () => {
+            nastaviIzkljuceno(dogodekIzbran, 'sporocilo', chk.dataset.id, !chk.checked);
+            chk.closest('.sporocilo-vrstica').classList.toggle('izkljuceno', !chk.checked);
+        });
+    });
 
     kontejner.querySelectorAll('.sporocilo-vrstica').forEach(el => {
         const s = prikazana[parseInt(el.dataset.idx, 10)];
