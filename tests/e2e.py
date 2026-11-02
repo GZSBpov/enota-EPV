@@ -1,5 +1,5 @@
-# E2E test V2: Chromium (Playwright) + simulator Apps Script s PRAVO Code_V2.gs + nadomestek za Leaflet.
-# Zagon:  python3 tests-v2/e2e.py
+# E2E test V2: Chromium (Playwright) + simulator Apps Script s PRAVO Code.gs + nadomestek za Leaflet.
+# Zagon:  python3 tests/e2e.py
 import json, os, re, subprocess, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -44,14 +44,14 @@ def vpis(ime, lat, lon, dogodek, acc=10, t=None, sporocilo=None, id_=None):
     if sporocilo: p['sporocilo'] = sporocilo
     return exec_(**{k: v for k, v in p.items() if k != 'geslo'}) if False else json.loads(urllib.request.urlopen(f'{BASE}/exec?' + urllib.parse.urlencode(p), timeout=10).read())
 
-srv = subprocess.Popen(['node', os.path.join(ROOT, 'tests-v2', 'apps-script-mock.js'), str(PORT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+srv = subprocess.Popen(['node', os.path.join(ROOT, 'tests', 'apps-script-mock.js'), str(PORT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 try:
     if not cakaj(lambda: urllib.request.urlopen(f'{BASE}/exec?geslo=EPV2026&akcija=pridobiSeznamDogodkov', timeout=2).status == 200, 10):
         print('Simulator se ni zagnal'); sys.exit(2)
 
-    with open(os.path.join(ROOT, 'js-v2', 'shared-config.js'), encoding='utf-8') as f:
-        konfig = f.read().replace('VSTAVI_URL_SKRIPTE_V2', f'{BASE}/exec')
-    with open(os.path.join(ROOT, 'tests-v2', 'leaflet-stub.js'), encoding='utf-8') as f:
+    with open(os.path.join(ROOT, 'js', 'shared-config.js'), encoding='utf-8') as f:
+        konfig = re.sub(r'window\.GOOGLE_APPS_SCRIPT_URL = "[^"]*";', f'window.GOOGLE_APPS_SCRIPT_URL = "{BASE}/exec";', f.read())
+    with open(os.path.join(ROOT, 'tests', 'leaflet-stub.js'), encoding='utf-8') as f:
         stub = f.read()
 
     SKALIRAJ_INTERVALE = "(() => { const o = window.setInterval; window.setInterval = (f, ms, ...a) => o(f, (ms >= 5000 ? ms / 5 : ms), ...a); })();"
@@ -72,7 +72,7 @@ try:
         def pot_konfig(route):
             route.fulfill(status=200, content_type='application/javascript', body=konfig)
         ctx.route(re.compile(r'^https?://(?!127\.0\.0\.1)'), pot_zunanje)
-        ctx.route(f'{BASE}/js-v2/shared-config.js', pot_konfig)
+        ctx.route('**/js/shared-config.js', pot_konfig)
         return ctx
 
     napake_strani = []
@@ -86,7 +86,7 @@ try:
         # ================= TEREN =================
         ctxF = pripravi_kontekst(browser, geolocation={'latitude': 46.3934, 'longitude': 15.5746, 'accuracy': 20}, permissions=['geolocation'])
         F = ctxF.new_page(); spremljaj(F, 'teren')
-        F.goto(f'{BASE}/terenEPV_V2.html?dogodek=Rogla')
+        F.goto(f'{BASE}/terenEPV.html?dogodek=Rogla')
         pri('teren: ni opozorila o konfiguraciji', not F.is_visible('#konfiguracijaNapaka'))
 
         F.fill('#imeEnote', 'pgd kebelj')
@@ -129,7 +129,7 @@ try:
         ctxH = pripravi_kontekst(browser)
         H = ctxH.new_page(); spremljaj(H, 'stab')
         H.on('dialog', lambda d: d.accept())
-        H.goto(f'{BASE}/mapeEPV_V2.html')
+        H.goto(f'{BASE}/mapeEPV.html')
         H.add_script_tag(content='window.print = function(){};')
         H.fill('#input-geslo', 'EPV2026')
         H.click('#btn-potrdi-geslo')
@@ -141,7 +141,7 @@ try:
         pri('štab: gumb za zvok', H.is_visible('#btn-zvok'))
 
         # ----- čas: poletni in zimski čas -----
-        t_zimski = H.evaluate("import('/js-v2/cas-pomoc.js').then(m => [m.formatirajCas('2026-11-02T00:30:00.000Z'), m.formatirajCas('2026-07-12T10:00:00.000Z'), m.formatirajCas('2026-03-29T00:59:00.000Z'), m.formatirajCas('2026-03-29T01:01:00.000Z'), m.formatirajCas('2026-11-02T00:30:00.000Z', true)])")
+        t_zimski = H.evaluate("import('/js/cas-pomoc.js').then(m => [m.formatirajCas('2026-11-02T00:30:00.000Z'), m.formatirajCas('2026-07-12T10:00:00.000Z'), m.formatirajCas('2026-03-29T00:59:00.000Z'), m.formatirajCas('2026-03-29T01:01:00.000Z'), m.formatirajCas('2026-11-02T00:30:00.000Z', true)])")
         pri('čas: zimski čas (UTC+1)', t_zimski[0] == '2026-11-02 01:30:00', t_zimski)
         pri('čas: poletni čas (UTC+2)', t_zimski[1] == '2026-07-12 12:00:00', t_zimski)
         pri('čas: prehod na poletni čas', t_zimski[2] == '2026-03-29 01:59:00' and t_zimski[3] == '2026-03-29 03:01:00', t_zimski)
@@ -229,7 +229,7 @@ try:
         # ----- SOS brez GPS (nov kontekst brez dovoljenja za lokacijo) -----
         ctxN = pripravi_kontekst(browser)
         N = ctxN.new_page(); spremljaj(N, 'teren-brez-gps')
-        N.goto(f'{BASE}/terenEPV_V2.html?dogodek=Rogla')
+        N.goto(f'{BASE}/terenEPV.html?dogodek=Rogla')
         N.fill('#imeEnote', 'Brez GPS')
         N.dispatch_event('#imeEnote', 'change')
         N.click('button[data-sporocilo="SOS"]')
@@ -257,7 +257,26 @@ try:
             [v[3] for v in sheet('Sporocila')[1:]][-4:])
         pri('zaključek: geslo dogodka shranjeno', any(v[0] == 'Rogla' for v in sheet('DogodekGesla')[1:]))
 
-        for c in (ctxF, ctxH, ctxN):
+        # ----- stara stran V1/ mora z novo skripto in istim Sheetom še vedno delovati (prehodno obdobje) -----
+        ctxV = pripravi_kontekst(browser, geolocation={'latitude': 46.30, 'longitude': 15.50, 'accuracy': 20}, permissions=['geolocation'])
+        V = ctxV.new_page(); spremljaj(V, 'V1-teren')
+        V.goto(f'{BASE}/V1/terenEPV.html?dogodek=StaraStran')
+        V.fill('#imeEnote', 'Stara Enota')
+        V.click('#gumbOddaja')
+        pri('V1 teren: pozicija prispe v isti Sheet', cakaj(lambda: any('Stara Enota' in str(v[1]) and v[5] == 'StaraStran' for v in sheet('Lokacije')[1:]), 20), sheet('Lokacije')[-2:])
+        # (sporočila stare strani niso preizkušena v brskalniku: njen getCurrentPosition v Playwrightovi emulaciji GPS ne dobi svežega
+        #  položaja in poteče - to je lastnost stare strani, ki jo V2 odpravlja; isti klic strežniku preizkuša backend.test.js)
+        ctxVH = pripravi_kontekst(browser)
+        VH = ctxVH.new_page(); spremljaj(VH, 'V1-stab')
+        VH.on('dialog', lambda d: d.accept())
+        VH.goto(f'{BASE}/V1/mapeEPV.html')
+        VH.fill('#input-geslo', 'EPV2026')
+        VH.click('#btn-potrdi-geslo')
+        pri('V1 štab: seznam dogodkov (nizi) deluje', cakaj(lambda: VH.evaluate("Array.from(document.querySelectorAll('#select-dogodek option')).some(o => o.value === 'StaraStran')"), 15))
+        VH.select_option('#select-dogodek', 'StaraStran')
+        pri('V1 štab: enota se pokaže', cakaj(lambda: 'Stara Enota' in VH.inner_text('#seznamEnotGumbi'), 15), VH.inner_text('#seznamEnotGumbi'))
+
+        for c in (ctxF, ctxH, ctxN, ctxV, ctxVH):
             c.close()
         browser.close()
 

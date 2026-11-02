@@ -1,5 +1,5 @@
-// Samodejni testi za js-v2/koordinate.js  (zagon: node tests-v2/koordinate.test.js)
-const K = require('../js-v2/koordinate.js');
+// Samodejni testi za js/koordinate.js  (zagon: node tests/koordinate.test.js)
+const K = require('../js/koordinate.js');
 let ok = 0, fail = 0;
 function pri(ime, pogoj, podrobnost) {
     if (pogoj) { ok++; } else { fail++; console.log('NAPAKA:', ime, podrobnost !== undefined ? JSON.stringify(podrobnost) : ''); }

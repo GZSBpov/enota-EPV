@@ -15,8 +15,12 @@
 //  - FILTRIRANJE PO DOGODKU: pridobiLokacije vrne samo vrstice izbranega dogodka (in samo novejše od "od").
 //  - Besedila, ki se začnejo z = + - @, se zapišejo kot besedilo (ne kot formula v Sheetu).
 //
-// NAMESTITEV: glej README_V2.md (kopija Sheeta -> Razširitve -> Apps Script -> prilepi to kodo ->
-// zaženi pripraviListe() -> Uvedi kot spletno aplikacijo: izvaja kot jaz, dostop: vsi).
+// ZGODOVINA IN STARA STRAN (V1/): koda je združljiva s starim odjemalcem - privzeti klic (brez "akcija") vrne
+// celoten list Lokacije, seznam dogodkov je brez parametra "oblika" seznam nizov, vpis lokacij je enak.
+// Obstoječi Sheet in vsi stari podatki ostanejo; novi stolpci (ID) se dodajo na desni.
+//
+// NAMESTITEV: glej README.md (varnostna kopija Sheeta -> Razširitve -> Apps Script -> prilepi to kodo ->
+// zaženi pripraviListe() -> Uvedi -> Upravljanje uvedb -> Uredi -> Nova različica; URL ostane enak).
 // ==========================================================================
 
 var PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
@@ -159,7 +163,7 @@ function doGet(e) {
   if (gesloNapaka) return napaka(gesloNapaka);
 
   switch (p.akcija) {
-    case "pridobiSeznamDogodkov": return pridobiSeznamDogodkov();
+    case "pridobiSeznamDogodkov": return pridobiSeznamDogodkov(p);
     case "pridobiLokacije": return pridobiLokacije(p);
     case "pridobiImenaEnot": return pridobiImenaEnot(p);
     case "pridobiDogodke": return pridobiDogodke(p);
@@ -177,8 +181,18 @@ function doGet(e) {
       var r = preveriZascitoDogodka(p.dogodek || "", p.gesloHash || "");
       return vrniJson({ status: "success", zascitena: r.zascitena, ok: r.ok });
     }
+    case undefined:
+    case "":
+      return vsaLokacijeZaStaroStran();
     default: return napaka("Neznana akcija.");
   }
+}
+
+/** Združljivost s staro stranjo (V1/): celoten list Lokacije kot tabela (glava + vrstice), kot doslej. */
+function vsaLokacijeZaStaroStran() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lokacije");
+  if (!sheet) return vrniJson({ status: "success", data: [] });
+  return vrniJson({ status: "success", data: sheet.getDataRange().getValues() });
 }
 
 function doPost(e) {
@@ -233,7 +247,7 @@ function vpisSporocilaBrezLokacije(p) {
   });
 }
 
-function pridobiSeznamDogodkov() {
+function pridobiSeznamDogodkov(p) {
   var zadnji = {};
   function zabelezi(ime, ms) {
     if (!ime) return;
@@ -243,6 +257,8 @@ function pridobiSeznamDogodkov() {
   vrstice("Dogodki").forEach(function (v) { zabelezi(v[0], 0); });
   vrstice("Lokacije").forEach(function (v) { zabelezi(v[5], vMs(v[0])); });
   vrstice("Sporocila").forEach(function (v) { zabelezi(v[2], vMs(v[0])); });
+  // stari odjemalec (V1/) pričakuje samo imena; nov doda oblika=objekt in dobi tudi čas zadnje dejavnosti
+  if (!p || p.oblika !== "objekt") return vrniJson({ status: "success", data: Object.keys(zadnji) });
   var seznam = Object.keys(zadnji).map(function (ime) {
     return { ime: ime, zadnji: zadnji[ime] ? new Date(zadnji[ime]) : null };
   });
@@ -547,16 +563,30 @@ function shraniGesloDogodka(p) {
 
 // ---------- enkratna priprava (zaženi ročno v urejevalniku Apps Script) ----------
 
-/** Ustvari vse liste z glavami in nastavi časovni pas Sheeta ter obliko stolpcev s časom. */
+/**
+ * Pripravi liste za V2. Varno za obstoječi Sheet z zgodovino:
+ *  - obstoječi podatki se ne spreminjajo, dodajo se samo manjkajoči listi in glave (stolpec ID na desni)
+ *  - časovni pas tabele se spremeni SAMO, če v listu Lokacije še ni podatkov. Pri tabeli z zgodovino bi
+ *    sprememba pasu premaknila čase že zapisanih vrstic - pas preveri ročno (Datoteka -> Nastavitve -> Časovni pas;
+ *    pričakovan je "Ljubljana"). Stare vrstice so bile zapisane v poletnem času, zato so v tem pasu pravilne.
+ */
 function pripraviListe() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.setSpreadsheetTimeZone(CASOVNI_PAS);
+  var lokacije = ss.getSheetByName("Lokacije");
+  var imaZgodovino = lokacije && lokacije.getLastRow() > 1;
+  if (!imaZgodovino) {
+    ss.setSpreadsheetTimeZone(CASOVNI_PAS);
+  } else if (ss.getSpreadsheetTimeZone() !== CASOVNI_PAS) {
+    Logger.log("POZOR: časovni pas tabele je " + ss.getSpreadsheetTimeZone() + ", ne " + CASOVNI_PAS +
+      ". Ker tabela vsebuje zgodovino, ga skripta NI spremenila - preveri ročno, da se čas stare zgodovine ne premakne.");
+  }
   Object.keys(GLAVE).forEach(function (ime) {
     var sheet = pridobiSheet(ime);
+    sheet.getRange(1, 1, 1, GLAVE[ime].length).setValues([GLAVE[ime]]); // dopolni glavo (npr. stolpec ID)
     var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11], Potrditve: [1], DogodekGesla: [3] }[ime] || [];
     casStolpci.forEach(function (c) {
       sheet.getRange(2, c, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
     });
   });
-  Logger.log("Liste pripravljene, časovni pas: " + ss.getSpreadsheetTimeZone());
+  Logger.log("Liste pripravljene. Časovni pas tabele: " + ss.getSpreadsheetTimeZone());
 }

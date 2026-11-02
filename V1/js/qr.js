@@ -25,7 +25,7 @@ export function prikaziQRModal() {
     }
 
     // Sestavimo celoten URL do terenEPV.html
-    const bazniUrl = TEREN_EPV_URL || "https://gzsbpov.github.io/enota-EPV/terenEPV_V2.html";
+    const bazniUrl = TEREN_EPV_URL || "https://gzsbpov.github.io/enota-EPV/terenEPV.html";
     const terenskiUrl = `${bazniUrl}?dogodek=${encodeURIComponent(dogodekIme)}`;
 
     posodobiPovezaveZaDeljenje(terenskiUrl, dogodekIme);
@@ -58,7 +58,7 @@ export function prikaziQRModal() {
  * ko skeniranje QR kode ni mogoče (npr. enota nima druge naprave ob sebi za skeniranje).
  */
 function posodobiPovezaveZaDeljenje(terenskiUrl, dogodekIme) {
-    const besediloDeljenje = `Povezava za EPV teren V2 (${dogodekIme}): ${terenskiUrl}`;
+    const besediloDeljenje = `Povezava za EPV teren (${dogodekIme}): ${terenskiUrl}`;
 
     const direktnaEl = document.getElementById('qr-direktna-povezava');
     if (direktnaEl) {

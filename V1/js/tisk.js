@@ -5,11 +5,10 @@
 import { GOOGLE_APPS_SCRIPT_URL, SLOVAR_BARV } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
 import { pridobiTrenutnoVidneEnote } from './units.js';
-import { formatirajCas as formatCas, casVMs } from './cas-pomoc.js';
-import { apiGet } from './api.js';
+import { formatirajCas as formatCas } from './cas-pomoc.js';
 import { pridobiSejnoGeslo, vprasajZaGesloDogodka, ponastaviGesloDogodka } from './geslo-dogodka.js';
 
-const STORAGE_STEVILKA_TISKA = 'epv2_stevilka_tiska';
+const STORAGE_STEVILKA_TISKA = 'epv_stevilka_tiska';
 
 function escapeHtml(niz) {
     const el = document.createElement('div');
@@ -29,7 +28,7 @@ function imeIzPolnegaImena(polnoIme) {
  */
 function kljucEnoteIzPolnegaImena(polnoIme) {
     const deli = (polnoIme || '').split(':');
-    return `${(deli[0] || '').toUpperCase()}:${(deli[1] || polnoIme || '').trim().toLowerCase()}`;
+    return `${deli[0] || ''}:${deli[1] || polnoIme || ''}`;
 }
 
 /**
@@ -80,7 +79,6 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     // ne vseh, ki so kdajkoli poročale za ta dogodek.
     const vidneEnote = pridobiTrenutnoVidneEnote();
     const vidniIdji = new Set(vidneEnote.map(e => e.id));
-    const imeZaPrikaz = new Map(vidneEnote.map(e => [e.id, e.ime]));
     const clanovPoEnoti = new Map(vidneEnote.map(e => [e.id, e.clanovStevilo || 0]));
     const vozilPoEnoti = new Map(vidneEnote.map(e => [e.id, e.vozilaStevilo || 0]));
 
@@ -128,38 +126,34 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         return;
     }
 
-    let tockeRes = { data: [] };
-    let potrditveRes = { data: [] };
     try {
-        [lokacijeRes, sporocilaStabRes, tockeRes, potrditveRes] = await Promise.all([
-            apiGet({ akcija: 'pridobiLokacije', dogodek: dogodekId, kazalec: 0 }),
-            apiGet({ akcija: 'pridobiSporocilaStab', dogodek: dogodekId }),
-            apiGet({ akcija: 'pridobiTocke', dogodek: dogodekId }),
-            apiGet({ akcija: 'pridobiPotrditve', dogodek: dogodekId })
+        [lokacijeRes, sporocilaStabRes] = await Promise.all([
+            fetch(`${GOOGLE_APPS_SCRIPT_URL}?geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()),
+            fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocilaStab&dogodek=${encodeURIComponent(dogodekId)}&geslo=EPV2026`, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ data: [] }))
         ]);
-        if (lokacijeRes.status !== 'success') throw new Error(lokacijeRes.message || 'Lokacij ni mogoče prebrati');
     } catch (err) {
         console.error('Napaka pri pripravi podatkov za tiskanje:', err);
         if (tabelaEl) tabelaEl.innerHTML = '<p>Napaka pri pripravi podatkov za tiskanje.</p>';
         return;
     }
 
-    // 1. Prva/zadnja prijava vsake TRENUTNO ODKLJUKANE enote na tem dogodku (časi so pravi trenutki - primerjamo v ms)
-    const enote = new Map(); // ključ enote -> { prva, zadnja, prvaMs, zadnjaMs }
+    // 1. Prva/zadnja prijava vsake TRENUTNO ODKLJUKANE enote na tem dogodku
+    const vrstice = (lokacijeRes.data || []).slice(1); // brez glave
+    const enote = new Map(); // polnoIme -> { prva, zadnja }
 
-    (lokacijeRes.data || []).forEach(v => {
-        if (!v.enota) return;
-        const kljucEnote = kljucEnoteIzPolnegaImena(v.enota);
+    vrstice.forEach(v => {
+        const [cas, enotaPolno, lat, lon, acc, dId] = v;
+        if (!enotaPolno || dId !== dogodekId) return;
+
+        const kljucEnote = kljucEnoteIzPolnegaImena(enotaPolno);
         if (!vidniIdji.has(kljucEnote)) return; // samo trenutno odkljukane enote
-        const ms = casVMs(v.cas);
-        if (isNaN(ms)) return;
 
         const obstojeca = enote.get(kljucEnote);
         if (!obstojeca) {
-            enote.set(kljucEnote, { prva: v.cas, zadnja: v.cas, prvaMs: ms, zadnjaMs: ms });
+            enote.set(kljucEnote, { prva: cas, zadnja: cas });
         } else {
-            if (ms < obstojeca.prvaMs) { obstojeca.prva = v.cas; obstojeca.prvaMs = ms; }
-            if (ms > obstojeca.zadnjaMs) { obstojeca.zadnja = v.cas; obstojeca.zadnjaMs = ms; }
+            if (cas < obstojeca.prva) obstojeca.prva = cas;
+            if (cas > obstojeca.zadnja) obstojeca.zadnja = cas;
         }
     });
 
@@ -173,14 +167,14 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         if ((s.sporocilo || '').toLowerCase().includes('konec oddajanja')) {
             const kljucEnote = kljucEnoteIzPolnegaImena(s.enota);
             const obstojeci = koncOddaje.get(kljucEnote);
-            if (!obstojeci || casVMs(s.cas) > casVMs(obstojeci)) koncOddaje.set(kljucEnote, s.cas);
+            if (!obstojeci || s.cas > obstojeci) koncOddaje.set(kljucEnote, s.cas);
         }
     });
 
     // "Konec intervencije" - zaključek celotnega dogodka (gumb "🏁 Zaključi intervencijo")
     const zakljucki = sporocila
         .filter(s => (s.sporocilo || '').toLowerCase().includes('konec intervencije'))
-        .sort((a, b) => casVMs(a.cas) - casVMs(b.cas));
+        .sort((a, b) => (a.cas || '').localeCompare(b.cas || ''));
     const zakljucek = zakljucki.length ? zakljucki[zakljucki.length - 1] : null;
 
     const dodelitve = pridobiDodeljitve();
@@ -206,9 +200,9 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         </tr></thead><tbody>`;
 
         Array.from(enote.entries())
-            .sort((a, b) => a[1].prvaMs - b[1].prvaMs)
+            .sort((a, b) => (a[1].prva || '').localeCompare(b[1].prva || ''))
             .forEach(([kljucEnote, info]) => {
-                const ime = imeZaPrikaz.get(kljucEnote) || imeIzPolnegaImena(kljucEnote);
+                const ime = imeIzPolnegaImena(kljucEnote);
                 const koncCas = koncOddaje.get(kljucEnote);
                 const dodeljeno = dodelitve.get(ime.trim().toLowerCase());
                 const dodeljenoBesedilo = dodeljeno
@@ -264,47 +258,17 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
         html += '<p>Ni sporočil iz štaba za ta dogodek.</p>';
     } else {
         html += `<table class="tisk-tabela"><thead><tr>
-            <th>Čas</th><th>Cilj</th><th>Sporočilo</th><th>Potrdili prejem</th>
+            <th>Čas</th><th>Cilj</th><th>Sporočilo</th>
         </tr></thead><tbody>`;
 
-        const potrditveStab = (potrditveRes.data || []).filter(p => p.tip === 'sporocilo');
-        sporocilaStab.slice().sort((a, b) => casVMs(b.cas) - casVMs(a.cas)).forEach(s => {
-            const prejeli = potrditveStab.filter(p => p.ref === s.id);
+        sporocilaStab.slice().reverse().forEach(s => {
             html += `<tr>
                 <td>${escapeHtml(formatCas(s.cas))}</td>
                 <td>${escapeHtml(s.cilj)}</td>
                 <td>${escapeHtml(s.sporocilo)}</td>
-                <td>${prejeli.length ? prejeli.map(p => escapeHtml(p.enota) + ' (' + escapeHtml(formatCas(p.cas, true)) + ')').join('<br>') : '-'}</td>
             </tr>`;
         });
 
-        html += '</tbody></table>';
-    }
-
-    // --- Točke iz koordinat (štab -> teren) ---
-    const tocke = (tockeRes.data || []).filter(t => t && t.status !== 'umaknjena');
-    const potrditve = (potrditveRes.data || []);
-    html += `<h2>Točke iz koordinat (${tocke.length})</h2>`;
-    if (tocke.length === 0) {
-        html += '<p>Ni točk za ta dogodek.</p>';
-    } else {
-        const K = window.EPVKoordinate;
-        html += `<table class="tisk-tabela"><thead><tr>
-            <th>Naziv</th><th>Koordinate</th><th>Opomba</th><th>Poslano</th><th>Potrdili prejem</th>
-        </tr></thead><tbody>`;
-        tocke.forEach(t => {
-            const lat = parseFloat(t.lat), lon = parseFloat(t.lon);
-            const f = (K && !isNaN(lat) && !isNaN(lon)) ? K.oblikuj(lat, lon) : null;
-            const prejeli = potrditve.filter(p => p.tip === 'tocka' && p.ref === `${t.id}|${t.ver}`);
-            const cilj = !t.cilj ? 'samo štab' : (String(t.cilj).toLowerCase() === 'vsi' ? 'vse enote' : String(t.cilj).split('|').join(', '));
-            html += `<tr>
-                <td>${escapeHtml(t.naziv)}</td>
-                <td>${f ? escapeHtml(f.decimalno) + '<br>D96/TM: ' + escapeHtml(f.d96) : '-'}${t.polmer ? '<br>±' + escapeHtml(Math.round(t.polmer)) + ' m' : ''}</td>
-                <td>${escapeHtml(t.opomba || '')}</td>
-                <td>${escapeHtml(cilj)}${t.ver ? '<br>' + escapeHtml(formatCas(t.ver)) : ''}</td>
-                <td>${prejeli.length ? prejeli.map(p => escapeHtml(p.enota) + ' (' + escapeHtml(formatCas(p.cas, true)) + ')').join('<br>') : '-'}</td>
-            </tr>`;
-        });
         html += '</tbody></table>';
     }
 
@@ -335,7 +299,7 @@ export async function pripraviInNatisni() {
     const stevilkaTiska = pridobiSteviloTiska(dogodekId);
 
     if (naslovEl) {
-        naslovEl.textContent = `EPV V2 - Poročilo intervencije: ${dogodekId} (izpis št. ${stevilkaTiska})`;
+        naslovEl.textContent = `EPV - Poročilo intervencije: ${dogodekId} (izpis št. ${stevilkaTiska})`;
     }
     // Naslov strani (uporabijo ga brskalniki kot privzeto ime datoteke pri "Natisni v PDF")
     document.title = `EPV - ${dogodekId} - izpis ${stevilkaTiska}`;

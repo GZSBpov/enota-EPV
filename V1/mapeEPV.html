@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPV V2 - Enota za Podporo Vodenju</title>
+    <title>EPV - Enota za Podporo Vodenju</title>
 
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -17,24 +17,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <!-- Stil -->
-    <link rel="stylesheet" href="style-v2.css">
+    <link rel="stylesheet" href="style.css">
 
-    <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL), zvok in koordinate (navadne skripte, pred modulom) -->
-    <script src="js-v2/shared-config.js"></script>
-    <script src="js-v2/zvok.js"></script>
-    <script src="js-v2/koordinate.js"></script>
+    <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL) -->
+    <script src="js/shared-config.js"></script>
 </head>
 <body>
-
-    <div id="konfiguracija-opozorilo" style="display:none; position:fixed; top:0; left:0; right:0; z-index:100000; background:#b91c1c; color:#fff; padding:10px; text-align:center; font-weight:bold;">
-        ⚠️ Naslov skripte V2 ni nastavljen. Odpri js-v2/shared-config.js in vstavi URL spletne aplikacije Apps Script (konča se z /exec).
-    </div>
-
-    <!-- SOS pasica: vidna in sirena zveni, dokler štab ne potrdi -->
-    <div id="sos-pasica" class="sos-pasica" style="display:none;" title="Klikni za lokacijo in utišaj alarm">
-        <span class="sos-besedilo"></span>
-        <button type="button" id="btn-utisaj-sos-pasica" tabindex="-1">🔕 Utišaj</button>
-    </div>
 
     <!-- MODALNO OKNO ZA GESLO -->
     <div id="vstopno-geslo-modal" class="modal-overlay">
@@ -47,35 +35,10 @@
         </div>
     </div>
 
-    <!-- MODALNO OKNO: TOČKA IZ KOORDINAT -->
-    <div id="tocka-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-vsebina tocka-modal-vsebina">
-            <h3>🎯 Točka iz koordinat</h3>
-            <div id="tocka-dogodek-opozorilo" class="tocka-opozorilo" style="display:none;">⚠️ Najprej izberi ali ustvari dogodek - točke se shranjujejo pod dogodek.</div>
-            <label for="tocka-vnos">Koordinate (poljuben zapis):</label>
-            <textarea id="tocka-vnos" rows="2" placeholder="46.3934, 15.5746" autocomplete="off" spellcheck="false"></textarea>
-            <div id="tocka-predogled" class="tocka-predogled"></div>
-            <div class="tocka-vrstica-polj">
-                <div><label for="tocka-naziv">Naziv:</label><input type="text" id="tocka-naziv" placeholder="npr. Klic - oseba"></div>
-                <div style="max-width:110px;"><label for="tocka-polmer">Negotovost (m):</label><input type="number" id="tocka-polmer" min="0" step="10" placeholder="npr. 200"></div>
-            </div>
-            <label for="tocka-opomba">Opomba (neobvezno):</label>
-            <input type="text" id="tocka-opomba" placeholder="npr. klicatelj je slišal vpitje">
-            <label for="tocka-cilj">Komu poslati:</label>
-            <select id="tocka-cilj"></select>
-            <div id="tocka-status" class="tocka-status"></div>
-            <div class="tocka-gumbi">
-                <button type="button" id="btn-tocka-prikazi" class="tocka-gumb-sekundaren" disabled>📍 Samo označi</button>
-                <button type="button" id="btn-tocka-poslji" class="tocka-gumb-primaren" disabled>📤 Označi in pošlji</button>
-            </div>
-            <button type="button" id="btn-tocka-zapri" class="tocka-gumb-zapri">Zapri</button>
-        </div>
-    </div>
-
     <!-- MODALNO OKNO ZA QR KODO -->
     <div id="qr-modal" class="modal-overlay" style="display: none;">
         <div class="modal-vsebina card-fullscreen-target" id="qr-card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-between; align-items:center;">
                 <h3>Povezava za Teren (terenEPV)</h3>
                 <button class="btn-fullscreen" data-target="qr-card" title="Celozaslonski prikaz">⛶</button>
             </div>
@@ -111,13 +74,8 @@
         <!-- 2. STRANSKA VRSTICA NA DESNI STRANI (ZADNJA TRETJINA) -->
         <aside id="sidebar">
             <header>
-                <h2>Enotni nadzor EPV <span class="verzija-oznaka">V2</span></h2>
+                <h2>Enotni nadzor EPV</h2>
                 <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Pregled enot in sektorjev</p>
-                <div class="glava-vrstica">
-                    <span id="povezava-status" class="povezava-ok">● Povezano</span>
-                    <button type="button" id="btn-zvok" class="btn-zvok">🔔 Zvok</button>
-                    <button type="button" id="btn-utisaj-sos" class="btn-utisaj-sos" style="display:none;">🔕 Utišaj alarm</button>
-                </div>
             </header>
 
             <!-- Izbira in shranjevanje dogodkov -->
@@ -129,7 +87,6 @@
                     </select>
                     <button id="btn-osvezi-dogodke" title="Osveži seznam iz Driva">🔄</button>
                 </div>
-                <label class="stari-dogodki-oznaka"><input type="checkbox" id="chk-stari-dogodki"> pokaži tudi dogodke, starejše od 30 dni</label>
                 <input type="text" id="input-ime-dogodka" placeholder="Naziv nove intervencije..." style="width: 100%; margin-top: 6px; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
                 <button id="btn-zakljuci-dogodek" style="width: 100%; margin-top: 6px; padding: 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🏁 Zaključi intervencijo</button>
             </div>
@@ -139,7 +96,6 @@
                 <button id="btn-shrani" class="btn btn-primaren">💾 Shrani</button>
                 <button id="btn-tisk" class="btn btn-sekundaren">🖨️ Tisk</button>
                 <button id="btn-qr-teren" class="btn" style="background-color: #8b5cf6; color: white;">📱 QR Teren</button>
-                <button id="btn-tocka-odpri" class="btn btn-tocka">🎯 Točka iz koordinat</button>
             </div>
 
             <!-- Sporočila s terena (SOS, najdena oseba/žival, ...) -->
@@ -163,14 +119,7 @@
                     <input type="text" id="stabSporociloText" placeholder="Vpiši sporočilo ...">
                     <button id="btnPosljiStabSporocilo">📤 Pošlji</button>
                     <div id="stabSporociloStatus"></div>
-                    <div id="stabLog" class="stab-log"></div>
                 </div>
-            </div>
-
-            <!-- Točke iz koordinat -->
-            <div id="tocke-panel" class="tocke-panel">
-                <div class="panel-glava"><span>🎯 Točke</span></div>
-                <div id="tocke-seznam"></div>
             </div>
 
             <!-- OBS Video Predvajalnik v živo -->
@@ -204,6 +153,6 @@
         <div id="print-tabela"></div>
     </div>
 
-    <script type="module" src="js-v2/app.js"></script>
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>

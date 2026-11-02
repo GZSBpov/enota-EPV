@@ -1,5 +1,5 @@
-// Simulator Google Apps Script okolja: naloži PRAVO apps-script/Code_V2.gs in jo požene nad
-// pomnilniškim "Sheetom". Uporabljajo ga tests-v2/backend.test.js in tests-v2/e2e.py.
+// Simulator Google Apps Script okolja: naloži PRAVO apps-script/Code.gs in jo požene nad
+// pomnilniškim "Sheetom". Uporabljajo ga tests/backend.test.js in tests/e2e.py.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -90,8 +90,8 @@ function ustvari(opcije) {
         Date: Date, JSON: JSON, Math: Math, Object: Object, String: String, parseFloat: parseFloat, isNaN: isNaN, Array: Array
     };
     vm.createContext(sandbox);
-    const koda = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code_V2.gs'), 'utf8');
-    vm.runInContext(koda, sandbox, { filename: 'Code_V2.gs' });
+    const koda = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+    vm.runInContext(koda, sandbox, { filename: 'Code.gs' });
 
     function vJson(izhod) { return JSON.parse(izhod.getContent()); }
 

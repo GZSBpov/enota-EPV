@@ -1,4 +1,4 @@
-// Testi strežniške skripte Code_V2.gs (zagon: node tests-v2/backend.test.js)
+// Testi strežniške skripte Code.gs (zagon: node tests/backend.test.js)
 const { ustvari } = require('./apps-script-mock.js');
 let ok = 0, fail = 0;
 function pri(ime, pogoj, podrobnost) { if (pogoj) ok++; else { fail++; console.log('NAPAKA:', ime, podrobnost !== undefined ? JSON.stringify(podrobnost) : ''); } }
@@ -50,7 +50,7 @@ m.sheeti.Sporocila.vrstice.pop(); // vrni stanje za naslednje teste
 
 // Seznam dogodkov in lokacije po dogodku
 m.get({ enota: 'GASILEC:Kebelj:3:0', lat: '46.5', lon: '15.6', dogodek: 'Vaja', id: 'v1' });
-r = g({ akcija: 'pridobiSeznamDogodkov' });
+r = g({ akcija: 'pridobiSeznamDogodkov', oblika: 'objekt' });
 pri('seznam dogodkov vsebuje oba', r.data.map(d => d.ime).sort().join() === '+cmd,Rogla,Vaja'.split(',').sort().join(), r);
 pri('seznam ima zadnji čas', r.data.every(d => d.zadnji));
 r = g({ akcija: 'pridobiLokacije', dogodek: 'Rogla' });
@@ -82,6 +82,12 @@ r = g({ akcija: 'pridobiSporocilaStab', dogodek: 'Rogla', cilj: 'oplotnica' });
 pri('štab filter po cilju', r.data.length === 2 && r.data.every(x => x.id && x.cas), r);
 pri('štab brez filtra vse', g({ akcija: 'pridobiSporocilaStab', dogodek: 'Rogla' }).data.length === 3);
 pri('štab manjka param', g({ akcija: 'posljiSporociloStab', dogodek: 'Rogla', cilj: '', sporocilo: 'x' }).status === 'error');
+
+// Združljivost s staro stranjo (V1/)
+r = g({ akcija: 'pridobiSeznamDogodkov' });
+pri('stari odjemalec: seznam dogodkov so nizi', r.data.length >= 2 && r.data.every(d => typeof d === 'string'), r.data);
+r = m.get({ geslo: 'EPV2026' });
+pri('stari odjemalec: privzeti klic vrne celoten list', Array.isArray(r.data) && r.data.length === m.sheeti.Lokacije.vrstice.length && r.data[0][0] === 'Čas', r.data && r.data[0]);
 
 // Točke
 r = g({ akcija: 'posljiTocko', dogodek: 'Rogla', id: 't1', lat: '46.4', lon: '15.58', naziv: 'Klic osebe', polmer: '200', opomba: 'oseba v gozdu', cilj: 'Oplotnica' });
@@ -139,6 +145,23 @@ pri('prepis gesla ne podvaja', m.sheeti.DogodekGesla.vrstice.length === 2);
 // Zaklep
 const m2 = ustvari({ zakleni: true }); m2.pripravi();
 pri('zasedeno ob zaklepu', m2.get({ enota: 'A:B:1:0', lat: '46', lon: '15', id: 'q1' }).status === 'error');
+
+
+// pripraviListe na tabeli z zgodovino ne spremeni časovnega pasu
+{
+  const h = ustvari(); h.pripravi();
+  h.get({ enota: 'GASILEC:Stara:1:0', lat: '46', lon: '15', dogodek: 'Zgodovina', id: 'h1' });
+  h.ss.setSpreadsheetTimeZone('Etc/GMT-2');
+  h.pripravi();
+  console.log('Časovni pas po pripraviListe na tabeli z zgodovino:', h.ss.getSpreadsheetTimeZone());
+  if (h.ss.getSpreadsheetTimeZone() !== 'Etc/GMT-2') { console.log('NAPAKA: časovni pas je bil spremenjen'); process.exit(1); }
+  const novo = ustvari(); novo.pripravi();
+  if (novo.ss.getSpreadsheetTimeZone() !== 'Europe/Ljubljana') { console.log('NAPAKA: prazna tabela bi morala dobiti Ljubljana'); process.exit(1); }
+  // stara glava z 6 stolpci se dopolni
+  const st = ustvari(); st.ss.insertSheet('Lokacije').appendRow(['ČAS', 'ENOTA', 'Latitude', 'Longitude', 'Natančnost', 'Dogodek']);
+  st.sheeti.Lokacije.appendRow(['x']); st.pripravi();
+  if (st.sheeti.Lokacije.vrstice[0].length !== 7 || st.sheeti.Lokacije.vrstice[0][6] !== 'ID') { console.log('NAPAKA: glava ni dopolnjena', st.sheeti.Lokacije.vrstice[0]); process.exit(1); }
+}
 
 console.log('Strežnik: ' + ok + ' uspešnih, ' + fail + ' napak.');
 process.exit(fail ? 1 : 0);

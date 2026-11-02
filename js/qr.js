@@ -58,7 +58,7 @@ export function prikaziQRModal() {
  * ko skeniranje QR kode ni mogoče (npr. enota nima druge naprave ob sebi za skeniranje).
  */
 function posodobiPovezaveZaDeljenje(terenskiUrl, dogodekIme) {
-    const besediloDeljenje = `Povezava za EPV teren (${dogodekIme}): ${terenskiUrl}`;
+    const besediloDeljenje = `Povezava za EPV teren V2 (${dogodekIme}): ${terenskiUrl}`;
 
     const direktnaEl = document.getElementById('qr-direktna-povezava');
     if (direktnaEl) {

@@ -1,12 +1,16 @@
 import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, posodobiOznakoSektorja, pridobiGeoJsonSektorjev, map } from './map.js';
-import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE } from './config.js';
+import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE, STORAGE_STARI_DOGODKI, DOGODKI_PRIKAZ_DNI } from './config.js';
+import { apiGet, novId } from './api.js';
+import { casVMs } from './cas-pomoc.js';
+import { ponastaviTocke, osveziTocke } from './tocke.js';
+import { osveziStabLog } from './stab-sporocila.js';
 import { osveziLokacijeEnot } from './units.js';
-import { naloziSporocila } from './sporocila.js';
+import { naloziSporocila, ponastaviSporocila } from './sporocila.js';
 import { pridobiSejnoGeslo, vprasajZaGesloDogodka, generirajGesloDogodka, sha256Hex, shraniGesloDogodkaNaStreznik, shraniSejnoGeslo, ponastaviGesloDogodka } from './geslo-dogodka.js';
 
 // Lokalna varnostna kopija dogodkov, ker Google Apps Script ni vedno dosegljiv.
 // Dogodek je identificiran po IMENU (tako ga hrani tudi Apps Script - glej list "Dogodki").
-const STORAGE_LOKALNI_DOGODKI = 'epv_lokalni_dogodki_v2';
+const STORAGE_LOKALNI_DOGODKI = 'epv2_lokalni_dogodki';
 
 function nalozitLokalniPredpomnilnik() {
     try {
@@ -143,40 +147,60 @@ async function naloziSektorjeDogodka(imeDogodka) {
     return true;
 }
 
+/** Po zamenjavi dogodka takoj osveži enote, sporočila, točke in dnevnik poslanih sporočil. */
+function osveziVseZaDogodek() {
+    osveziLokacijeEnot();
+    naloziSporocila();
+    osveziTocke();
+    osveziStabLog();
+}
+
 export async function naloziSeznamDogodkov() {
     const selectEl = document.getElementById('select-dogodek');
     if (!selectEl) return;
 
-    let imenaDogodkov = [];
-    try {
-        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSeznamDogodkov&geslo=EPV2026`, { cache: 'no-store' });
-        if (response.ok) {
-            const odgovor = await response.json();
-            if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
-                imenaDogodkov = odgovor.data;
-            }
-        }
-    } catch (err) {
-        console.warn("Seznam dogodkov s strežnika ni dosegljiv, prikazujem samo lokalno znane dogodke.", err);
+    // strežnik vrne [{ ime, zadnji }] - zadnji = čas zadnje dejavnosti (lokacija/sporočilo)
+    let dogodki = [];
+    const odgovor = await apiGet({ akcija: 'pridobiSeznamDogodkov', oblika: 'objekt' });
+    if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
+        dogodki = odgovor.data.map(d => (typeof d === 'string') ? { ime: d, zadnji: null } : d);
+    } else {
+        console.warn("Seznam dogodkov s strežnika ni dosegljiv, prikazujem samo lokalno znane dogodke.");
     }
 
     // Dodamo še dogodke, ki so bili shranjeni samo lokalno (npr. strežnik takrat ni bil dosegljiv)
     const predpomnilnik = nalozitLokalniPredpomnilnik();
     Object.keys(predpomnilnik).forEach(ime => {
-        if (!imenaDogodkov.includes(ime)) imenaDogodkov.push(ime);
+        if (!dogodki.some(d => d.ime === ime)) dogodki.push({ ime, zadnji: null });
     });
 
     const trenutnaVrednost = selectEl.value;
+    const pokaziStare = document.getElementById('chk-stari-dogodki')?.checked || false;
+    const meja = Date.now() - DOGODKI_PRIKAZ_DNI * 86400000;
+    const vidni = dogodki.filter(d => {
+        if (d.ime === trenutnaVrednost || pokaziStare) return true;
+        const ms = d.zadnji ? casVMs(d.zadnji) : NaN;
+        return isNaN(ms) || ms >= meja; // brez časa dejavnosti (samo sektorji) pokažemo vedno
+    });
+    vidni.sort((a, b) => (casVMs(b.zadnji) || 0) - (casVMs(a.zadnji) || 0));
+
     selectEl.innerHTML = '<option value="novy">-- Nov dogodek --</option>';
-    imenaDogodkov.forEach(ime => {
+    vidni.forEach(d => {
         const opt = document.createElement('option');
-        opt.value = ime;
-        opt.textContent = ime;
+        opt.value = d.ime;
+        const ms = d.zadnji ? casVMs(d.zadnji) : NaN;
+        opt.textContent = isNaN(ms) ? d.ime : `${d.ime} · ${new Date(ms).toLocaleDateString('sl-SI', { timeZone: 'Europe/Ljubljana', day: 'numeric', month: 'numeric' })}`;
         selectEl.appendChild(opt);
     });
 
-    if (imenaDogodkov.includes(trenutnaVrednost)) {
+    if (vidni.some(d => d.ime === trenutnaVrednost)) {
         selectEl.value = trenutnaVrednost;
+    }
+
+    const chk = document.getElementById('chk-stari-dogodki');
+    if (chk && !chk.dataset.vezan) {
+        chk.dataset.vezan = '1';
+        chk.addEventListener('change', () => naloziSeznamDogodkov());
     }
 
     // Poslušalec registriramo samo EN krat (funkcija se sicer kliče ob zagonu, ob gumbu "Osveži"
@@ -187,11 +211,13 @@ export async function naloziSeznamDogodkov() {
             const imeDogodka = e.target.value;
             const inputIme = document.getElementById('input-ime-dogodka');
 
+            ponastaviSporocila();
+            ponastaviTocke();
+
             if (imeDogodka === 'novy' || !imeDogodka) {
                 narisaniSektorjiSloj.clearLayers();
                 if (inputIme) inputIme.value = '';
-                osveziLokacijeEnot();
-                naloziSporocila();
+                osveziVseZaDogodek();
                 osveziGumbZakljucka();
                 return;
             }
@@ -203,13 +229,11 @@ export async function naloziSeznamDogodkov() {
                 selectEl.value = 'novy';
                 if (inputIme) inputIme.value = '';
                 narisaniSektorjiSloj.clearLayers();
-                osveziLokacijeEnot();
-                naloziSporocila();
+                osveziVseZaDogodek();
                 osveziGumbZakljucka();
                 return;
             }
-            osveziLokacijeEnot();
-            naloziSporocila();
+            osveziVseZaDogodek();
             osveziGumbZakljucka();
         });
     }
@@ -309,12 +333,18 @@ async function posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, ges
  */
 async function posljiZaznamekDogodka(dogodekId, besedilo) {
     const center = map ? map.getCenter() : { lat: ZACETNE_KOORDINATE[0], lng: ZACETNE_KOORDINATE[1] };
-    try {
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:' + besedilo + ':0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent(besedilo.toUpperCase())}`;
-        await fetch(url, { method: 'GET', mode: 'no-cors' });
-    } catch (err) {
-        console.warn(`Napaka pri beleženju zaznamka "${besedilo}":`, err);
+    const id = novId('z');
+    const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:' + besedilo + ':0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent(besedilo.toUpperCase())}&id=${encodeURIComponent(id)}`;
+    for (let poskus = 0; poskus < 3; poskus++) {
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            const odgovor = res.ok ? await res.json() : null;
+            if (odgovor && odgovor.status === 'success') return true;
+        } catch (err) {
+            console.warn(`Napaka pri beleženju zaznamka "${besedilo}" (poskus ${poskus + 1}):`, err);
+        }
     }
+    return false;
 }
 
 /**
@@ -390,6 +420,8 @@ export async function osveziGumbZakljucka() {
  * sporočilo "KONEC INTERVENCIJE", da se to prikaže v poročilu za tisk) in shrani trenutno
  * stanje sektorjev.
  */
+let zakljucevanjeVTeku = false;
+
 async function zakljuciIntervencijo() {
     const selectEl = document.getElementById('select-dogodek');
     const dogodekId = selectEl?.value || '';
@@ -399,10 +431,22 @@ async function zakljuciIntervencijo() {
         return;
     }
 
+    if (zakljucevanjeVTeku) return; // zaščita pred dvojnim klikom (na Rogli je bil zaključek zabeležen dvakrat)
     const potrdi = window.confirm(`Ali res želite zaključiti intervencijo "${dogodekId}"?`);
     if (!potrdi) return;
+    zakljucevanjeVTeku = true;
+    try {
+        await zakljuciIntervencijoPotrjeno(dogodekId);
+    } finally {
+        zakljucevanjeVTeku = false;
+    }
+}
 
-    await posljiZaznamekDogodka(dogodekId, 'Konec intervencije');
+async function zakljuciIntervencijoPotrjeno(dogodekId) {
+    if (!(await posljiZaznamekDogodka(dogodekId, 'Konec intervencije'))) {
+        alert('Zaključka ni bilo mogoče zabeležiti na strežniku (povezava). Poskusi znova.');
+        return;
+    }
 
     // Ob vsakem zaključku (tudi po popravku in ponovnem zaključku) se generira novo geslo za
     // dostop do podatkov tega dogodka - od zdaj naprej so ogled/popravki/tisk zanj zaščiteni.
@@ -438,7 +482,10 @@ async function popraviIntervencijo() {
     const potrdi = window.confirm(`Intervencija "${dogodekId}" je bila zaključena.\nAli želite popraviti podatke? Dogodek bo znova odprt za urejanje, dokler ga znova ne zaključite.`);
     if (!potrdi) return;
 
-    await posljiZaznamekDogodka(dogodekId, 'Popravek intervencije');
+    if (!(await posljiZaznamekDogodka(dogodekId, 'Popravek intervencije'))) {
+        alert('Popravka ni bilo mogoče zabeležiti na strežniku (povezava). Poskusi znova.');
+        return;
+    }
 
     alert('Dogodek je znova odprt za urejanje. Ko končate s popravki, ga shranite (💾 Shrani) ali znova zaključite.');
     naloziSporocila();

@@ -3,17 +3,23 @@
 // ==========================================
 
 import { iniciirajZemljevid, map } from './map.js';
-import { iniciirajSlojeEnot, osveziLokacijeEnot } from './units.js';
+import { iniciirajSlojeEnot, osveziLokacijeEnot, osveziStatuse } from './units.js';
 import { shraniDogodek, naloziSeznamDogodkov, obravnavajGumbZakljucka } from './events.js';
 import { iniciirajQRGenerator } from './qr.js';
-import { naloziSporocila } from './sporocila.js';
-import { iniciirajStabSporocila } from './stab-sporocila.js';
+import { naloziSporocila, iniciirajAlarmSOS } from './sporocila.js';
+import { iniciirajStabSporocila, osveziStabLog } from './stab-sporocila.js';
+import { iniciirajTocke, osveziTocke } from './tocke.js';
 import { pripraviInNatisni } from './tisk.js';
-import { OSVEZEVANJE_INTERVAL_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO } from './config.js';
+import { OSVEZEVANJE_INTERVAL_MS, OSVEZEVANJE_STATUSOV_MS, OSVEZEVANJE_STAB_LOGA_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO, NAVADNO_GESLO } from './config.js';
 
-const PRAVO_GESLO = "EPV2026";
+const PRAVO_GESLO = NAVADNO_GESLO;
 
 async function naloziVsebinoAplikacije() {
+    if (!window.EPV_KONFIGURACIJA_OK) {
+        const opozorilo = document.getElementById('konfiguracija-opozorilo');
+        if (opozorilo) opozorilo.style.display = 'block';
+    }
+    window.EPVZvok?.pripraviGumb(document.getElementById('btn-zvok'));
     iniciirajZemljevid();
     iniciirajSlojeEnot();
     iniciirajVideoStream();
@@ -28,10 +34,18 @@ async function naloziVsebinoAplikacije() {
     // Iniciacija modalnega okna za QR kodo
     iniciirajQRGenerator();
     iniciirajStabSporocila();
+    iniciirajTocke();
+    iniciirajAlarmSOS();
 
     setInterval(osveziLokacijeEnot, OSVEZEVANJE_INTERVAL_MS);
     setInterval(naloziSporocila, OSVEZEVANJE_INTERVAL_MS);
+    setInterval(osveziTocke, OSVEZEVANJE_INTERVAL_MS);
+    setInterval(osveziStabLog, OSVEZEVANJE_STAB_LOGA_MS);
+    // "pred X min" in barve stanja se spreminjajo tudi brez novih podatkov
+    setInterval(osveziStatuse, OSVEZEVANJE_STATUSOV_MS);
     naloziSporocila();
+    osveziTocke();
+    osveziStabLog();
 
     // Poslušalci dogodkov za gumba in padajoči meni
     document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());

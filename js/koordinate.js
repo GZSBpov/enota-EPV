@@ -1,6 +1,6 @@
 // ==========================================
 // EPV V2 - KOORDINATE: razčlenjevanje različnih zapisov + pretvorbe + razdalja/smer
-// Navadna (ne-modul) skripta: window.EPVKoordinate (uporabljata jo mapeEPV_V2 in terenEPV_V2).
+// Navadna (ne-modul) skripta: window.EPVKoordinate (uporabljata jo mapeEPV.html in terenEPV.html).
 // Deluje tudi v Node (module.exports) - za samodejne teste.
 //
 // Podprti zapisi (WGS84):
