@@ -1,0 +1,590 @@
+/* ==========================================
+   TEMNA TEMA IN OSNOVNI SLOG (DARK THEME)
+   ========================================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0f172a;
+    color: #f8fafc;
+    overflow: hidden;
+}
+
+.print-only {
+    display: none;
+}
+
+#app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* ZEMLJEVID LEVO */
+#map-container {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    min-width: 300px;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    background: #1e293b;
+}
+
+/* PREMIČNA MEJA (RESIZER) */
+#resizer {
+    width: 6px;
+    height: 100%;
+    background: #334155;
+    cursor: col-resize;
+    z-index: 2000;
+}
+
+#resizer:hover {
+    background: #3b82f6;
+}
+
+/* STRANSKA VRSTICA DESNO - TEMNA */
+#sidebar {
+    width: 380px;
+    min-width: 280px;
+    height: 100%;
+    min-height: 0;
+    background-color: #1e293b;
+    border-left: 1px solid #334155;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    /* Če vsi paneli skupaj ne gredo v razpoložljivo višino, naj se stranska vrstica
+       premika kot celota, namesto da se vsak panel stiska v premalo prostora. */
+    overflow-y: auto;
+}
+
+header {
+    padding: 6px 12px;
+    background: #0f172a;
+    border-bottom: 1px solid #334155;
+    flex-shrink: 0;
+}
+
+header h2 {
+    font-size: 1rem;
+}
+
+.dogodek-panel {
+    padding: 12px;
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    flex-shrink: 0;
+}
+
+.dogodek-panel select, .dogodek-panel input {
+    background: #0f172a;
+    color: #fff;
+    border: 1px solid #475569;
+}
+
+.gumbi-panel {
+    padding: 10px;
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid #334155;
+    background: #0f172a;
+    flex-shrink: 0;
+}
+
+.btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-primaren { background-color: #2563eb; color: white; }
+.btn-sekundaren { background-color: #059669; color: white; }
+
+/* SPOROČILA S TERENA (SOS, najdena oseba/žival, ...) */
+.sporocila-panel {
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    max-height: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sporocila-panel.ima-sos {
+    box-shadow: inset 0 0 0 2px #ef4444;
+}
+
+/* Skupen slog za glave panelov (Sporočila, Enote na terenu) - enaka barva kot Live Stream,
+   da je napis viden (prej svetlo ozadje + svetel napis = skoraj nečitljivo). */
+.panel-glava {
+    padding: 8px 12px;
+    background: #0f172a;
+    color: #ff9800;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+#seznamSporocil {
+    overflow-y: auto;
+}
+
+.sporocilo-vrstica {
+    padding: 6px 12px;
+    border-bottom: 1px solid #334155;
+    font-size: 0.8rem;
+}
+
+.sporocilo-vrstica.sos {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.sporocilo-glava {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    color: #f8fafc;
+}
+
+.sporocilo-cas {
+    color: #94a3b8;
+    font-weight: normal;
+}
+
+.sporocilo-besedilo {
+    color: #cbd5e1;
+    margin-top: 2px;
+}
+
+.sporocilo-vrstica.sos .sporocilo-besedilo {
+    color: #fecaca;
+    font-weight: bold;
+}
+
+.sporocilo-vrstica {
+    cursor: pointer;
+}
+
+/* Neprebrano sporočilo - utripajoč obroč, dokler ga v štabu ne odpreš/preberš */
+.sporocilo-vrstica.novo {
+    box-shadow: inset 0 0 0 2px #fbbf24;
+    animation: sporocilo-utripa 1.4s ease-in-out infinite;
+}
+
+@keyframes sporocilo-utripa {
+    0%, 100% { box-shadow: inset 0 0 0 2px #fbbf24; }
+    50% { box-shadow: inset 0 0 0 2px #fbbf24, 0 0 8px 2px rgba(251, 191, 36, 0.7); }
+}
+
+/* POŠLJI SPOROČILO ENOTI / SEKTORJU (poveljstvo -> teren) */
+.stab-sporocilo-panel {
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    flex-shrink: 0;
+}
+
+.stab-sporocilo-vsebina {
+    padding: 8px 12px;
+}
+
+.stab-sporocilo-vsebina select,
+.stab-sporocilo-vsebina input {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 6px;
+    background: #0f172a;
+    color: #fff;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.stab-sporocilo-vsebina button {
+    width: 100%;
+    padding: 8px;
+    background-color: #7c3aed;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#stabSporociloStatus {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 4px;
+    min-height: 16px;
+}
+
+.btn-posljisporocilo-enoti {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+/* VIDEO OKNO (OBS STREAM) */
+.video-panel {
+    border-bottom: 1px solid #334155;
+    background: #000;
+    flex-shrink: 0;
+}
+
+.video-panel.strnjen .video-body {
+    display: none;
+}
+
+.video-header {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0f172a;
+    color: #ff9800;
+}
+
+.video-body {
+    width: 100%;
+    height: 200px;
+}
+
+.video-body iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* MODALNO OKNO GESLO (PREKRIJE CEL ZASLON) */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.95);
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-vsebina {
+    background: #1e293b;
+    color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    width: 360px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    text-align: center;
+    border: 1px solid #334155;
+}
+
+.modal-vsebina input {
+    width: 100%;
+    padding: 10px;
+    margin: 15px 0;
+    background: #0f172a;
+    color: #fff;
+    border: 1px solid #475569;
+    border-radius: 4px;
+}
+
+.modal-vsebina button {
+    width: 100%;
+    padding: 10px;
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.napaka-sporocilo {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin-top: 10px;
+}
+/* VRSTICE ENOT V STRANSKI VRSTICI */
+.enota-vrstica {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    font-size: 0.85rem;
+}
+
+.enota-vrstica input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.status-zacka {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+.status-zacka.aktiven { background: #10b981; color: #fff; }
+.status-zacka.neaktiven { background: #64748b; color: #fff; }
+
+/* Stalno vidna oznaka z nazivom sektorja na zemljevidu (glej posodobiOznakoSektorja v map.js) */
+.sektor-label-tooltip {
+    background: rgba(15, 23, 42, 0.85);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 2px 6px;
+    box-shadow: none;
+}
+.sektor-label-tooltip::before {
+    display: none;
+}
+
+/* ==========================================
+   PRILAGODITEV ZA TISK (PRINT VIEW FIX)
+   ========================================== */
+@media print {
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: visible !important;
+    }
+
+    /* Skrijemo vse stranske menije, gumbe in resizer */
+    #sidebar, #resizer, .leaflet-control-container, .btn-fullscreen, .modal-overlay {
+        display: none !important;
+    }
+
+    #app-container {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    #map-container {
+        width: 100% !important;
+        height: 500px !important;
+        page-break-after: always;
+    }
+
+    #map {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .print-only {
+        display: block !important;
+        padding: 20px;
+    }
+
+    #print-naslov {
+        font-size: 1.4rem;
+        margin-bottom: 12px;
+    }
+
+    .print-only h2 {
+        font-size: 1.1rem;
+        margin: 18px 0 8px;
+    }
+
+    .tisk-tabela {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-bottom: 10px;
+    }
+
+    .tisk-tabela th, .tisk-tabela td {
+        border: 1px solid #94a3b8;
+        padding: 4px 8px;
+        text-align: left;
+    }
+
+    .tisk-tabela th {
+        background: #e2e8f0;
+    }
+}
+
+/* ==========================================
+   ODZIVNA POSTAVITEV ZA TELEFONE (ANDROID/iOS)
+   Pod to širino zemljevid in stranska vrstica ne gresta več eden ob drugem,
+   ampak se zložita eden pod drugega (oba delno vidna, brez vodoravnega drsenja).
+   ========================================== */
+@media (max-width: 820px) {
+    #app-container {
+        flex-direction: column;
+    }
+
+    #map-container {
+        flex: none;
+        width: 100%;
+        height: 48vh;
+        /* Dovolj visoko, da orodja za risanje (zoom + barva + risanje + uredi/izbriši) ne
+           padejo izven vidnega dela zemljevida - na kratkih zaslonih jih je bilo prej videti
+           samo del, gumba "Uredi"/"Izbriši" pa sploh ne. */
+        min-height: 380px;
+        min-width: 0;
+    }
+
+    /* Vodoravni premik med zemljevidom in stransko vrstico ni smiseln na dotik - skrijemo ga */
+    #resizer {
+        display: none;
+    }
+
+    #sidebar {
+        width: 100% !important;
+        min-width: 0;
+        flex: 1;
+        min-height: 0;
+        /* Na mobilnem se cela stranska vrstica premika kot ena dolga stran - preprosteje in
+           zanesljiveje kot poskušati vsak notranji panel stisniti v premalo prostora. */
+        overflow-y: auto;
+    }
+
+    #seznam-enot-wrapper {
+        flex: none;
+        min-height: 220px;
+    }
+
+    #seznamEnotGumbi {
+        max-height: 280px;
+    }
+
+    .gumbi-panel {
+        flex-wrap: wrap;
+    }
+
+    .gumbi-panel .btn {
+        min-width: 90px;
+    }
+
+    /* Na ozkem zaslonu telefonske naprave sporočila in video ne smejo pojesti vsega prostora */
+    .sporocila-panel {
+        max-height: 110px;
+    }
+
+    .video-body {
+        height: 140px;
+    }
+}
+
+
+/* ==========================================
+   V2 - NOVI ELEMENTI
+   ========================================== */
+.verzija-oznaka {
+    font-size: 0.65rem; background: #7c3aed; color: #fff; padding: 1px 6px; border-radius: 8px;
+    vertical-align: middle; margin-left: 4px;
+}
+
+.glava-vrstica { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.povezava-ok { font-size: 0.72rem; color: #34d399; }
+.povezava-napaka { font-size: 0.72rem; color: #f87171; font-weight: bold; }
+
+.btn-zvok {
+    font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; border: 1px solid #475569;
+    background: #0f172a; color: #e2e8f0; cursor: pointer;
+}
+.btn-zvok.zvok-zaklenjen { background: #b45309; border-color: #f59e0b; color: #fff; font-weight: bold; animation: zvok-opozorilo 1.4s ease-in-out infinite; }
+.btn-zvok.zvok-utisan { background: #334155; color: #cbd5e1; }
+@keyframes zvok-opozorilo { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+
+.btn-utisaj-sos {
+    font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; border: none;
+    background: #dc2626; color: #fff; font-weight: bold; cursor: pointer;
+}
+
+.sos-pasica {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100001; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 12px; background: #dc2626; color: #fff; font-weight: bold; font-size: 1.05rem; cursor: pointer;
+    animation: sos-utripa 0.8s ease-in-out infinite; box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+.sos-pasica button { background: #fff; color: #b91c1c; border: none; border-radius: 4px; padding: 5px 10px; font-weight: bold; cursor: pointer; }
+@keyframes sos-utripa { 0%, 100% { background: #dc2626; } 50% { background: #7f1d1d; } }
+
+.stari-dogodki-oznaka { display: block; font-size: 0.72rem; color: #94a3b8; margin-top: 4px; }
+.stari-dogodki-oznaka input { width: auto; margin-right: 4px; }
+
+.btn-tocka { background-color: #dc2626; color: #fff; }
+
+/* Stanja enot v seznamu */
+.enota-vrstica.enota-zastarelo { opacity: .85; }
+.enota-vrstica.enota-brez-signala, .enota-vrstica.enota-ustavljeno { opacity: .6; }
+
+/* Dnevnik poslanih sporočil štaba */
+.stab-log { margin-top: 6px; max-height: 150px; overflow-y: auto; }
+.stab-log-vrstica { padding: 4px 6px; border-top: 1px solid #334155; font-size: 0.75rem; }
+.stab-log-glava { display: flex; justify-content: space-between; gap: 6px; color: #94a3b8; }
+.stab-log-besedilo { color: #e2e8f0; word-break: break-word; }
+.stab-log-ok { color: #34d399; font-weight: bold; }
+.stab-log-caka { color: #fbbf24; }
+.stab-log-prazno { font-size: 0.75rem; color: #64748b; padding: 4px 6px; }
+
+/* Točke */
+.tocke-panel { border-bottom: 1px solid #334155; background: #1e293b; flex-shrink: 0; max-height: 170px; display: flex; flex-direction: column; }
+#tocke-seznam { overflow-y: auto; }
+.tocka-vrstica { padding: 6px 12px; border-bottom: 1px solid #334155; cursor: pointer; font-size: 0.8rem; }
+.tocka-vrstica:hover { background: #273449; }
+.tocka-vrstica-glava { display: flex; justify-content: space-between; gap: 8px; font-weight: bold; }
+.tocka-vrstica-cilj { color: #fca5a5; font-weight: normal; font-size: 0.72rem; }
+.tocka-vrstica-koordinate { color: #94a3b8; font-size: 0.72rem; font-family: monospace; }
+.tocke-prazno { font-size: 0.78rem; color: #64748b; padding: 8px 12px; }
+.tocka-oznaka { background: rgba(127, 29, 29, .9); color: #fff; border: 1px solid #fca5a5; font-weight: bold; }
+.tocka-oznaka::before { display: none; }
+
+/* Obrazec za vnos koordinat */
+.tocka-modal-vsebina { width: 440px; max-width: 94vw; text-align: left; max-height: 94vh; overflow-y: auto; }
+.tocka-modal-vsebina h3 { margin-bottom: 8px; }
+.tocka-modal-vsebina label { display: block; font-size: 0.78rem; color: #94a3b8; margin-top: 8px; }
+.tocka-modal-vsebina input, .tocka-modal-vsebina select, .tocka-modal-vsebina textarea {
+    width: 100%; padding: 8px; margin: 4px 0 0; background: #0f172a; color: #fff; border: 1px solid #475569; border-radius: 4px; font-size: 0.95rem; font-family: inherit;
+}
+.tocka-modal-vsebina textarea { font-family: monospace; resize: vertical; }
+.tocka-vrstica-polj { display: flex; gap: 8px; }
+.tocka-vrstica-polj > div { flex: 1; }
+.tocka-predogled { margin-top: 6px; padding: 8px; border-radius: 4px; background: #0f172a; border: 1px solid #334155; font-size: 0.78rem; color: #94a3b8; }
+.tocka-predogled.ok { border-color: #059669; color: #d1fae5; }
+.tocka-predogled.napaka { border-color: #dc2626; color: #fecaca; }
+.tocka-predogled .formati { font-family: monospace; margin-top: 4px; color: #fff; line-height: 1.5; }
+.tocka-predogled .opozorilo { color: #fcd34d; margin-top: 2px; }
+.tocka-predogled code { background: #1e293b; padding: 1px 4px; border-radius: 3px; color: #e2e8f0; }
+.tocka-opozorilo { background: #7f1d1d; color: #fff; padding: 6px 8px; border-radius: 4px; font-size: 0.8rem; margin-bottom: 6px; }
+.tocka-status { min-height: 18px; font-size: 0.8rem; color: #fbbf24; margin-top: 6px; }
+.tocka-gumbi { display: flex; gap: 8px; margin-top: 8px; }
+.tocka-gumbi button { flex: 1; width: auto; padding: 10px; }
+.tocka-gumb-primaren { background: #dc2626 !important; }
+.tocka-gumb-sekundaren { background: #475569 !important; }
+.tocka-gumbi button:disabled { opacity: .45; cursor: not-allowed; }
+.tocka-gumb-zapri { margin-top: 8px; background: #334155 !important; }
+
+@media print {
+    .sos-pasica, #konfiguracija-opozorilo { display: none !important; }
+}
