@@ -122,6 +122,25 @@
         vibriraj([150, 100, 150, 100, 400]);
     }
 
+    /** Teren: oddajanje je prenehalo / ne teče. Padajoča trojica, drugačna od sporočila, da jo enota loči. */
+    function opomnik() {
+        belezi('opomnik');
+        if (utisan) return;
+        ton(740, 0, 0.2, 0.35, 'triangle');
+        ton(587, 0.25, 0.2, 0.35, 'triangle');
+        ton(440, 0.5, 0.45, 0.35, 'triangle');
+        vibriraj([300, 150, 300, 150, 300]);
+    }
+
+    /** Štab: enota je prenehala oddajati (ni signala). Dva podobna tona, krajši od sporočila. */
+    function opozorilo() {
+        belezi('opozorilo');
+        if (utisan) return;
+        ton(523, 0, 0.18, 0.3, 'triangle');
+        ton(392, 0.22, 0.35, 0.3, 'triangle');
+        vibriraj([200, 100, 200]);
+    }
+
     function enaSirena() {
         // dvotonska sirena (kot reševalna): 960 Hz / 770 Hz, štirje izmenični toni
         ton(960, 0.0, 0.3, 0.45, 'square');
@@ -234,6 +253,8 @@
         obvestilo: obvestilo,
         sporocilo: sporocilo,
         tocka: tocka,
+        opomnik: opomnik,
+        opozorilo: opozorilo,
         alarmSOS: alarmSOS,
         alarmAktiven: alarmAktiven,
         ustavi: ustavi,

@@ -72,6 +72,12 @@
         .tocka-gumbi button, .tocka-gumbi a { flex: 1; margin: 0; padding: 9px; font-size: 14px; text-align: center; text-decoration: none; border-radius: 4px; color: #fff; font-weight: bold; box-sizing: border-box; }
         .tocka-gumbi a { background: #2563eb; }
         .tocka-gumbi button { background: #4f46e5; width: auto; }
+        #tezaveBanner { display: none; }
+        #tezaveBanner .tezava { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #fca5a5; }
+        #tezaveBanner .tezava:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+        #tezaveBanner button { width: auto; margin: 6px 0 0; padding: 8px 12px; font-size: 13px; background: #7f1d1d; }
+        .opomniki-vrstica { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; margin-top: 8px; text-align: left; }
+        .opomniki-vrstica input { width: auto; margin: 0; }
         .teren-sporocilo-ikona, .teren-tocka-ikona { font-size: 22px; line-height: 1; text-align: center; }
     </style>
     <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL, seznam enot), zvok -->
@@ -93,6 +99,7 @@
         <b>⚠️ Naslov skripte V2 ni nastavljen.</b> V js/shared-config.js vstavi URL spletne aplikacije Apps Script.
     </div>
 
+    <div id="tezaveBanner" class="pasica napaka" role="alert"></div>
     <div id="obvestiloNadaljevanje" class="pasica opozorilo"></div>
     <div id="opozoriloOzadje" class="pasica opozorilo"></div>
 
@@ -120,6 +127,7 @@
     <button id="gumbOddaja" type="button">ZAČNI ODDAJANJE LOKACIJE</button>
     <div class="status" id="statusPolje">Status: Pripravljen</div>
     <div id="vrstaStatus"></div>
+    <label class="opomniki-vrstica"><input type="checkbox" id="chkOpomniki" checked> Opozori me (zvok in napis), če oddajanje preneha ali ne teče</label>
 
     <div class="opozorilo-ozadje">
         ℹ️ Oddajanje deluje zanesljivo, dokler je zaslon prižgan in je ta stran odprta v ospredju. Če zaslon zaspi ali zamenjate aplikacijo, oddajanje preneha (omejitev telefona) - aplikacija vas ob vrnitvi na to opozori. Na iPhone (Safari) ob zaklepu zaslona oddajanje preneha.
@@ -182,6 +190,14 @@
     const OPOMNIK_MAX = 5;
     const MAX_VRSTA = 500;
 
+    // Opomniki (delujejo, dokler je stran odprta in zaslon prižgan - telefon z ugasnjenim zaslonom ne more zvoniti)
+    const TEZAVA_GPS_MS = window.EPV_TEZAVA_GPS_MS || 60000;               // brez GPS fiksa tako dolgo -> opozorilo
+    const TEZAVA_POVEZAVA_MS = window.EPV_TEZAVA_POVEZAVA_MS || 60000;     // podatki čakajo v vrsti tako dolgo -> opozorilo
+    const OPOMNIK_NEODDAJANJE_MS = window.EPV_OPOMNIK_NEODDAJANJE_MS || 10 * 60 * 1000; // oddajanje ne teče: opomnik vsakih 10 min
+    const PONOVITEV_ZVOKA_MS = window.EPV_PONOVITEV_ZVOKA_MS || 60000;     // težava traja: zvok se ponovi
+    const ODLOZITEV_MS = window.EPV_ODLOZITEV_MS || 10 * 60 * 1000;        // »Razumem« utiša težavo za 10 min
+    const STORAGE_OPOMNIKI = 'epv2_teren_opomniki';
+
     let watchId = null;
     let prejsnjiCas = 0;
     let izbranDogodek = "Splošno";
@@ -199,6 +215,8 @@
     let zadnjiFiksCas = 0;         // Date.now() ob zadnjem fiksu
     let skrilSeOb = 0;             // Date.now(), ko je stran odšla v ozadje med oddajanjem
     let zadnjiPonovniZagonGps = 0;
+    let uporabnikUstavil = false;  // enota je oddajanje ustavila namenoma - opomnik »oddajanje ne teče« ni potreben
+    let neoddajaOd = Date.now();   // od kdaj oddajanje ne teče (od odprtja strani)
 
     const $ = (id) => document.getElementById(id);
 
@@ -450,12 +468,85 @@
     }
 
     // ==========================================================================
+    // OPOMNIKI: zvok + napis, če oddajanje preneha ali ne teče
+    //  - ni GPS fiksa (že X s)                          -> opozorilo, zvok se ponavlja na 1 min
+    //  - podatki ne pridejo do štaba (ni povezave)      -> opozorilo, zvok se ponavlja na 1 min
+    //  - oddajanje ne teče (nikoli vklopljeno / prekinjeno, ne namenoma ustavljeno) -> opomnik vsakih 10 min
+    // »Razumem« utiša težavo za 10 min. Vse to deluje samo, dokler je stran odprta in zaslon prižgan;
+    // ko telefon zaspi ali je v ozadju, opozorilo prejme štab (enota je tam označena »Ni signala«).
+    // ==========================================================================
+    let opomnikiVklopljeni = true;
+    try { opomnikiVklopljeni = localStorage.getItem(STORAGE_OPOMNIKI) !== '0'; } catch (e) {}
+    const tezave = {}; // ključ -> { besedilo, od, zadnjiZvok, odlozenoDo }
+
+    function oceniTezave() {
+        const zdaj = Date.now();
+        const novo = {};
+        if (opomnikiVklopljeni) {
+            if (watchId !== null) {
+                const brezFiksa = zdaj - zadnjiFiksCas;
+                if (brezFiksa > TEZAVA_GPS_MS) {
+                    novo.gps = `Ni GPS signala že ${Math.round(brezFiksa / 1000)} s. Preveri, da je GPS vklopljen in da zaslon ostane prižgan.`;
+                }
+                if (vrsta.length > 0) {
+                    const najstarejsi = Math.min.apply(null, vrsta.map(v => v.dodano || zdaj));
+                    if (zdaj - najstarejsi > TEZAVA_POVEZAVA_MS) {
+                        novo.povezava = `Ni povezave s štabom - čaka ${vrsta.length} podatkov. Poslani bodo, ko se povezava vrne.`;
+                    }
+                }
+            } else if (!uporabnikUstavil && normalizirajIme($('imeEnote').value) && zdaj - neoddajaOd >= OPOMNIK_NEODDAJANJE_MS) {
+                novo.neoddaja = 'Oddajanje lokacije ni vklopljeno - štab vas ne vidi. Pritisni ZAČNI ODDAJANJE LOKACIJE.';
+            }
+        }
+        Object.keys(tezave).forEach(k => { if (!novo[k]) delete tezave[k]; });
+        Object.keys(novo).forEach(k => {
+            const t = tezave[k] = tezave[k] || { od: zdaj, zadnjiZvok: 0, odlozenoDo: 0 };
+            t.besedilo = novo[k];
+            if (zdaj < t.odlozenoDo) return;
+            const interval = (k === 'neoddaja') ? OPOMNIK_NEODDAJANJE_MS : PONOVITEV_ZVOKA_MS;
+            if (zdaj - t.zadnjiZvok >= interval) {
+                t.zadnjiZvok = zdaj;
+                Zvok?.opomnik();
+                Zvok?.utripajNaslov('⚠️ Oddajanje!');
+            }
+        });
+        izrisiTezave();
+    }
+
+    function izrisiTezave() {
+        const el = $('tezaveBanner');
+        const zdaj = Date.now();
+        const vidne = Object.keys(tezave).filter(k => zdaj >= tezave[k].odlozenoDo);
+        if (vidne.length === 0) {
+            el.style.display = 'none';
+            el.innerHTML = '';
+            Zvok?.ustaviUtripanje();
+            return;
+        }
+        el.style.display = 'block';
+        el.innerHTML = vidne.map(k => `<div class="tezava"><b>⚠️ ${pobegni(tezave[k].besedilo)}</b><button type="button" data-kljuc="${pobegniAtribut(k)}">Razumem (10 min mir)</button></div>`).join('');
+        el.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+            const t = tezave[btn.dataset.kljuc];
+            if (t) { t.odlozenoDo = Date.now() + ODLOZITEV_MS; t.zadnjiZvok = Date.now(); }
+            izrisiTezave();
+        }));
+    }
+
+    setInterval(oceniTezave, 5000);
+
+    // ==========================================================================
     // ZAČETEK
     // ==========================================================================
     window.onload = function () {
         if (!/^https?:\/\//.test(SCRIPT_URL) || window.EPV_KONFIGURACIJA_OK === false) $('konfiguracijaNapaka').style.display = 'block';
 
         Zvok?.pripraviGumb($('btnZvok'));
+        $('chkOpomniki').checked = opomnikiVklopljeni;
+        $('chkOpomniki').addEventListener('change', () => {
+            opomnikiVklopljeni = $('chkOpomniki').checked;
+            try { localStorage.setItem(STORAGE_OPOMNIKI, opomnikiVklopljeni ? '1' : '0'); } catch (e) {}
+            oceniTezave();
+        });
         osveziPredlogeImen();
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -521,7 +612,7 @@
             ponovniZagonGps();
         }
         skrilSeOb = 0;
-        if (document.visibilityState === 'visible') osveziStabInTocke();
+        if (document.visibilityState === 'visible') { osveziStabInTocke(); oceniTezave(); }
     });
 
     function prikaziOpozoriloOzadje(htmlBesedilo) {
@@ -610,6 +701,7 @@
                 status.innerText = "GPS ni podprt na tej napravi.";
                 return;
             }
+            uporabnikUstavil = false;
             gumb.innerText = "USTAVI ODDAJANJE";
             gumb.classList.add('oddaja');
             status.innerText = "Iščem GPS signal...";
@@ -627,6 +719,8 @@
         } else {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
+            uporabnikUstavil = true; // namerno ustavljeno - brez opomnika »oddajanje ne teče«
+            neoddajaOd = Date.now();
             gumb.innerText = "ZAČNI ODDAJANJE LOKACIJE";
             gumb.classList.remove('oddaja');
             status.classList.remove('slab');

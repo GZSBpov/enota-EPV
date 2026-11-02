@@ -158,6 +158,7 @@ try:
         vpis('GASILEC:Slaba:2:0', 46.50, 15.80, 'Rogla', acc=900, t=zdaj - 5 * 1000)
         vpis('GASILEC:Vzhod:2:0', 46.44, 15.63, 'Rogla', acc=60, t=zdaj - 2 * 1000)
 
+        vpis('GASILEC:Padec:2:0', 46.45, 15.65, 'Rogla', t=zdaj - (4 * 60 + 50) * 1000)  # 4 min 50 s star signal -> kmalu »ni signala«
         def besedilo_enot(): return H.inner_text('#seznamEnotGumbi')
         pri('štab: Zastarela enota', cakaj(lambda: 'Zastarelo' in besedilo_enot(), 15), besedilo_enot())
         pri('štab: enota Ni signala', 'Ni signala' in besedilo_enot(), besedilo_enot())
@@ -250,6 +251,13 @@ try:
             pri('tisk: čas SOS je v lokalnem času Ljubljane (brez +2 h napake)', pricakovan in tisk, (pricakovan, tisk[:500]))
         pri('tisk: naslov V2', 'V2' in H.inner_text('#print-naslov'))
 
+        # ----- štab: opozorilo, ko enota preneha oddajati -----
+        pri('štab: enota Padec je najprej zastarela, nato brez signala', cakaj(lambda: 'Padec' in H.inner_text('#opozorila-enot') if H.is_visible('#opozorila-enot') else False, 45), H.inner_text('#opozorila-enot') if H.is_visible('#opozorila-enot') else 'ni opozorila')
+        pri('štab: za prehod se sproži zvok opozorila', 'opozorilo' in H.evaluate("EPVZvok.dnevnik.map(x => x.tip)"), H.evaluate("EPVZvok.dnevnik.map(x => x.tip)"))
+        pri('štab: enota, ki je bila ob odprtju že brez signala, ne zvoni', 'Izgubljena' not in H.inner_text('#opozorila-enot'), H.inner_text('#opozorila-enot'))
+        vpis('GASILEC:Padec:2:0', 46.45, 15.65, 'Rogla')
+        pri('štab: opozorilo izgine, ko enota spet odda', cakaj(lambda: 'Padec' not in H.inner_text('#opozorila-enot'), 20), H.inner_text('#opozorila-enot'))
+
         # ----- izbira točke s klikom na zemljevid -----
         H.click('#btn-tocka-odpri')
         H.click('#btn-tocka-klik')
@@ -308,6 +316,48 @@ try:
             and (time.sleep(2) or sum(1 for v in sheet('Sporocila')[1:] if v[3] == 'KONEC INTERVENCIJE') == 1),
             [v[3] for v in sheet('Sporocila')[1:]][-4:])
         pri('zaključek: geslo dogodka shranjeno', any(v[0] == 'Rogla' for v in sheet('DogodekGesla')[1:]))
+
+        # ----- teren: opomniki (oddajanje ne teče / ni povezave / ni GPS) -----
+        ctxR = pripravi_kontekst(browser, geolocation={'latitude': 46.35, 'longitude': 15.55, 'accuracy': 20}, permissions=['geolocation'])
+        ctxR.add_init_script("window.EPV_OPOMNIK_NEODDAJANJE_MS = 4000; window.EPV_TEZAVA_POVEZAVA_MS = 3000; window.EPV_PONOVITEV_ZVOKA_MS = 3000; window.EPV_TEZAVA_GPS_MS = 3000;")
+        R = ctxR.new_page(); spremljaj(R, 'teren-opomniki')
+        R.goto(f'{BASE}/terenEPV.html?dogodek=Opomniki')
+        stevilo_opomnikov = lambda: R.evaluate("EPVZvok.dnevnik.filter(x => x.tip === 'opomnik').length")
+        pri('opomniki: kljukica je privzeto vklopljena', R.is_checked('#chkOpomniki'))
+        R.fill('#imeEnote', 'Opomnik Enota')
+        R.dispatch_event('#imeEnote', 'change')
+        pri('opomniki: oddajanje ne teče -> opomnik z napisom', cakaj(lambda: R.is_visible('#tezaveBanner') and 'ni vklopljeno' in R.inner_text('#tezaveBanner'), 15), R.inner_text('#tezaveBanner'))
+        pri('opomniki: oddajanje ne teče -> zvok', stevilo_opomnikov() >= 1, stevilo_opomnikov())
+        R.click('#tezaveBanner button')
+        pri('opomniki: »Razumem« skrije opomnik', cakaj(lambda: not R.is_visible('#tezaveBanner'), 5))
+        n = stevilo_opomnikov(); time.sleep(5)
+        pri('opomniki: po »Razumem« je mir (ni novega zvoka)', stevilo_opomnikov() == n, (n, stevilo_opomnikov()))
+
+        R.click('#gumbOddaja')
+        pri('opomniki: ob vklopu oddajanja opomnik izgine', cakaj(lambda: not R.is_visible('#tezaveBanner'), 10))
+
+        # prekinitev povezave: podatki čakajo v vrsti -> opozorilo
+        ctxR.set_offline(True)
+        R.click('button[data-sporocilo="Začetek reševanja/gašenja"]')
+        pri('opomniki: ni povezave -> opozorilo', cakaj(lambda: R.is_visible('#tezaveBanner') and 'Ni povezave' in R.inner_text('#tezaveBanner'), 20), R.inner_text('#tezaveBanner'))
+        n = stevilo_opomnikov()
+        pri('opomniki: ni povezave -> zvok se ponavlja', cakaj(lambda: stevilo_opomnikov() >= n + 1, 15), (n, stevilo_opomnikov()))
+        ctxR.set_offline(False)
+        pri('opomniki: povezava se vrne -> opozorilo izgine', cakaj(lambda: not R.is_visible('#tezaveBanner') or 'Ni povezave' not in R.inner_text('#tezaveBanner'), 40), R.inner_text('#tezaveBanner'))
+
+        # GPS signal je izginil
+        n = stevilo_opomnikov()
+        R.evaluate("zadnjiFiksCas = Date.now() - 200000")
+        pri('opomniki: ni GPS signala -> zvok', cakaj(lambda: stevilo_opomnikov() >= n + 1, 10), (n, stevilo_opomnikov()))
+
+        # namerna ustavitev: brez opomnikov
+        R.click('#gumbOddaja')
+        R.wait_for_timeout(500)
+        n = stevilo_opomnikov(); time.sleep(6)
+        pri('opomniki: namerno ustavljeno oddajanje ne sproži opomnikov', stevilo_opomnikov() == n and not R.is_visible('#tezaveBanner'), (n, stevilo_opomnikov()))
+        R.uncheck('#chkOpomniki')
+        pri('opomniki: izklop kljukice se shrani', R.evaluate("localStorage.getItem('epv2_teren_opomniki')") == '0')
+        ctxR.close()
 
         # ----- stara stran V1/ mora z novo skripto in istim Sheetom še vedno delovati (prehodno obdobje) -----
         ctxV = pripravi_kontekst(browser, geolocation={'latitude': 46.30, 'longitude': 15.50, 'accuracy': 20}, permissions=['geolocation'])
