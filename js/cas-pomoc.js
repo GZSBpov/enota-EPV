@@ -1,30 +1,51 @@
 // ==========================================
-// EPV - POMOŽNA FUNKCIJA ZA PRIKAZ ČASA (GMT+2)
+// EPV V2 - ČAS
+// Strežnik (Code.gs) zapisuje PRAVI trenutek (UTC, ISO). Tu ga samo prikažemo v časovnem
+// pasu Europe/Ljubljana - poletni/zimski čas se tako prilagodi sam, brez fiksnega odmika +2 h.
 // ==========================================
-// Google Sheets samodejno pretvori čas, ki ga Apps Script zapiše kot GMT+2 niz,
-// v pravi datumski tip. Ko ga kasneje preberemo, se serializira nazaj v UTC
-// (npr. "2026-08-02T11:16:34.000Z"), zato ga je treba za prikaz spet premakniti
-// za 2 uri naprej - enako, kot ga Apps Script izvorno zapiše (Utilities.formatDate(..., "GMT+2", ...)).
+
+const PAS = 'Europe/Ljubljana';
+let oblikovalnik = null;
+try {
+    oblikovalnik = new Intl.DateTimeFormat('en-GB', {
+        timeZone: PAS, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+    });
+} catch (e) { oblikovalnik = null; }
+
+function deli(ms) {
+    if (!oblikovalnik) {
+        const d = new Date(ms), p = (n) => String(n).padStart(2, '0');
+        return { year: d.getFullYear(), month: p(d.getMonth() + 1), day: p(d.getDate()), hour: p(d.getHours()), minute: p(d.getMinutes()), second: p(d.getSeconds()) };
+    }
+    const o = {};
+    oblikovalnik.formatToParts(new Date(ms)).forEach(p => { o[p.type] = p.value; });
+    if (o.hour === '24') o.hour = '00';
+    return o;
+}
+
+/** Čas (ISO niz, Date ali ms) -> milisekunde; NaN, če ni veljaven. */
+export function casVMs(cas) {
+    if (cas instanceof Date) return cas.getTime();
+    if (typeof cas === 'number') return cas;
+    const t = Date.parse(cas);
+    return isNaN(t) ? NaN : t;
+}
 
 export function formatirajCas(cas, kratkoOblika = false) {
     if (!cas) return kratkoOblika ? '' : '-';
-    const niz = cas.toString();
+    const ms = casVMs(cas);
+    if (isNaN(ms)) return String(cas);
+    const d = deli(ms);
+    return kratkoOblika ? `${d.hour}:${d.minute}` : `${d.year}-${d.month}-${d.day} ${d.hour}:${d.minute}:${d.second}`;
+}
 
-    if (niz.includes('T') || /Z$/i.test(niz)) {
-        const datum = new Date(niz);
-        if (!isNaN(datum.getTime())) {
-            const premaknjen = new Date(datum.getTime() + 2 * 60 * 60 * 1000);
-            const p = (n) => n.toString().padStart(2, '0');
-            const leto = premaknjen.getUTCFullYear();
-            const mesec = p(premaknjen.getUTCMonth() + 1);
-            const dan = p(premaknjen.getUTCDate());
-            const ura = p(premaknjen.getUTCHours());
-            const minuta = p(premaknjen.getUTCMinutes());
-            const sekunda = p(premaknjen.getUTCSeconds());
-            return kratkoOblika ? `${ura}:${minuta}` : `${leto}-${mesec}-${dan} ${ura}:${minuta}:${sekunda}`;
-        }
-    }
-
-    // Že zapisan kot navaden niz (Sheets ga ni pretvoril v datumski tip) - domnevamo, da je že v GMT+2
-    return kratkoOblika && niz.length > 16 ? niz.substring(11, 16) : niz;
+/** "pred 12 s", "pred 3 min", "pred 1 h 05 min" */
+export function starostBesedilo(ms, zdaj = Date.now()) {
+    if (!ms || isNaN(ms)) return '';
+    const s = Math.max(0, Math.round((zdaj - ms) / 1000));
+    if (s < 60) return `pred ${s} s`;
+    const min = Math.floor(s / 60);
+    if (min < 60) return `pred ${min} min`;
+    return `pred ${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`;
 }

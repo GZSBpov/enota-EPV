@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPV - Enota za Podporo Vodenju</title>
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Draw CSS & JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- Stil -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL) -->
+    <script src="js/shared-config.js"></script>
+</head>
+<body>
+
+    <!-- MODALNO OKNO ZA GESLO -->
+    <div id="vstopno-geslo-modal" class="modal-overlay">
+        <div class="modal-vsebina">
+            <h2>EPV Vstopna Avtentikacija</h2>
+            <p>Vnesite dostopno geslo za dostop do poveljniškega vmesnika:</p>
+            <input type="password" id="input-geslo" placeholder="Vnesite geslo..." autocomplete="off">
+            <button id="btn-potrdi-geslo">Prijava</button>
+            <div id="geslo-napaka" class="napaka-sporocilo"></div>
+        </div>
+    </div>
+
+    <!-- MODALNO OKNO ZA QR KODO -->
+    <div id="qr-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-vsebina card-fullscreen-target" id="qr-card">
+            <div style="display:flex; justify-between; align-items:center;">
+                <h3>Povezava za Teren (terenEPV)</h3>
+                <button class="btn-fullscreen" data-target="qr-card" title="Celozaslonski prikaz">⛶</button>
+            </div>
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Skenirajte z mobilno napravo na terenu:</p>
+            <div id="qr-code-container" style="display: flex; justify-content: center; margin: 15px 0;"></div>
+
+            <a id="qr-direktna-povezava" href="#" target="_blank" rel="noopener" style="display:block; font-size:0.75rem; color:#2563eb; word-break:break-all; text-align:center; margin-bottom:10px;"></a>
+
+            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:10px;">
+                <a id="qr-sms" href="#" style="flex:1 1 70px; text-align:center; background:#64748b; color:#fff; padding:8px 4px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">📩 SMS</a>
+                <a id="qr-whatsapp" href="#" target="_blank" rel="noopener" style="flex:1 1 70px; text-align:center; background:#25D366; color:#fff; padding:8px 4px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">WhatsApp</a>
+                <a id="qr-viber" href="#" style="flex:1 1 70px; text-align:center; background:#7360f2; color:#fff; padding:8px 4px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">Viber</a>
+                <a id="qr-messenger" href="#" style="flex:1 1 70px; text-align:center; background:#0084FF; color:#fff; padding:8px 4px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">Messenger</a>
+                <button type="button" id="qr-kopiraj" style="flex:1 1 70px; background:#334155; color:#fff; padding:8px 4px; border-radius:4px; border:none; font-size:11px; font-weight:bold; cursor:pointer;">📋 Kopiraj</button>
+            </div>
+
+            <button id="btn-zapri-qr" style="background-color: #64748b;">Zapri</button>
+        </div>
+    </div>
+
+    <!-- GLAVNI VSEBNIK APLIKACIJE -->
+    <div id="app-container">
+        
+        <!-- 1. ZEMLJEVID NA LEVI STRANI -->
+        <main id="map-container" class="card-fullscreen-target">
+            <button class="btn-fullscreen btn-fullscreen-map" data-target="map-container" title="Celozaslonski prikaz zemljevida">⛶ Celotni zaslon</button>
+            <div id="map"></div>
+        </main>
+
+        <!-- PREMIČNA MEJA MED ZEMLJEVIDOM IN DESNO VRSTICO (RESIZER) -->
+        <div id="resizer"></div>
+
+        <!-- 2. STRANSKA VRSTICA NA DESNI STRANI (ZADNJA TRETJINA) -->
+        <aside id="sidebar">
+            <header>
+                <h2>Enotni nadzor EPV</h2>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Pregled enot in sektorjev</p>
+            </header>
+
+            <!-- Izbira in shranjevanje dogodkov -->
+            <div class="dogodek-panel">
+                <label for="select-dogodek">Aktivni dogodek / Intervencija:</label>
+                <div style="display: flex; gap: 4px; margin-top: 4px;">
+                    <select id="select-dogodek" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
+                        <option value="novy">-- Nov dogodek --</option>
+                    </select>
+                    <button id="btn-osvezi-dogodke" title="Osveži seznam iz Driva">🔄</button>
+                </div>
+                <input type="text" id="input-ime-dogodka" placeholder="Naziv nove intervencije..." style="width: 100%; margin-top: 6px; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
+                <button id="btn-zakljuci-dogodek" style="width: 100%; margin-top: 6px; padding: 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🏁 Zaključi intervencijo</button>
+            </div>
+
+            <!-- Nadzorni gumbi -->
+            <div class="gumbi-panel">
+                <button id="btn-shrani" class="btn btn-primaren">💾 Shrani</button>
+                <button id="btn-tisk" class="btn btn-sekundaren">🖨️ Tisk</button>
+                <button id="btn-qr-teren" class="btn" style="background-color: #8b5cf6; color: white;">📱 QR Teren</button>
+            </div>
+
+            <!-- Sporočila s terena (SOS, najdena oseba/žival, ...) -->
+            <div id="sporocila-panel" class="sporocila-panel card-fullscreen-target">
+                <div class="panel-glava">
+                    <span>📢 Sporočila s terena</span>
+                    <button class="btn-fullscreen" data-target="sporocila-panel" title="Celozaslonski prikaz sporočil">⛶</button>
+                </div>
+                <div id="seznamSporocil"></div>
+            </div>
+
+            <!-- Pošlji sporočilo enoti / sektorju (poveljstvo -> teren) -->
+            <div id="stab-sporocilo-panel" class="stab-sporocilo-panel">
+                <div class="panel-glava">
+                    <span>✉️ Sporočilo enoti / sektorju</span>
+                </div>
+                <div class="stab-sporocilo-vsebina">
+                    <select id="stabCiljSelect">
+                        <option value="VSI">📢 Vsem enotam</option>
+                    </select>
+                    <input type="text" id="stabSporociloText" placeholder="Vpiši sporočilo ...">
+                    <button id="btnPosljiStabSporocilo">📤 Pošlji</button>
+                    <div id="stabSporociloStatus"></div>
+                </div>
+            </div>
+
+            <!-- OBS Video Predvajalnik v živo -->
+            <div id="video-stream-container" class="video-panel card-fullscreen-target">
+                <div class="video-header">
+                    <span>📹 Live Stream (Dron / OBS)</span>
+                    <div>
+                        <button class="btn-fullscreen" data-target="video-stream-container" title="Celozaslonski prenos">⛶</button>
+                        <button id="btn-toggle-video" style="background:none; border:none; color:white; cursor:pointer;">▼</button>
+                    </div>
+                </div>
+                <div id="video-wrapper" class="video-body">
+                    <iframe id="iframe-obs-stream" src="" frameborder="0" allowfullscreen></iframe>
+                </div>
+            </div>
+
+            <!-- Seznam enot na terenu -->
+            <div id="seznam-enot-wrapper" class="card-fullscreen-target" style="flex: 1; min-height: 200px; display: flex; flex-direction: column;">
+                <div class="panel-glava" style="flex-shrink: 0;">
+                    <span>Enote na terenu</span>
+                    <button class="btn-fullscreen" data-target="seznam-enot-wrapper" title="Celozaslonski seznam enot">⛶</button>
+                </div>
+                <div id="seznamEnotGumbi" style="flex: 1; min-height: 0; overflow-y: auto;"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Tiskalno poročilo (napolni ga js/tisk.js ob kliku na "Tisk") -->
+    <div id="print-section" class="print-only">
+        <h1 id="print-naslov">EPV - Poročilo Intervencije</h1>
+        <div id="print-tabela"></div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

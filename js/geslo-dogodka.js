@@ -7,7 +7,7 @@
 
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 
-const STORAGE_SEJA_GESLA = 'epv_seja_gesla_dogodkov';
+const STORAGE_SEJA_GESLA = 'epv2_seja_gesla_dogodkov';
 
 /**
  * SHA-256 zgoščena vrednost (hex) - geslo dogodka se na strežnik nikoli ne pošlje v

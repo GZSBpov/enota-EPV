@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPV Teren - Lokator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; text-align: center; }
+        .posoda { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+        input, select, button { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #d32f2f; color: white; font-weight: bold; border: none; cursor: pointer; }
+        button.oddaja { background: #388e3c; }
+        .status { font-weight: bold; margin-top: 15px; color: #555; }
+        .zacka-dogodek { background: #e0e0e0; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; color: #333; margin-bottom: 10px; display: inline-block; }
+        #oznakaDodeljenSektor { font-size: 13px; color: #555; margin-top: 6px; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        #btnOsveziSektor { width: auto; margin: 0; padding: 4px 10px; font-size: 12px; background: #1976d2; flex-shrink: 0; }
+        #terenski-zemljevid { width: 100%; height: 220px; border-radius: 8px; margin: 10px 0; display: none; }
+        .posoda-sporocila { margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; text-align: left; }
+        .posoda-sporocila label { font-weight: bold; display: block; margin-bottom: 6px; }
+        #hitraSporocila { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .btn-sporocilo { width: auto; flex: 1 1 auto; padding: 8px 10px; margin: 0; font-size: 13px; background: #555; }
+        .btn-sporocilo.sos { background: #b71c1c; }
+        #statusSporocila { font-size: 13px; color: #555; margin-top: 6px; min-height: 18px; }
+        .opozorilo-ozadje { font-size: 11px; color: #888; margin-top: 12px; text-align: left; line-height: 1.4; }
+        #obvestiloNadaljevanje { background: #fef3c7; border: 2px solid #d97706; border-radius: 6px; padding: 12px; margin-bottom: 12px; text-align: left; }
+        #obvestiloNadaljevanje b { display: block; margin-bottom: 6px; color: #92400e; }
+        #obvestiloNadaljevanje .gumbi-nadaljevanje { display: flex; gap: 6px; }
+        #obvestiloNadaljevanje button { width: auto; flex: 1; margin: 0; padding: 10px; font-size: 14px; }
+        #btnNadaljujOddajanje { background: #16a34a; }
+        #btnOpustiNadaljevanje { background: #64748b; }
+        #stabSporocilaPanel { display:none; margin-top: 12px; text-align: left; background: #eef2ff; border: 1px solid #6366f1; border-radius: 6px; padding: 8px 10px; }
+        #stabSporocilaPanel label { font-weight: bold; display: block; margin-bottom: 4px; color: #3730a3; }
+        .stab-sporocilo-vrstica { font-size: 13px; padding: 5px 4px; border-bottom: 1px solid #c7d2fe; color: #1e1b4b; cursor: pointer; }
+        .stab-sporocilo-vrstica:last-child { border-bottom: none; }
+        .stab-sporocilo-cas { color: #4f46e5; font-weight: bold; margin-right: 6px; }
+        .stab-sporocilo-vrstica.novo { background: #fef3c7; border-radius: 4px; animation: stab-utripa 1.4s ease-in-out infinite; }
+        @keyframes stab-utripa {
+            0%, 100% { box-shadow: inset 0 0 0 2px #f59e0b; }
+            50% { box-shadow: inset 0 0 0 2px #f59e0b, 0 0 6px 2px rgba(245,158,11,0.6); }
+        }
+    </style>
+    <!-- Skupna konfiguracija (GOOGLE_APPS_SCRIPT_URL) -->
+    <script src="js/shared-config.js"></script>
+    <!-- Leaflet (za prikaz dodeljenega sektorja) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<div class="posoda">
+    <h2>EPV Terenska Prijava</h2>
+
+    <div id="obvestiloNadaljevanje" style="display:none;"></div>
+
+    <div id="prikazDogodka" class="zacka-dogodek">Dogodek: Splošno</div>
+     
+    <label for="imeEnote">Ime enote (npr. Slb 1, Vodja 2):</label>
+    <input type="text" id="imeEnote" placeholder="Vpiši oznako...">
+
+    <label for="tipEnote">Tip enote:</label>
+    <select id="tipEnote">
+        <option value="gasilec">Gasilec (Rdeča)</option>
+        <option value="vozilo">Vozilo (Modra)</option>
+        <option value="vodja">Vodstvo / Štab / EPV (Rumena)</option>
+        <option value="resevalec">Reševalec / NMP (Zelena)</option>
+        <option value="drugo">CZ / Drugo (Oranžna)</option>
+    </select>
+
+    <label for="stClanov">Število članov v enoti:</label>
+    <input type="number" id="stClanov" value="1" min="1">
+
+    <label for="stVozil">Število vozil:</label>
+    <input type="number" id="stVozil" value="0" min="0">
+
+    <button id="gumbOddaja" onclick="preklopiOddajanje()">ZAČNI ODDAJANJE LOKACIJE</button>
+    <div class="status" id="statusPolje">Status: Pripravljen</div>
+
+    <div class="opozorilo-ozadje">
+        ℹ️ Oddajanje deluje zanesljivo, dokler je zaslon prižgan in je ta stran odprta v ospredju. Na iPhone (Safari) se oddajanje ustavi, če zaklenete zaslon ali zamenjate aplikacijo - to je omejitev iOS-a, ne te aplikacije.
+    </div>
+
+    <div id="oznakaDodeljenSektor">
+        <span id="oznakaDodeljenSektorTekst"></span>
+        <button type="button" id="btnOsveziSektor">🔄 Osveži sektor</button>
+    </div>
+    <div id="terenski-zemljevid"></div>
+
+    <div id="stabSporocilaPanel">
+        <label>📥 Sporočila iz štaba:</label>
+        <div id="stabSporocilaSeznam"></div>
+    </div>
+
+    <div class="posoda-sporocila">
+        <label>Pošlji sporočilo z lokacijo:</label>
+        <div id="hitraSporocila">
+            <button type="button" class="btn-sporocilo sos" data-sporocilo="SOS">🆘 SOS</button>
+            <button type="button" class="btn-sporocilo" data-sporocilo="Najdena oseba/žival">🔎 Najdena oseba/žival</button>
+            <button type="button" class="btn-sporocilo" data-sporocilo="Začetek reševanja/gašenja">▶️ Začetek reševanja/gašenja</button>
+            <button type="button" class="btn-sporocilo" data-sporocilo="Konec reševanja/gašenja">⏹️ Konec reševanja/gašenja</button>
+        </div>
+        <input type="text" id="lastnoSporocilo" placeholder="Ali vpiši kratek opis...">
+        <button type="button" id="posljiLastnoSporocilo" style="background:#555;">Pošlji opis</button>
+        <div id="statusSporocila"></div>
+    </div>
+</div>
+
+<script>
+    // GOOGLE_APPS_SCRIPT_URL je definiran v js/shared-config.js (skupen z mapeEPV.html)
+    const SCRIPT_URL = GOOGLE_APPS_SCRIPT_URL;
+
+    let watchId = null;
+    let prejsnjiCas = 0;
+    let izbranDogodek = "Splošno";
+    let dodeljenSektorIntervalId = null;
+    let terenskiMap = null;
+    let terenskaSektorjiSloj = null;
+    let terenskaSporocilaSloj = null;
+    let mojaLokacijaOznacevalec = null;
+    let wakeLock = null;
+
+    // Wake Lock: prepreči zaspanje zaslona med oddajanjem (najpogostejši vzrok prekinitve na terenu).
+    // Ne pomaga, če uporabnik zaklene zaslon ročno ali zamenja aplikacijo - to je omejitev OS-a.
+    async function zahtevajWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => { wakeLock = null; });
+            }
+        } catch (err) {
+            // Wake Lock ni podprt ali je bil zavrnjen - ni kritično, oddajanje nadaljuje brez njega
+        }
+    }
+
+    function sprostiWakeLock() {
+        if (wakeLock) {
+            wakeLock.release();
+            wakeLock = null;
+        }
+    }
+
+    // Brskalniki samodejno sprostijo Wake Lock, ko stran ni vidna - ob vrnitvi ga znova zahtevamo
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && watchId !== null && wakeLock === null) {
+            zahtevajWakeLock();
+        }
+    });
+
+    // ==========================================
+    // OKREVANJE PO NEHOTENEM ZAPIRANJU OKNA/ZAVIHKA
+    // Če se stran zapre (po pomoti), medtem ko je enota aktivno oddajala, JS spremenljivke
+    // (watchId, ime enote ...) izginejo. Podatke zato shranjujemo v localStorage na tej NAPRAVI,
+    // da lahko enota ob ponovnem odprtju te strani takoj nadaljuje oddajanje - brez ponovnega
+    // vpisovanja imena/tipa/dogodka in brez iskanja QR kode.
+    // ==========================================
+    const STORAGE_TEREN_STANJE = 'epv_teren_stanje';
+
+    function shraniStanjeObrazca(aktivnoOddaja) {
+        try {
+            localStorage.setItem(STORAGE_TEREN_STANJE, JSON.stringify({
+                ime: document.getElementById('imeEnote').value.trim(),
+                tip: document.getElementById('tipEnote').value,
+                clanov: document.getElementById('stClanov').value,
+                vozila: document.getElementById('stVozil').value,
+                dogodek: izbranDogodek,
+                oddaja: aktivnoOddaja
+            }));
+        } catch (e) {}
+    }
+
+    function nalozizStanjeObrazca() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_TEREN_STANJE)) || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function prikaziPozivZaNadaljevanje(shranjeno) {
+        const obvestilo = document.getElementById('obvestiloNadaljevanje');
+        obvestilo.style.display = 'block';
+        obvestilo.innerHTML = `
+            <b>⚠️ Oddajanje je bilo prekinjeno (npr. zaprto okno) za enoto "${pobegniHtmlLokalno(shranjeno.ime)}".</b>
+            <div class="gumbi-nadaljevanje">
+                <button type="button" id="btnNadaljujOddajanje">▶️ Nadaljuj oddajanje</button>
+                <button type="button" id="btnOpustiNadaljevanje">Prezri</button>
+            </div>
+        `;
+
+        document.getElementById('btnNadaljujOddajanje').addEventListener('click', () => {
+            obvestilo.style.display = 'none';
+            preklopiOddajanje(); // watchId je še null, torej to zažene oddajanje s trenutno izpolnjenim obrazcem
+        });
+        document.getElementById('btnOpustiNadaljevanje').addEventListener('click', () => {
+            obvestilo.style.display = 'none';
+            shraniStanjeObrazca(false);
+        });
+    }
+
+    // Opozorimo (kjer brskalnik to podpira), če uporabnik med aktivnim oddajanjem poskusi
+    // zapreti/zapustiti stran - da do zaprtja po pomoti sploh ne pride. (Na iOS Safari to
+    // ni vedno zanesljivo - to je omejitev sistema, ne te strani.)
+    window.addEventListener('beforeunload', (e) => {
+        if (watchId !== null) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // Avtomatsko branje nastavitev iz QR kode ob zagonu
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tip = urlParams.get('tip');
+        const clanov = urlParams.get('clanov');
+        const vozila = urlParams.get('vozila');
+        const dogodek = urlParams.get('dogodek');
+
+        // Najprej obnovimo iz lokalno shranjenega stanja te naprave (če obstaja) ...
+        const shranjeno = nalozizStanjeObrazca();
+        if (shranjeno) {
+            if (shranjeno.ime) document.getElementById('imeEnote').value = shranjeno.ime;
+            if (shranjeno.tip) document.getElementById('tipEnote').value = shranjeno.tip;
+            if (shranjeno.clanov) document.getElementById('stClanov').value = shranjeno.clanov;
+            if (shranjeno.vozila !== undefined && shranjeno.vozila !== '') document.getElementById('stVozil').value = shranjeno.vozila;
+            if (shranjeno.dogodek) {
+                izbranDogodek = shranjeno.dogodek;
+                document.getElementById('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
+            }
+        }
+
+        // ... nato preglasimo z URL parametri, če so podani (npr. sveže poskeniran QR za nov dogodek)
+        if (tip) document.getElementById('tipEnote').value = tip;
+        if (clanov) document.getElementById('stClanov').value = clanov;
+        if (vozila) document.getElementById('stVozil').value = vozila;
+
+        if (dogodek) {
+            izbranDogodek = decodeURIComponent(dogodek);
+            document.getElementById('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
+        }
+
+        // Če je bilo oddajanje aktivno, ko se je stran nazadnje zaprla (ni bilo pravilno ustavljeno
+        // z gumbom), ponudimo takojšnjo nadaljevanje - eno tipko, brez ponovnega vpisovanja.
+        if (shranjeno?.oddaja && shranjeno?.ime) {
+            prikaziPozivZaNadaljevanje(shranjeno);
+        }
+
+        // Če enota svoje ime že pozna (npr. shranjeno iz prejšnje seje), takoj preverimo dodelitev
+        document.getElementById('imeEnote').addEventListener('change', naloziDodeljenSektor);
+        document.getElementById('imeEnote').addEventListener('change', naloziSporocilaStaba);
+        document.getElementById('btnOsveziSektor').addEventListener('click', naloziDodeljenSektor);
+        document.getElementById('btnOsveziSektor').addEventListener('click', naloziSporocilaStaba);
+
+        // Sporočila iz štaba naj bodo vidna takoj, tudi še preden enota pritisne "Začni oddajanje"
+        // (npr. ime je bilo obnovljeno iz shranjenega stanja te naprave).
+        if (document.getElementById('imeEnote').value.trim()) {
+            naloziSporocilaStaba();
+        }
+    };
+
+    function pripraviTerenskiZemljevid() {
+        if (terenskiMap) return;
+        terenskiMap = L.map('terenski-zemljevid');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(terenskiMap);
+        terenskaSektorjiSloj = L.featureGroup().addTo(terenskiMap);
+        terenskaSporocilaSloj = L.featureGroup().addTo(terenskiMap);
+    }
+
+    function pobegniHtmlLokalno(niz) {
+        const el = document.createElement('div');
+        el.textContent = niz ?? '';
+        return el.innerHTML;
+    }
+
+    // Enak +2h popravek kot v js/cas-pomoc.js (terenEPV.html ni modul, zato je podvojen)
+    function formatirajCasLokalno(cas) {
+        if (!cas) return '-';
+        const niz = cas.toString();
+        if (niz.includes('T') || /Z$/i.test(niz)) {
+            const datum = new Date(niz);
+            if (!isNaN(datum.getTime())) {
+                const premaknjen = new Date(datum.getTime() + 2 * 60 * 60 * 1000);
+                const p = (n) => n.toString().padStart(2, '0');
+                return `${premaknjen.getUTCFullYear()}-${p(premaknjen.getUTCMonth() + 1)}-${p(premaknjen.getUTCDate())} ${p(premaknjen.getUTCHours())}:${p(premaknjen.getUTCMinutes())}:${p(premaknjen.getUTCSeconds())}`;
+            }
+        }
+        return niz;
+    }
+
+    // Ray-casting test točka-v-poligonu (GeoJSON [lon,lat] zunanji obroč, brez lukenj)
+    function tockaVPoligonu(lat, lon, coordinates) {
+        const ring = coordinates[0];
+        let znotraj = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const xi = ring[i][0], yi = ring[i][1];
+            const xj = ring[j][0], yj = ring[j][1];
+            const presek = ((yi > lat) !== (yj > lat)) &&
+                (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (presek) znotraj = !znotraj;
+        }
+        return znotraj;
+    }
+
+    function tockaVSektorju(lat, lon, elem) {
+        if (!elem || !elem.geometry) return false;
+        const tip = elem.properties?.tipObmočja;
+
+        if (tip === "circle" && elem.geometry.type === "Point") {
+            const center = L.latLng(elem.geometry.coordinates[1], elem.geometry.coordinates[0]);
+            const polmer = elem.properties.polmer || 100;
+            return L.latLng(lat, lon).distanceTo(center) <= polmer;
+        }
+        if (elem.geometry.type === "Polygon") {
+            return tockaVPoligonu(lat, lon, elem.geometry.coordinates);
+        }
+        return false; // črte (polyline) nimajo "notranjosti"
+    }
+
+    function izrisiSporocilaVSektorju(sporocila, sektorji) {
+        if (!terenskaSporocilaSloj) return;
+        terenskaSporocilaSloj.clearLayers();
+        if (!sporocila || !sektorji || sektorji.length === 0) return;
+
+        sporocila.forEach(s => {
+            if (!s || !s.sporocilo) return;
+            const lat = parseFloat(s.lat);
+            const lon = parseFloat(s.lon);
+            if (isNaN(lat) || isNaN(lon)) return;
+
+            const vSektorju = sektorji.some(elem => tockaVSektorju(lat, lon, elem));
+            if (!vSektorju) return;
+
+            const jeSOS = (s.sporocilo || '').toString().toUpperCase().includes('SOS');
+            const marker = L.marker([lat, lon], {
+                icon: L.divIcon({
+                    className: 'teren-sporocilo-ikona',
+                    html: jeSOS ? '🆘' : '📍',
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 24]
+                })
+            });
+
+            marker.bindPopup(`
+                <div style="color:#000; font-family:sans-serif; font-size:12px;">
+                    <b>${pobegniHtmlLokalno(s.enota)}</b><br>
+                    Čas: ${pobegniHtmlLokalno(formatirajCasLokalno(s.cas))}<br>
+                    Koordinate: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
+                    ${pobegniHtmlLokalno(s.sporocilo)}
+                </div>
+            `);
+
+            terenskaSporocilaSloj.addLayer(marker);
+        });
+    }
+
+    function naloziSporocilaVSektorju(sektorji) {
+        if (!sektorji || sektorji.length === 0) {
+            if (terenskaSporocilaSloj) terenskaSporocilaSloj.clearLayers();
+            return;
+        }
+        fetch(`${SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(izbranDogodek)}&geslo=EPV2026`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(odgovor => {
+                if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
+                    izrisiSporocilaVSektorju(odgovor.data, sektorji);
+                }
+            })
+            .catch(() => { /* tiho - sporočila na mini zemljevidu niso nujna za osnovno delovanje */ });
+    }
+
+    function izrisiDodeljeneSektorje(sektorji) {
+        const zemljevidEl = document.getElementById('terenski-zemljevid');
+        const oznakaEl = document.getElementById('oznakaDodeljenSektorTekst');
+
+        if (!sektorji || sektorji.length === 0) {
+            oznakaEl.innerText = 'Ni dodeljenih sektorjev.';
+            if (!mojaLokacijaOznacevalec) zemljevidEl.style.display = 'none';
+            return;
+        }
+
+        oznakaEl.innerText = `📍 Dodeljenih sektorjev: ${sektorji.length}`;
+        zemljevidEl.style.display = 'block';
+
+        pripraviTerenskiZemljevid();
+        terenskaSektorjiSloj.clearLayers();
+
+        const barveHex = { red: "#ef4444", blue: "#3b82f6", green: "#10b981", gold: "#eab308", orange: "#f97316", purple: "#a855f7" };
+
+        sektorji.forEach(elem => {
+            if (!elem || !elem.geometry) return;
+            const barva = barveHex[elem.properties?.barvaSektorja] || "#ef4444";
+            const tip = elem.properties?.tipObmočja;
+            let layer;
+
+            if (tip === "circle" && elem.geometry.type === "Point") {
+                const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
+                layer = L.circle(coords, { radius: elem.properties.polmer || 100, color: barva, fillColor: barva, fillOpacity: 0.35, weight: 3 });
+            } else if (tip === "tocka" && elem.geometry.type === "Point") {
+                const coords = [elem.geometry.coordinates[1], elem.geometry.coordinates[0]];
+                layer = L.circleMarker(coords, { radius: 9, color: '#ffffff', weight: 2, fillColor: barva, fillOpacity: 1 });
+                layer.bindTooltip('📍 Označena točka');
+            } else if (elem.geometry.type !== "Point") {
+                layer = L.geoJSON(elem, { style: { color: barva, fillColor: barva, fillOpacity: 0.35, weight: 3 } }).getLayers()[0];
+            }
+
+            if (layer) terenskaSektorjiSloj.addLayer(layer);
+        });
+
+        setTimeout(() => {
+            terenskiMap.invalidateSize();
+            if (terenskaSektorjiSloj.getLayers().length > 0) {
+                const meje = terenskaSektorjiSloj.getBounds();
+                if (mojaLokacijaOznacevalec) meje.extend(mojaLokacijaOznacevalec.getLatLng());
+                terenskiMap.fitBounds(meje, { maxZoom: 16 });
+            }
+        }, 100);
+    }
+
+    /**
+     * Doda (oz. premakne) modro piko z lastno GPS lokacijo na mini zemljevidu.
+     * Prvič, ko se pika ustvari, zemljevid tudi približa nanjo (in na morebiten dodeljen sektor);
+     * kasnejše posodobitve samo premaknejo piko, brez skakanja pogleda.
+     */
+    function posodobiMojoLokacijoNaZemljevidu(lat, lon) {
+        const zemljevidEl = document.getElementById('terenski-zemljevid');
+        zemljevidEl.style.display = 'block';
+        pripraviTerenskiZemljevid();
+
+        if (mojaLokacijaOznacevalec) {
+            mojaLokacijaOznacevalec.setLatLng([lat, lon]);
+            return;
+        }
+
+        mojaLokacijaOznacevalec = L.circleMarker([lat, lon], {
+            radius: 8,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: '#2563eb',
+            fillOpacity: 1
+        }).addTo(terenskiMap).bindTooltip('Moja lokacija');
+
+        setTimeout(() => {
+            terenskiMap.invalidateSize();
+            if (terenskaSektorjiSloj.getLayers().length > 0) {
+                terenskiMap.fitBounds(terenskaSektorjiSloj.getBounds().extend([lat, lon]), { maxZoom: 16 });
+            } else {
+                terenskiMap.setView([lat, lon], 16);
+            }
+        }, 100);
+    }
+
+    // ==========================================
+    // SPOROČILA IZ ŠTABA (poveljstvo -> teren) - obratna smer od hitrih sporočil zgoraj
+    // ==========================================
+    const STORAGE_STAB_PREBRANA = 'epv_teren_stab_prebrana';
+
+    function pridobiStabPrebrana() {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(STORAGE_STAB_PREBRANA)) || []);
+        } catch (e) {
+            return new Set();
+        }
+    }
+
+    function oznaciStabPrebrano(id) {
+        const prebrana = pridobiStabPrebrana();
+        prebrana.add(id);
+        localStorage.setItem(STORAGE_STAB_PREBRANA, JSON.stringify(Array.from(prebrana).slice(-200)));
+    }
+
+    function stabSporociloId(s) {
+        return `${s.cas}|${s.cilj}|${s.sporocilo}`;
+    }
+
+    function izrisiSporocilaStaba(sporocila) {
+        const panel = document.getElementById('stabSporocilaPanel');
+        const kontejner = document.getElementById('stabSporocilaSeznam');
+        if (!panel || !kontejner) return;
+
+        const veljavna = (sporocila || []).filter(s => s && s.sporocilo);
+        if (veljavna.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.style.display = 'block';
+        const prebrana = pridobiStabPrebrana();
+        const razvrscena = veljavna.slice().sort((a, b) => (b.cas || '').localeCompare(a.cas || '')).slice(0, 15);
+
+        kontejner.innerHTML = razvrscena.map(s => {
+            const id = stabSporociloId(s);
+            const jeNovo = !prebrana.has(id);
+            return `<div class="stab-sporocilo-vrstica ${jeNovo ? 'novo' : ''}" data-id="${pobegniHtmlLokalno(id)}">
+                <span class="stab-sporocilo-cas">${pobegniHtmlLokalno(formatirajCasLokalno(s.cas))}</span>${pobegniHtmlLokalno(s.sporocilo)}
+            </div>`;
+        }).join('');
+
+        kontejner.querySelectorAll('.stab-sporocilo-vrstica').forEach(el => {
+            el.addEventListener('click', () => {
+                oznaciStabPrebrano(el.dataset.id);
+                el.classList.remove('novo');
+            });
+        });
+    }
+
+    function naloziSporocilaStaba() {
+        const ime = document.getElementById('imeEnote').value.trim();
+        if (!ime || !izbranDogodek) return;
+
+        fetch(`${SCRIPT_URL}?akcija=pridobiSporocilaStab&dogodek=${encodeURIComponent(izbranDogodek)}&cilj=${encodeURIComponent(ime)}&geslo=EPV2026`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(odgovor => {
+                if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
+                    izrisiSporocilaStaba(odgovor.data);
+                }
+            })
+            .catch(() => { /* tiho - sporočila iz štaba niso nujna za osnovno delovanje oddajanja */ });
+    }
+
+    function naloziDodeljenSektor() {
+        const ime = document.getElementById('imeEnote').value.trim();
+        const oznakaEl = document.getElementById('oznakaDodeljenSektorTekst');
+        if (!ime) {
+            if (oznakaEl) oznakaEl.innerText = 'Za prikaz sektorja najprej vpiši ime enote.';
+            return;
+        }
+
+        fetch(`${SCRIPT_URL}?akcija=pridobiDodeljeneSektorje&dogodek=${encodeURIComponent(izbranDogodek)}&enotaIme=${encodeURIComponent(ime)}&geslo=EPV2026`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(odgovor => {
+                if (odgovor.status === 'success' && Array.isArray(odgovor.data)) {
+                    const sektorji = odgovor.data.map(v => v.podatki).filter(Boolean);
+                    izrisiDodeljeneSektorje(sektorji);
+                    naloziSporocilaVSektorju(sektorji);
+                }
+            })
+            .catch(() => { /* tiho - dodeljen sektor ni nujen za osnovno delovanje oddajanja lokacije */ });
+    }
+
+    function preklopiOddajanje() {
+        const gumb = document.getElementById('gumbOddaja');
+        const status = document.getElementById('statusPolje');
+        const ime = document.getElementById('imeEnote').value.trim();
+
+        if (!ime) {
+            alert("Prosimo, vpiši ime enote!");
+            return;
+        }
+
+        if (watchId === null) {
+            if (!navigator.geolocation) {
+                status.innerText = "GPS ni podprt na tej napravi.";
+                return;
+            }
+
+            gumb.innerText = "USTAVI ODDAJANJE";
+            gumb.classList.add('oddaja');
+            status.innerText = "Iščem GPS signal...";
+
+            // Konfiguracija za iPhone (omogoča natančen GPS in preprečuje predpomnjenje stare lokacije)
+            const gpsOpcije = { 
+                enableHighAccuracy: true, 
+                timeout: 15000, 
+                maximumAge: 0 
+            };
+
+            watchId = navigator.geolocation.watchPosition(posljiLokacijo,
+                (err) => {
+                    let sporocilo = err.message;
+                    if (err.code === 1) {
+                        sporocilo = "Dovoljenje zavrnjeno! V nastavitvah iPhona odobrite lokacijo za Safari.";
+                        alert("Prosimo, v nastavitvah iPhona dovolite uporabo lokacije za vaš brskalnik.");
+                    }
+                    status.innerText = "Napaka GPS: " + sporocilo;
+                },
+                gpsOpcije
+            );
+
+            // Preverimo dodeljen sektor in sporočila iz štaba takoj, nato pa občasno
+            // (če vodja med intervencijo kaj spremeni/pošlje)
+            naloziDodeljenSektor();
+            naloziSporocilaStaba();
+            dodeljenSektorIntervalId = setInterval(() => {
+                naloziDodeljenSektor();
+                naloziSporocilaStaba();
+            }, 30000);
+
+            zahtevajWakeLock();
+
+            // Shranimo stanje LOKALNO na to napravo - če se stran po pomoti zapre, jo lahko
+            // ob ponovnem odprtju takoj nadaljujemo (glej prikaziPozivZaNadaljevanje).
+            shraniStanjeObrazca(true);
+        } else {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+            gumb.innerText = "ZAČNI ODDAJANJE LOKACIJE";
+            gumb.classList.remove('oddaja');
+            status.innerText = "Status: Oddajanje ustavljeno.";
+
+            if (dodeljenSektorIntervalId) {
+                clearInterval(dodeljenSektorIntervalId);
+                dodeljenSektorIntervalId = null;
+            }
+
+            sprostiWakeLock();
+
+            // Namerno ustavljeno (ne nehoten izhod) - ne ponujaj več samodejnega nadaljevanja
+            shraniStanjeObrazca(false);
+
+            // Pošljemo eksplicitno "Konec oddajanja" - da ima poveljstvo pravi čas zaključka
+            // enote, ne le čas zadnjega utripa pred tišino (npr. izklop telefona).
+            posljiSporociloZLokacijo('Konec oddajanja');
+        }
+    }
+
+    function posljiSporociloZLokacijo(besedilo) {
+        besedilo = (besedilo || '').trim();
+        const ime = document.getElementById('imeEnote').value.trim();
+        const statusEl = document.getElementById('statusSporocila');
+
+        if (!ime) {
+            alert("Prosimo, najprej vpiši ime enote!");
+            return;
+        }
+        if (!besedilo) return;
+
+        if (!navigator.geolocation) {
+            statusEl.innerText = "GPS ni podprt na tej napravi.";
+            return;
+        }
+
+        statusEl.innerText = `Pridobivam lokacijo za sporočilo "${besedilo}"...`;
+
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const tip = document.getElementById('tipEnote').value;
+            const clanov = document.getElementById('stClanov').value;
+            const vozila = document.getElementById('stVozil').value;
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const acc = Math.round(position.coords.accuracy);
+            const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}:${vozila}`;
+
+            const url = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}&dogodek=${encodeURIComponent(izbranDogodek)}&sporocilo=${encodeURIComponent(besedilo)}`;
+
+            fetch(url, { method: 'GET', mode: 'no-cors' })
+                .then(() => {
+                    statusEl.innerText = `Poslano: "${besedilo}" ob ${new Date().toLocaleTimeString()}`;
+                })
+                .catch(() => {
+                    statusEl.innerText = "Napaka pri pošiljanju sporočila.";
+                });
+        }, function(err) {
+            statusEl.innerText = "Napaka GPS pri pošiljanju sporočila: " + err.message;
+        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    }
+
+    document.querySelectorAll('.btn-sporocilo').forEach(btn => {
+        btn.addEventListener('click', () => posljiSporociloZLokacijo(btn.dataset.sporocilo));
+    });
+
+    document.getElementById('posljiLastnoSporocilo').addEventListener('click', () => {
+        const input = document.getElementById('lastnoSporocilo');
+        posljiSporociloZLokacijo(input.value);
+        input.value = '';
+    });
+
+    async function posljiLokacijo(position) {
+        const trenutenCas = new Date().getTime();
+        // Varovalka: pošlji podatke največ na vsakih 5 sekund
+        if (trenutenCas - prejsnjiCas < 5000) return;
+        prejsnjiCas = trenutenCas;
+
+        const ime = document.getElementById('imeEnote').value.trim();
+        const tip = document.getElementById('tipEnote').value;
+        const clanov = document.getElementById('stClanov').value;
+        const vozila = document.getElementById('stVozil').value;
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const acc = Math.round(position.coords.accuracy);
+
+        posodobiMojoLokacijoNaZemljevidu(lat, lon);
+
+        document.getElementById('statusPolje').innerText = `Pošiljam... Natančnost: ${acc}m`;
+
+        const polnoIme = `${tip.toUpperCase()}:${ime}:${clanov}:${vozila}`;
+
+        // POPRAVEK ZA iOS: Pošiljanje parametrov vključno z dogodkom preko GET zahteve
+        const urlZParametri = `${SCRIPT_URL}?enota=${encodeURIComponent(polnoIme)}&lat=${lat}&lon=${lon}&acc=${acc}&dogodek=${encodeURIComponent(izbranDogodek)}`;
+
+        try {
+            await fetch(urlZParametri, {
+                method: 'GET',
+                mode: 'no-cors'
+            });
+
+            document.getElementById('statusPolje').innerText = `Poslano! Zadnji vpis ob ${new Date().toLocaleTimeString()}`;
+        } catch (e) {
+            document.getElementById('statusPolje').innerText = "Napaka pri povezavi.";
+        }
+    }
+</script>
+</body>
+</html>
