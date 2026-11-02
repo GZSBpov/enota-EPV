@@ -14,6 +14,7 @@ import { formatirajCas, casVMs } from './cas-pomoc.js';
 import { pridobiSejnoGeslo } from './geslo-dogodka.js';
 import { apiGet } from './api.js';
 import { zabeleziKonecOddajanja } from './enote-register.js';
+import { besediloSporocila, gumbiHtml, pripniKopiranje } from './deli.js';
 import { jeIzkljuceno, nastaviIzkljuceno } from './tisk-izbor.js';
 
 const Zvok = window.EPVZvok;
@@ -84,12 +85,15 @@ function oznaciSporociloNaZemljevidu(s, lat, lon) {
             Čas: ${escapeHtml(formatirajCas(s.cas))}<br>
             Koordinate: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
             ${escapeHtml(s.sporocilo)}
+            ${gumbiHtml(besediloSporocila(s, lat, lon, formatirajCas(s.cas, true)))}
         </div>`;
 
     sporociloOznacevalec = L.marker([lat, lon], {
         icon: L.divIcon({ className: 'sporocilo-oznacevalec-ikona', html: '📍', iconSize: [30, 30], iconAnchor: [15, 28] })
     }).addTo(map);
-    sporociloOznacevalec.bindPopup(vsebina).openPopup();
+    sporociloOznacevalec.bindPopup(vsebina);
+    sporociloOznacevalec.on('popupopen', (e) => pripniKopiranje(e.popup.getElement()));
+    sporociloOznacevalec.openPopup();
 }
 
 // ---------- SOS alarm ----------

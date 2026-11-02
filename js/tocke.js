@@ -15,6 +15,7 @@ import { jeIzkljuceno, nastaviIzkljuceno } from './tisk-izbor.js';
 import { pridobiVseEnote } from './units.js';
 import { pridobiPotrditve } from './enote-register.js';
 import { zgradiCiljeOptionsHtml, razresiCilj } from './stab-sporocila.js';
+import { besediloTocke, besediloRadio, gumbiHtml, pripniKopiranje } from './deli.js';
 
 const K = window.EPVKoordinate;
 const tocke = new Map(); // id -> { podatki, marker, krog }
@@ -95,6 +96,7 @@ function popupHtml(t) {
                 <a href="${mapsUrl}" target="_blank" rel="noopener" style="flex:1; text-align:center; background:#059669; color:#fff; padding:4px; border-radius:4px; text-decoration:none; font-weight:bold;">🧭 Navigacija</a>
                 <button type="button" class="tp-izbrisi" style="padding:4px 8px; background:#dc2626; color:#fff; border:none; border-radius:4px; cursor:pointer;">🗑 Umakni</button>
             </div>
+            ${gumbiHtml(besediloTocke(t), besediloRadio(t))}
             <div class="tp-status" style="margin-top:4px; color:#475569;"></div>
         </div>`;
 }
@@ -145,6 +147,7 @@ function pocistiVse() {
 
 function pripniPopup(vozlisce, id) {
     if (!vozlisce) return;
+    pripniKopiranje(vozlisce);
     const statusEl = vozlisce.querySelector('.tp-status');
     const poslji = vozlisce.querySelector('.tp-poslji');
     const izbrisi = vozlisce.querySelector('.tp-izbrisi');

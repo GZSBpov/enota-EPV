@@ -12,6 +12,7 @@ import { pridobiZnanaImenaEnot, pridobiPotrditve, postaviPotrditve } from './eno
 import { formatirajCas, casVMs } from './cas-pomoc.js';
 import { apiGet, novId } from './api.js';
 import { jeIzkljuceno, nastaviIzkljuceno } from './tisk-izbor.js';
+import { povezave } from './deli.js';
 
 function escapeHtml(niz) {
     const el = document.createElement('div');
@@ -214,7 +215,21 @@ export async function osveziStabLog() {
     }
 }
 
+/** Povezave »pošlji še prek WhatsApp / Viber / SMS« se sproti prilagodijo besedilu v polju. */
+function osveziDeliPovezave() {
+    const besedilo = (document.getElementById('stabSporociloText')?.value || '').trim();
+    const p = povezave(besedilo ? `EPV štab: ${besedilo}` : '');
+    [['stabDeliWa', p.wa], ['stabDeliViber', p.viber], ['stabDeliSms', p.sms]].forEach(([id, href]) => {
+        const a = document.getElementById(id);
+        if (!a) return;
+        a.href = besedilo ? href : '#';
+        a.classList.toggle('onemogoceno', !besedilo);
+    });
+}
+
 export function iniciirajStabSporocila() {
+    document.getElementById('stabSporociloText')?.addEventListener('input', osveziDeliPovezave);
+    osveziDeliPovezave();
     osveziStabCiljSeznam();
     document.getElementById('stabCiljSelect')?.addEventListener('focus', osveziStabCiljSeznam);
     document.getElementById('btnPosljiStabSporocilo')?.addEventListener('click', posljiIzObrazca);

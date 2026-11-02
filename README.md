@@ -51,6 +51,14 @@ Umaknjene točke ostanejo v seznamu in poročilu, z napisom »Umaknjena ob« in 
 zato opomniki delujejo, dokler je zaslon prižgan. Za primer, ko telefon zaspi, opozori **štab**: ko enota, ki je oddajala, 5 minut ne odda
 (in ni namerno ustavljena), se v stranski vrstici pojavi opozorilo ⚠️ z zvokom; klik prikaže enoto na zemljevidu. Štab jo nato pokliče.
 
+**Deljenje prek WhatsApp / Viber / SMS in za radio (ZARE)**: v oknu točke in v oknu sporočila s terena (npr. SOS) so gumbi WhatsApp, Viber in SMS, ki odprejo
+aplikacijo s pripravljenim besedilom (naziv, koordinate WGS84 in D96/TM, povezava na zemljevid); izberete osebo ali skupino in pošljete.
+Pod obrazcem za sporočilo štaba so isti gumbi za besedilo, ki ga pišete. Gumb »📋 Za radio« kopira kratko besedilo za branje po radijski zvezi
+(D96/TM vzhod in sever, nato WGS84). Pošiljate vi - brez računov in ključev, zato deluje tudi z navadnimi WhatsApp/Viber skupinami.
+
+**Štabni računalnik**: zaslon ne zaspi, dokler je aplikacija odprta; ob vrnitvi na zavihek se vse takoj osveži. Brskalnik zavihke v ozadju upočasni
+(do ene minute zamude), zato naj bo štabni zavihek viden (po možnosti v svojem oknu ali na svojem zaslonu), ne le odprt v ozadju.
+
 **Zvok**: štab - glasna sirena ob SOS (zveni do potrditve), ding-dong ob novem sporočilu; teren - zvok in vibracija ob sporočilu ali točki iz štaba,
 opomnik do 5-krat, dokler ni prebrano. Telefoni in brskalniki zvok dovolijo šele po dotiku: gumb »Tapni za vklop zvoka« se po prvem dotiku spremeni v »Zvok vklopljen«.
 (iPhone v brskalniku ne podpira vibracije.)
