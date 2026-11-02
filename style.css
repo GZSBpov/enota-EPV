@@ -588,3 +588,26 @@ header h2 {
 @media print {
     .sos-pasica, #konfiguracija-opozorilo { display: none !important; }
 }
+
+
+/* Poročilo: potrditvena polja pred točkami in sporočili (odkljukano = izpuščeno iz izpisa) */
+.chk-tisk { width: 15px; height: 15px; vertical-align: middle; margin-right: 4px; cursor: pointer; accent-color: #2563eb; }
+.sporocilo-vrstica.izkljuceno, .tocka-vrstica.izkljuceno, .stab-log-vrstica.izkljuceno { opacity: .5; }
+.tocka-vrstica.umaknjena { cursor: default; color: #94a3b8; }
+.tocka-vrstica.umaknjena .tocka-vrstica-cilj { color: #94a3b8; font-style: italic; }
+.stab-log { max-height: 180px; }
+
+/* Izbira točke s klikom na zemljevid */
+.tocka-gumb-klik { background: #0e7490 !important; margin-top: 8px; }
+.tocka-klik-pasica {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 100002; display: flex; align-items: center; gap: 12px;
+    background: #0e7490; color: #fff; font-weight: bold; padding: 10px 16px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+.tocka-klik-pasica button { background: #fff; color: #0e7490; border: none; border-radius: 4px; padding: 5px 10px; font-weight: bold; cursor: pointer; }
+
+
+/* Opozorila štabu: enota je prenehala oddajati */
+.opozorila-enot { background: #78350f; border-bottom: 2px solid #f59e0b; flex-shrink: 0; max-height: 130px; overflow-y: auto; }
+.opozorilo-enote { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 12px; font-size: 0.82rem; color: #fef3c7; cursor: pointer; border-bottom: 1px solid #92400e; }
+.opozorilo-enote:hover { background: #92400e; }
+.opozorilo-zapri { background: none; border: none; color: #fde68a; cursor: pointer; font-size: 1rem; padding: 0 4px; }

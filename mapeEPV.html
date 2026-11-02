@@ -47,6 +47,12 @@
         </div>
     </div>
 
+    <!-- Pasica med izbiro točke s klikom na zemljevid -->
+    <div id="tocka-klik-pasica" class="tocka-klik-pasica" style="display:none;">
+        <span>🖱️ Klikni na zemljevid, kjer je točka</span>
+        <button type="button" id="btn-tocka-klik-preklic">Prekliči (Esc)</button>
+    </div>
+
     <!-- MODALNO OKNO: TOČKA IZ KOORDINAT -->
     <div id="tocka-modal" class="modal-overlay" style="display: none;">
         <div class="modal-vsebina tocka-modal-vsebina">
@@ -54,6 +60,7 @@
             <div id="tocka-dogodek-opozorilo" class="tocka-opozorilo" style="display:none;">⚠️ Najprej izberi ali ustvari dogodek - točke se shranjujejo pod dogodek.</div>
             <label for="tocka-vnos">Koordinate (poljuben zapis):</label>
             <textarea id="tocka-vnos" rows="2" placeholder="46.3934, 15.5746" autocomplete="off" spellcheck="false"></textarea>
+            <button type="button" id="btn-tocka-klik" class="tocka-gumb-klik" title="Zapre obrazec; klikni točko na zemljevidu, koordinate se vpišejo same">🖱️ Ali izberi točko s klikom na zemljevidu</button>
             <div id="tocka-predogled" class="tocka-predogled"></div>
             <div class="tocka-vrstica-polj">
                 <div><label for="tocka-naziv">Naziv:</label><input type="text" id="tocka-naziv" placeholder="npr. Klic - oseba"></div>
@@ -133,6 +140,9 @@
                 <input type="text" id="input-ime-dogodka" placeholder="Naziv nove intervencije..." style="width: 100%; margin-top: 6px; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
                 <button id="btn-zakljuci-dogodek" style="width: 100%; margin-top: 6px; padding: 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🏁 Zaključi intervencijo</button>
             </div>
+
+            <!-- Opozorila: enota je prenehala oddajati -->
+            <div id="opozorila-enot" class="opozorila-enot" style="display:none;"></div>
 
             <!-- Nadzorni gumbi -->
             <div class="gumbi-panel">

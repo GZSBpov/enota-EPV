@@ -25,6 +25,11 @@ export const natancnostSloj = new L.FeatureGroup();
 const enoteBaza = {};
 const vidnostEnot = {};
 
+// Opozorila štabu: enota, ki je oddajala, je prenehala (ni signala, ne namerno ustavljeno).
+// Sproži se samo ob PREHODU med delovanjem dashboarda - enote, ki so že ob odprtju strani brez signala, ne zvonijo.
+const prejsnjiStatus = {};       // id enote -> zadnja koda stanja
+const opozorilaEnot = new Map(); // id enote -> { id, ime, casMs }
+
 // Prejete vrstice izbranega dogodka (id -> vrstica) in kazalec na zadnjo prebrano vrstico lista
 const vrsticePoId = new Map();
 let vrsticeDogodek = null;
@@ -193,12 +198,60 @@ function odstraniEnoto(id) {
     slediSloj.removeLayer(e.pathLayer);
     natancnostSloj.removeLayer(e.krog);
     delete enoteBaza[id];
+    delete prejsnjiStatus[id];
+    opozorilaEnot.delete(id);
 }
 
 function pocistiVse() {
     Object.keys(enoteBaza).forEach(odstraniEnoto);
     vrsticePoId.clear();
     kazalec = 0;
+    Object.keys(prejsnjiStatus).forEach(k => delete prejsnjiStatus[k]);
+    opozorilaEnot.clear();
+    izrisiOpozorilaEnot();
+}
+
+function izrisiOpozorilaEnot() {
+    const el = document.getElementById('opozorila-enot');
+    if (!el) return;
+    if (opozorilaEnot.size === 0) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    el.style.display = 'block';
+    el.innerHTML = Array.from(opozorilaEnot.values()).map(o => `
+        <div class="opozorilo-enote" data-id="${escapeHtml(o.id)}" title="Klikni za prikaz enote na zemljevidu">
+            <span>⚠️ <b>${escapeHtml(o.ime)}</b>: ni signala (zadnji ob ${escapeHtml(formatirajCas(new Date(o.casMs).toISOString(), true))})</span>
+            <button type="button" class="opozorilo-zapri" title="Skrij opozorilo">✕</button>
+        </div>`).join('');
+    el.querySelectorAll('.opozorilo-enote').forEach(vrsta => {
+        const id = vrsta.dataset.id;
+        vrsta.querySelector('.opozorilo-zapri').addEventListener('click', (e) => {
+            e.stopPropagation();
+            opozorilaEnot.delete(id);
+            izrisiOpozorilaEnot();
+        });
+        vrsta.addEventListener('click', () => {
+            const e = enoteBaza[id];
+            if (map && e) { map.flyTo(e.marker.getLatLng(), 16); e.marker.openPopup(); }
+        });
+    });
+}
+
+/** Spremljanje prehodov stanja: aktivna/zastarelo -> ni signala = opozorilo + zvok; ponovni signal ali namenski konec ga pobriše. */
+function spremljajPrehodeStanja(id, podatki, status) {
+    const prej = prejsnjiStatus[id];
+    prejsnjiStatus[id] = status.koda;
+    if (status.koda === 'aktivna' || status.koda === 'ustavljeno') {
+        if (opozorilaEnot.delete(id)) izrisiOpozorilaEnot();
+        return;
+    }
+    if (status.koda === 'brez-signala' && prej && prej !== 'brez-signala' && prej !== 'ustavljeno' && !opozorilaEnot.has(id)) {
+        opozorilaEnot.set(id, { id, ime: podatki.ime, casMs: podatki.casMs });
+        izrisiOpozorilaEnot();
+        window.EPVZvok?.opozorilo();
+    }
 }
 
 // Opomba: posodobiEnoto() samo posodobi podatke/marker - izris stranske vrstice je treba klicati
@@ -244,6 +297,7 @@ function osveziPrikazEnotNaMapi() {
         const item = enoteBaza[id];
         const jeVidna = vidnostEnot[id] !== false;
         const status = izracunajStatus(item.podatki);
+        spremljajPrehodeStanja(id, item.podatki, status);
         item.marker.setOpacity(status.krajse);
         item.pathLayer.setStyle({ opacity: 0.8 * status.krajse });
 

@@ -11,6 +11,7 @@ import { narisaniSektorjiSloj } from './map.js';
 import { pridobiZnanaImenaEnot, pridobiPotrditve, postaviPotrditve } from './enote-register.js';
 import { formatirajCas, casVMs } from './cas-pomoc.js';
 import { apiGet, novId } from './api.js';
+import { jeIzkljuceno, nastaviIzkljuceno } from './tisk-izbor.js';
 
 function escapeHtml(niz) {
     const el = document.createElement('div');
@@ -184,7 +185,7 @@ export async function osveziStabLog() {
         const vrstice = (sporocila.data || [])
             .filter(s => s && s.sporocilo)
             .sort((a, b) => casVMs(b.cas) - casVMs(a.cas))
-            .slice(0, 8);
+            .slice(0, 300);
 
         if (vrstice.length === 0) {
             kontejner.innerHTML = '<div class="stab-log-prazno">Še ni poslanih sporočil.</div>';
@@ -196,11 +197,18 @@ export async function osveziStabLog() {
             const oznaka = prejeli.length
                 ? `<span class="stab-log-ok" title="${escapeAtribut(prejeli.join(', '))}">✔ ${jeVsi ? prejeli.length + ' enot' : 'prejeto'}</span>`
                 : '<span class="stab-log-caka">⏳ čaka na potrditev</span>';
-            return `<div class="stab-log-vrstica">
-                <div class="stab-log-glava"><span>${escapeHtml(formatirajCas(s.cas, true))} → ${escapeHtml(s.cilj)}</span>${oznaka}</div>
+            const vkljuceno = !jeIzkljuceno(dogodek, 'stab', s.id);
+            return `<div class="stab-log-vrstica ${vkljuceno ? '' : 'izkljuceno'}">
+                <div class="stab-log-glava"><span><input type="checkbox" class="chk-tisk" title="Vključeno v poročilo (tisk)" data-id="${escapeAtribut(s.id)}" ${vkljuceno ? 'checked' : ''}> ${escapeHtml(formatirajCas(s.cas, true))} → ${escapeHtml(s.cilj)}</span>${oznaka}</div>
                 <div class="stab-log-besedilo">${escapeHtml(s.sporocilo)}</div>
             </div>`;
         }).join('');
+        kontejner.querySelectorAll('.chk-tisk').forEach(chk => {
+            chk.addEventListener('change', () => {
+                nastaviIzkljuceno(dogodek, 'stab', chk.dataset.id, !chk.checked);
+                chk.closest('.stab-log-vrstica').classList.toggle('izkljuceno', !chk.checked);
+            });
+        });
     } finally {
         osvezujemLog = false;
     }

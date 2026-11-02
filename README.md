@@ -36,6 +36,21 @@ Podprti zapisi: `46.3934, 15.5746` · `46,3934; 15,5746` · `N46.3934 E15.5746` 
 `33T 544175 5137918` (UTM) · `E 544188 N 139461` (D96/TM) · povezave Google/Apple Maps. Zapis `S` se razume kot *sever* (slovenski zapis).
 **D48/GK (staro Gauss-Krüger) ni podprto** in ga aplikacija zavrne, ker bi bila pretvorba netočna.
 
+**Točka s klikom na zemljevid**: v obrazcu za točko gumb »Ali izberi točko s klikom na zemljevidu« zapre obrazec, klik na zemljevid vpiše koordinate (Esc prekliče), nato nadaljujete kot pri vpisu koordinat.
+
+**Poročilo (tisk)**: pred vsako točko in pred vsakim sporočilom (s terena in iz štaba) je potrditveno polje, enako kot pri enotah. Kljukica = v poročilu,
+odkljukano = izpuščeno iz izpisa (ostane v seznamu in v bazi; izbor se pomni na napravi po dogodkih). Poročilo na koncu navede, koliko je bilo izpuščenega.
+Umaknjene točke ostanejo v seznamu in poročilu, z napisom »Umaknjena ob« in uro umika (Code.gs hrani čas umika v stolpcu `Umaknjeno`, čas pošiljanja ostane).
+
+**Opomniki, če oddajanje preneha** (teren, kljukica »Opozori me …« je privzeto vklopljena):
+- *ni GPS signala* več kot 60 s → rdeč napis + zvok (ponovi se na vsako minuto),
+- *ni povezave s štabom* (podatki čakajo v vrsti več kot 60 s) → rdeč napis + zvok,
+- *oddajanje ne teče* (nikoli vklopljeno ali prekinjeno, ne namerno ustavljeno) → napis + zvok vsakih **10 minut**,
+- po vrnitvi iz ozadja ali ugasnjenega zaslona → opozorilo (kot prej) + zvok.
+»Razumem« utiša težavo za 10 min. **Pomembna omejitev**: telefon z ugasnjenim zaslonom ali stranjo v ozadju sam ne more zvoniti (sistem ustavi stran),
+zato opomniki delujejo, dokler je zaslon prižgan. Za primer, ko telefon zaspi, opozori **štab**: ko enota, ki je oddajala, 5 minut ne odda
+(in ni namerno ustavljena), se v stranski vrstici pojavi opozorilo ⚠️ z zvokom; klik prikaže enoto na zemljevidu. Štab jo nato pokliče.
+
 **Zvok**: štab - glasna sirena ob SOS (zveni do potrditve), ding-dong ob novem sporočilu; teren - zvok in vibracija ob sporočilu ali točki iz štaba,
 opomnik do 5-krat, dokler ni prebrano. Telefoni in brskalniki zvok dovolijo šele po dotiku: gumb »Tapni za vklop zvoka« se po prvem dotiku spremeni v »Zvok vklopljen«.
 (iPhone v brskalniku ne podpira vibracije.)

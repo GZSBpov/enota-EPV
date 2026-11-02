@@ -106,8 +106,17 @@ r = g({ akcija: 'posljiTocko', dogodek: 'Rogla', id: 't1', lat: '46.41', lon: '1
 pri('zamenjaj cilje', r.cilj === 'Samo', r);
 pri('točka brez cilja je samo v štabu', (() => { g({ akcija: 'posljiTocko', dogodek: 'Rogla', id: 't2', lat: '46.4', lon: '15.58', naziv: 'Samo štab' }); const v = g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't2'); return v && !v.ver && g({ akcija: 'pridobiTocke', dogodek: 'Rogla', enotaIme: 'samo' }).data.filter(x => x.id === 't2').length === 0; })());
 pri('ponovni pošiljanje spremeni ver', (() => { const a = g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't1').ver; return a && a !== ver1 || true; })());
+const t1pred = g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't1');
+pri('pred umikom: ni časa umika', !t1pred.umaknjeno);
+const predUmik = Date.now();
 r = g({ akcija: 'umakniTocko', dogodek: 'Rogla', id: 't1' });
-pri('umakni točko', r.status === 'success' && g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't1').status === 'umaknjena');
+const t1po = g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't1');
+pri('umakni točko', r.status === 'success' && t1po.status === 'umaknjena');
+pri('umik: čas umika je zapisan', t1po.umaknjeno && Math.abs(Date.parse(t1po.umaknjeno) - predUmik) < 5000, t1po);
+pri('umik: čas pošiljanja (ver) ostane', t1po.ver === t1pred.ver, [t1pred.ver, t1po.ver]);
+r = g({ akcija: 'posljiTocko', dogodek: 'Rogla', id: 't1', lat: '46.4', lon: '15.58', cilj: 'Oplotnica' });
+pri('ponovna aktivacija: status in čas umika', g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't1').status === 'aktivna' && !g({ akcija: 'pridobiTocke', dogodek: 'Rogla' }).data.find(x => x.id === 't1').umaknjeno);
+g({ akcija: 'umakniTocko', dogodek: 'Rogla', id: 't1' });
 pri('umakni neobstoječo', g({ akcija: 'umakniTocko', dogodek: 'Rogla', id: 'nic' }).status === 'error');
 pri('točka neveljavne koordinate', g({ akcija: 'posljiTocko', dogodek: 'Rogla', id: 't9', lat: 'x', lon: '1' }).status === 'error');
 pri('točka formule', (() => { const pred = m.stanje.formuleVSheetu; g({ akcija: 'posljiTocko', dogodek: 'Rogla', id: 't3', lat: '46.4', lon: '15.5', naziv: '=1+1', opomba: '-cmd' }); return m.stanje.formuleVSheetu === pred; })());
