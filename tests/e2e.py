@@ -127,6 +127,8 @@ try:
 
         # ================= ŠTAB =================
         ctxH = pripravi_kontekst(browser)
+        try: ctxH.grant_permissions(['clipboard-read', 'clipboard-write'])
+        except Exception: pass
         H = ctxH.new_page(); spremljaj(H, 'stab')
         H.on('dialog', lambda d: d.accept())
         H.goto(f'{BASE}/mapeEPV.html')
@@ -192,6 +194,21 @@ try:
             pri('točka: koordinate pravilno pretvorjene', abs(tocke_vrstice[0][5] - (46 + 23/60 + 36/3600)) < 1e-6 and abs(tocke_vrstice[0][6] - (15 + 34/60 + 28/3600)) < 1e-6, tocke_vrstice[0][5:7])
         pri('točka: v seznamu štaba', cakaj(lambda: 'Klic - oseba' in H.inner_text('#tocke-seznam'), 10), H.inner_text('#tocke-seznam'))
 
+        # ----- deljenje prek WhatsApp / Viber / SMS, besedilo za radio -----
+        pri('deli: povezave v oknu točke', cakaj(lambda: H.is_visible('.stub-popup a.deli-wa'), 10))
+        href_wa = H.get_attribute('.stub-popup a.deli-wa', 'href') or ''
+        besedilo_wa = urllib.parse.unquote(href_wa.split('text=', 1)[1]) if 'text=' in href_wa else ''
+        pri('deli: WhatsApp povezava', href_wa.startswith('https://wa.me/?text='), href_wa)
+        pri('deli: besedilo vsebuje naziv, koordinate in povezavo na zemljevid', 'Klic - oseba' in besedilo_wa and 'D96/TM:' in besedilo_wa and 'google.com/maps?q=46.39' in besedilo_wa and 'WGS84:' in besedilo_wa, besedilo_wa)
+        pri('deli: Viber in SMS povezavi', (H.get_attribute('.stub-popup a.deli-viber', 'href') or '').startswith('viber://forward?text=') and (H.get_attribute('.stub-popup a.deli-sms', 'href') or '').startswith('sms:?body='))
+        H.click('.stub-popup .deli-radio')
+        pri('deli: gumb za radio potrdi kopiranje', cakaj(lambda: 'Kopirano' in H.inner_text('.stub-popup .deli-radio'), 5), H.inner_text('.stub-popup .deli-radio'))
+        try:
+            kopirano = H.evaluate("navigator.clipboard.readText()")
+            pri('deli: radijsko besedilo je kratko in vsebuje D96', 'D96/TM' in kopirano and 'vzhod' in kopirano and 'sever' in kopirano, kopirano)
+        except Exception:
+            pass
+
         # ----- točka pride na teren, zvok, potrditev -----
         pri('teren: točka se pokaže', cakaj(lambda: F.is_visible('#tockePanel') and 'Klic - oseba' in F.inner_text('#tockeSeznam'), 25), F.inner_text('#tockeSeznam') if F.is_visible('#tockePanel') else 'panel skrit')
         pri('teren: točka kaže razdaljo in smer', cakaj(lambda: ' proti ' in F.inner_text('#tockeSeznam'), 10), F.inner_text('#tockeSeznam'))
@@ -204,6 +221,7 @@ try:
         # ----- sporočilo štaba na teren -----
         H.select_option('#stabCiljSelect', 'VSI')
         H.fill('#stabSporociloText', 'Vsi na zbirno mesto')
+        pri('deli: sporočilo štaba ima povezave za WhatsApp/Viber/SMS', 'Vsi%20na%20zbirno%20mesto' in (H.get_attribute('#stabDeliWa', 'href') or '') and (H.get_attribute('#stabDeliSms', 'href') or '').startswith('sms:?body='), H.get_attribute('#stabDeliWa', 'href'))
         H.click('#btnPosljiStabSporocilo')
         pri('štab: sporočilo poslano', cakaj(lambda: 'Poslano' in H.inner_text('#stabSporociloStatus'), 10), H.inner_text('#stabSporociloStatus'))
         pri('teren: sporočilo iz štaba prispe', cakaj(lambda: 'Vsi na zbirno mesto' in F.inner_text('#stabSporocilaSeznam'), 25), F.inner_text('#stabSporocilaSeznam'))

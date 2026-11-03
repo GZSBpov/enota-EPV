@@ -14,12 +14,38 @@ import { OSVEZEVANJE_INTERVAL_MS, OSVEZEVANJE_STATUSOV_MS, OSVEZEVANJE_STAB_LOGA
 
 const PRAVO_GESLO = NAVADNO_GESLO;
 
+// Štabni računalnik: zaslon naj ne zaspi, dokler je aplikacija odprta, ob vrnitvi na zavihek pa se takoj osveži
+// (brskalnik zavihke v ozadju upočasni - opozorila bi sicer lahko zamujala do minute).
+let wakeLock = null;
+async function zahtevajWakeLock() {
+    try {
+        if ('wakeLock' in navigator && !wakeLock) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }
+    } catch (err) { /* ni podprto ali zavrnjeno - zaslon ostane odvisen od nastavitev računalnika */ }
+}
+
+function iniciirajSkrbZaOzadje() {
+    zahtevajWakeLock();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        zahtevajWakeLock();
+        osveziLokacijeEnot();
+        naloziSporocila();
+        osveziTocke();
+        osveziStabLog();
+        osveziStatuse();
+    });
+}
+
 async function naloziVsebinoAplikacije() {
     if (!window.EPV_KONFIGURACIJA_OK) {
         const opozorilo = document.getElementById('konfiguracija-opozorilo');
         if (opozorilo) opozorilo.style.display = 'block';
     }
     window.EPVZvok?.pripraviGumb(document.getElementById('btn-zvok'));
+    iniciirajSkrbZaOzadje();
     iniciirajZemljevid();
     iniciirajSlojeEnot();
     iniciirajVideoStream();

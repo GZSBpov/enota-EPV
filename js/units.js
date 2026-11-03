@@ -13,6 +13,7 @@ import { map } from './map.js';
 import { registrirajEnoto, pridobiKonecOddajanja } from './enote-register.js';
 import { formatirajCas, casVMs, starostBesedilo } from './cas-pomoc.js';
 import { predizberiCiljEnote } from './stab-sporocila.js';
+import { povezave as deliPovezave } from './deli.js';
 import { apiGet } from './api.js';
 import {
     CAS_AKTIVNA_MS, CAS_ZASTARELA_MS, NATANCNOST_SLABA_M, NATANCNOST_ZAVRZI_M
@@ -96,8 +97,8 @@ export function izracunajStatus(podatki, zdaj = Date.now()) {
 function pripraviPopupVsebino(enota, barva) {
     const status = izracunajStatus(enota);
     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${enota.lat},${enota.lng}`;
-    const smsBesedilo = encodeURIComponent(`Lokacija ${enota.naziv}: https://www.google.com/maps?q=${enota.lat},${enota.lng}`);
-    const smsUrl = `sms:?body=${smsBesedilo}`;
+    const deli = deliPovezave(`Lokacija ${enota.naziv}: https://www.google.com/maps?q=${enota.lat},${enota.lng}`);
+    const smsUrl = deli.sms;
     const opozorilo = enota.slabaZadnja
         ? `<div style="color:#b45309; margin:4px 0;">⚠️ Zadnji signal ima slabo natančnost (±${Math.round(enota.slabaZadnja)} m) - prikazana je zadnja zanesljiva pozicija (${escapeHtml(starostBesedilo(enota.pozCasMs))}).</div>`
         : (enota.acc > NATANCNOST_SLABA_M ? `<div style="color:#b45309; margin:4px 0;">⚠️ Slaba natančnost GPS (±${Math.round(enota.acc)} m)</div>` : '');
@@ -113,7 +114,11 @@ function pripraviPopupVsebino(enota, barva) {
             ${opozorilo}
             <div style="display:flex; gap:6px; margin-top:8px;">
                 <a href="${mapsUrl}" target="_blank" rel="noopener" style="flex:1; text-align:center; background:#2563eb; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">🧭 Navigacija</a>
-                <a href="${smsUrl}" style="flex:1; text-align:center; background:#059669; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">📩 Pošlji SMS</a>
+                <a href="${smsUrl}" style="flex:1; text-align:center; background:#059669; color:#fff; padding:5px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">📩 SMS</a>
+            </div>
+            <div style="display:flex; gap:6px; margin-top:4px;">
+                <a href="${deli.wa}" target="_blank" rel="noopener" style="flex:1; text-align:center; background:#25D366; color:#fff; padding:4px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">WhatsApp</a>
+                <a href="${deli.viber}" style="flex:1; text-align:center; background:#7360f2; color:#fff; padding:4px 6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:11px;">Viber</a>
             </div>
         </div>`;
 }
