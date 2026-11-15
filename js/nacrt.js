@@ -56,11 +56,17 @@
         const s = M.SLUZBE[sluzba] || M.SLUZBE.gasilci;
         const r = 'stroke="#0f172a" stroke-width="1.5"';
         const steklo = '#1f2937';
+        // Telo: spredaj zoženo v trapez, ob straneh rahlo vidna kolesa (4, pri triosnih vozilih 6).
         const telo = function (x, y, w, h) {
             const crtaY = y + Math.round(h * 0.52);
-            let t = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="2" fill="' + s.barva + '" ' + r + '/>' +
-                '<polygon points="' + (x + 2) + ',' + (y + 5) + ' ' + (x + w - 2) + ',' + (y + 5) + ' ' + (x + w - 4) + ',' + (y + 11) + ' ' + (x + 4) + ',' + (y + 11) + '" fill="' + steklo + '"/>' +
-                '<rect x="' + x + '" y="' + crtaY + '" width="' + w + '" height="3.5" fill="' + s.proga + '"/>';
+            const zozitev = 3.5, nos = Math.min(9, Math.round(h * 0.2));
+            const osi = o.kolesa === 6 && h >= 40 ? [y + nos + 3, y + h - 20, y + h - 10] : [y + nos + 3, y + h - 10];
+            let t = osi.map(function (oy) {
+                return '<rect x="' + (x - 2.2) + '" y="' + oy + '" width="4" height="7.5" rx="1.5" fill="#111827"/><rect x="' + (x + w - 1.8) + '" y="' + oy + '" width="4" height="7.5" rx="1.5" fill="#111827"/>';
+            }).join('');
+            t += '<polygon points="' + (x + zozitev) + ',' + y + ' ' + (x + w - zozitev) + ',' + y + ' ' + (x + w) + ',' + (y + nos) + ' ' + (x + w) + ',' + (y + h) + ' ' + x + ',' + (y + h) + ' ' + x + ',' + (y + nos) + '" fill="' + s.barva + '" ' + r + ' stroke-linejoin="round"/>' +
+                '<polygon points="' + (x + zozitev + 1.2) + ',' + (y + 3.5) + ' ' + (x + w - zozitev - 1.2) + ',' + (y + 3.5) + ' ' + (x + w - 2.2) + ',' + (y + nos + 1.5) + ' ' + (x + 2.2) + ',' + (y + nos + 1.5) + '" fill="' + steklo + '"/>' +
+                '<rect x="' + (x + 0.8) + '" y="' + crtaY + '" width="' + (w - 1.6) + '" height="3.5" fill="' + s.proga + '"/>';
             if (o.cisterna) {
                 const y1 = crtaY + 6, y2 = y + h - 3;
                 t += '<line x1="' + (x + 3) + '" y1="' + y1 + '" x2="' + (x + w - 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/><line x1="' + (x + w - 3) + '" y1="' + y1 + '" x2="' + (x + 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/>';
@@ -102,7 +108,7 @@
         const oblika = e.oblika || oblikaZaTip(e.tip, e.sluzba);
         const zasukRoke = (((e.roka === undefined ? (e.kot || 0) : e.roka) - (e.kot || 0)) % 360 + 360) % 360;
         const napis = brezNapisa ? '' : samoStevilka ? String(e.st === undefined || e.st === null ? '' : e.st) : (M.oznakaVozila(e) || '?');
-        const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(oblika, e.sluzba, { cisterna: M.jeCisterna(e), roka: zasukRoke }) + '</g></svg>' +
+        const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(oblika, e.sluzba, { cisterna: M.jeCisterna(e), roka: zasukRoke, kolesa: M.steviloKoles(e.tip) }) + '</g></svg>' +
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [60, 76], iconAnchor: [30, 28] });
     }
@@ -351,7 +357,7 @@
         const sel = $('drustvo');
         sel.innerHTML = M.DRUSTVA.map(function (d) { return '<option value="' + esc(d[0]) + '">' + esc(d[0] + ' - ' + d[1]) + '</option>'; }).join('');
         M.TIPI_VOZIL.forEach(function (v) {
-            $('pal-vozila').appendChild(gumbPalete('<svg viewBox="0 0 56 56">' + svgVozila(v.oblika, 'gasilci', { cisterna: M.jeCisterna({ tip: v.tip, sluzba: 'gasilci' }) }) + '</svg>' + esc(v.tip), { kljuc: 'v:' + v.tip, vrsta: 'vozilo', tip: v.tip, oblika: v.oblika, sluzba: 'gasilci' }, v.opis));
+            $('pal-vozila').appendChild(gumbPalete('<svg viewBox="0 0 56 56">' + svgVozila(v.oblika, 'gasilci', { cisterna: M.jeCisterna({ tip: v.tip, sluzba: 'gasilci' }), kolesa: M.steviloKoles(v.tip) }) + '</svg>' + esc(v.tip), { kljuc: 'v:' + v.tip, vrsta: 'vozilo', tip: v.tip, oblika: v.oblika, sluzba: 'gasilci' }, v.opis));
         });
         $('pal-vozila').appendChild(gumbPalete('<svg viewBox="0 0 56 56">' + svgVozila('tovorno', 'gasilci') + '</svg>Drugo…', { kljuc: 'v:rocno', vrsta: 'vozilo', tip: '', oblika: 'tovorno', sluzba: 'gasilci', rocno: true }, 'Posebno vozilo od drugod - tip in kratico vpišeš ročno'));
         Object.keys(M.VOZILA_SLUZB).forEach(function (k) {
