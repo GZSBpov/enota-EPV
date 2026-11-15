@@ -7,10 +7,27 @@ Pomoč gasilskim enotam: teren oddaja lokacijo in sporočila, štab vidi enote n
 | **Štab** | `mapeEPV.html` | `js/`, `style.css` |
 | **Teren** | `terenEPV.html` | `js/` |
 | Strežnik | Google Apps Script `apps-script/Code.gs` | isti Sheet **Baza Lokacij EPV** |
+| **Načrt (taktična tabla)** | `nacrtEPV.html` | `js/nacrt.js`, `js/nacrt-model.js`, `nacrt.css` |
 | Stara različica (V1) | `V1/mapeEPV.html`, `V1/terenEPV.html` | `V1/js/`, `V1/style.css` |
 | Testi | | `tests/` |
 
 Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabela, zgodovina se vidi naprej).
+
+## Modul Načrt (taktična tabla)
+
+`nacrtEPV.html` je interaktivna tabla za načrtovanje vaj in intervencij ter za skice pri analizi. Odpre se z gumbom **🚒 Načrt** v štabu
+(na trenutnem izrezu zemljevida) ali neposredno. Ne potrebuje strežnika, gesla ali Sheeta.
+
+- **Vozila**: izbereš društvo (kratica), tapneš tip vozila in nato mesto na zemljevidu (ali ga povlečeš). Zaporedna številka prihoda se dodeli sama;
+  napis je npr. `3 · SLB · GVC-1`. Vse se da popraviti v desnem stolpcu (številka, kratica, tip, naloga, zasuk). »Drugo…« je za posebno vozilo od drugod.
+- **Druge službe**: CZ (modro-rumeno), policija (belo-modro), reševalci (rumeno), vojska (temno zeleno), drugo (roza).
+- **Oznake in črte**: poveljniško mesto, triaža, zbirna mesta, požar, nevarnost, vodni vir, veter …; cevovod, smer napada, evakuacijska pot, sektor, nevarno območje, besedilo.
+- **Skice (koraki)**: privzeto Lokacija, Evakuacija, Posredovanje. »Naslednji korak« naredi kopijo trenutne skice za prikaz poteka po času. Vsaka skica si zapomni svoj izrez zemljevida.
+- **Shrani / Odpri**: načrt je ena datoteka (`.epvnacrt.json`), ki jo preneseš na drug računalnik in tam odpreš. Delo se sproti hrani tudi v brskalniku.
+- **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.
+- Seznam društev, tipov vozil in oznak je na vrhu `js/nacrt-model.js`.
+
+Omejitve prve različice: črt in sektorjev se po risanju ne da preoblikovati (izbriši in nariši znova); podlaga zemljevida potrebuje internet; več naprav ne ureja istega načrta hkrati.
 
 ## Prehod na novo različico (isti Sheet)
 
@@ -93,6 +110,8 @@ zato preglej na pravih napravah:
 ```
 node tests/koordinate.test.js   # razčlenjevanje in pretvorbe (D96/TM, UTM preverjeni z neodvisno formulo)
 node tests/backend.test.js      # PRAVA koda Code.gs nad simuliranim Sheetom
+node tests/nacrt-model.test.js  # model taktične table
+python3 tests/nacrt.e2e.py      # taktična tabla v Chromiumu
 python3 tests/e2e.py            # Chromium: teren + štab + stara stran V1/ prek simulatorja (potrebuje Playwright)
 ```
 

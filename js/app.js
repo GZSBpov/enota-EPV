@@ -76,6 +76,13 @@ async function naloziVsebinoAplikacije() {
     // Poslušalci dogodkov za gumba in padajoči meni
     document.getElementById('btn-shrani')?.addEventListener('click', () => shraniDogodek());
     document.getElementById('btn-tisk')?.addEventListener('click', () => pripraviInNatisni());
+    // Modul načrtovanja: taktična tabla v novem oknu, na trenutnem izrezu zemljevida in z nazivom izbranega dogodka
+    document.getElementById('btn-nacrt')?.addEventListener('click', () => {
+        const c = map.getCenter();
+        const dogodek = document.getElementById('select-dogodek')?.value || '';
+        const naziv = dogodek && dogodek !== 'novy' ? `&naziv=${encodeURIComponent(dogodek)}` : '';
+        window.open(`nacrtEPV.html?lat=${c.lat.toFixed(6)}&lon=${c.lng.toFixed(6)}&z=${map.getZoom()}${naziv}`, '_blank');
+    });
     document.getElementById('btn-osvezi-dogodke')?.addEventListener('click', () => naloziSeznamDogodkov());
     document.getElementById('btn-zakljuci-dogodek')?.addEventListener('click', () => obravnavajGumbZakljucka());
     // Opomba: poslušalec za preklop dogodkov v spustnem meniju se registrira

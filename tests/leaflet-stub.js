@@ -63,6 +63,7 @@
             toGeoJSON: () => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [self.latlng[1], self.latlng[0]] } }),
             flyTo: () => proxy, setView: () => proxy, fitBounds: () => proxy, invalidateSize: () => proxy,
             getCenter: () => ({ lat: 46.39, lng: 15.57 }),
+            getZoom: () => 16,
             getContainer: () => (self.vsebnik = self.vsebnik || document.createElement('div')),
             addControl: () => proxy, removeControl: () => proxy
         };
@@ -90,6 +91,7 @@
         marker: function () { const m = ustvari(Marker, arguments, 'Marker'); window.__L.markers.push(m); return m; },
         circle: function () { const c = ustvari(Circle, arguments, 'Circle'); window.__L.circles.push(c); return c; },
         circleMarker: function () { const c = ustvari(Marker, arguments, 'CircleMarker'); return c; },
+        polygon: function () { return ustvari(Polygon, arguments, 'Polygon'); },
         polyline: function () { const p = ustvari(Polyline, arguments, 'Polyline'); window.__L.polylines.push(p); return p; },
         featureGroup: function () { return ustvari(null, [], 'FeatureGroup'); },
         layerGroup: function () { return ustvari(null, [], 'LayerGroup'); },
