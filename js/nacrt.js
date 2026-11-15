@@ -16,7 +16,11 @@
     let orodje = null;        // { vrsta, ... } ali null
     let risanje = null;       // { tocke: [[lat,lon]...], predogled: L.polyline }
     let zgodovina = [];
-    let map, sloj, podlage, trenutnaPodlaga = 'ortofoto';
+    let map, sloj, slojOsnove, podlage, trenutnaPodlaga = 'ortofoto';
+    const KLJUC_OSNOVA = 'epv_nacrt_osnova';
+    const KLJUC_OSNOVA_VIDNA = 'epv_nacrt_osnova_vidna';
+    let osnova = { tocke: [], obrisi: [] };   // stalno: območje zveze in gasilski domovi (enako za vse načrte na tej napravi)
+    let osnovaVidna = true;
 
     function esc(niz) {
         return String(niz === undefined || niz === null ? '' : niz).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -94,17 +98,17 @@
         return (M.VOZILA_SLUZB[sluzba] || { oblika: 'tovorno' }).oblika;
     }
     /** samoStevilka: v izpisu je pod vozilom samo zaporedna številka (podrobnosti so v tabeli pod skico). */
-    function ikonaVozila(e, izbran, samoStevilka) {
+    function ikonaVozila(e, izbran, samoStevilka, brezNapisa) {
         const oblika = e.oblika || oblikaZaTip(e.tip, e.sluzba);
         const zasukRoke = (((e.roka === undefined ? (e.kot || 0) : e.roka) - (e.kot || 0)) % 360 + 360) % 360;
-        const napis = samoStevilka ? String(e.st === undefined || e.st === null ? '' : e.st) : (M.oznakaVozila(e) || '?');
+        const napis = brezNapisa ? '' : samoStevilka ? String(e.st === undefined || e.st === null ? '' : e.st) : (M.oznakaVozila(e) || '?');
         const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(oblika, e.sluzba, { cisterna: M.jeCisterna(e), roka: zasukRoke }) + '</g></svg>' +
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [60, 76], iconAnchor: [30, 28] });
     }
-    function ikonaZnaka(e, izbran) {
+    function ikonaZnaka(e, izbran, brezNapisa) {
         const z = M.ZNAKI[e.znak];
-        const napis = e.opis || z.napis || '';
+        const napis = brezNapisa ? '' : (e.opis || z.napis || '');
         const html = '<div class="nz' + (izbran ? ' izbran' : '') + '"><div class="nz-telo' + (z.krog ? ' krog' : '') + (z.prazen ? ' prazen' : '') + '" style="background:' + z.barva + ';' + (z.vrti ? 'transform:rotate(' + ((e.kot || 0) - 90) + 'deg);' : '') + '">' + esc(z.znak) + '</div>' +
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [40, 56], iconAnchor: [20, 19] });
@@ -123,6 +127,8 @@
         cilj.clearLayers();
         sk.elementi.forEach(function (e) {
             const izbran = interaktivno && e.id === izbranId;
+            // napisi: skupno stikalo za ves načrt in izklop pri posameznem elementu
+            const kazi = nacrt.napisi !== false && !e.skrijNapis;
             const klik = function (plast) {
                 if (!interaktivno) return plast;
                 plast.on('click', function (ev) {
@@ -142,14 +148,17 @@
                 });
             };
             if (e.vrsta === 'vozilo' || e.vrsta === 'znak' || e.vrsta === 'besedilo') {
-                const ikona = e.vrsta === 'vozilo' ? ikonaVozila(e, izbran, !interaktivno) : e.vrsta === 'znak' ? ikonaZnaka(e, izbran) : ikonaBesedila(e, izbran);
+                const ikona = e.vrsta === 'vozilo' ? ikonaVozila(e, izbran, !interaktivno, !kazi) : e.vrsta === 'znak' ? ikonaZnaka(e, izbran, !kazi) : ikonaBesedila(e, izbran);
                 const m = L.marker([e.lat, e.lon], { icon: ikona, draggable: !!interaktivno, zIndexOffset: e.vrsta === 'vozilo' ? 500 : 300 });
                 if (e.vrsta === 'vozilo' && e.opis) m.bindTooltip(e.opis, { direction: 'top', offset: [0, -24] });
                 premik(m); cilj.addLayer(klik(m));
             } else if (e.vrsta === 'crta') {
                 const c = M.CRTE[e.slog];
-                const pl = L.polyline(e.tocke, { color: c.barva, weight: c.debelina + (izbran ? 4 : 0), dashArray: c.crtkano, opacity: 0.95, bubblingMouseEvents: false });
-                if (e.opis) pl.bindTooltip(e.opis, { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
+                const barva = e.barva || c.barva;
+                // temna obroba pod črto, da se svetle barve vidijo na vsaki podlagi
+                cilj.addLayer(L.polyline(e.tocke, { color: '#0f172a', weight: c.debelina + 4 + (izbran ? 4 : 0), opacity: 0.9, interactive: false }));
+                const pl = L.polyline(e.tocke, { color: barva, weight: c.debelina + (izbran ? 4 : 0), dashArray: c.crtkano, opacity: 1, bubblingMouseEvents: false });
+                if (e.opis && kazi) pl.bindTooltip(e.opis, { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
                 cilj.addLayer(klik(pl));
                 if (c.puscica && e.tocke.length >= 2) {
                     const a = e.tocke[e.tocke.length - 2], b = e.tocke[e.tocke.length - 1];
@@ -159,16 +168,16 @@
                         kot = Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI;
                     } catch (err) { kot = 0; }
                     if (!isFinite(kot)) kot = 0;
-                    const p = L.marker(b, { interactive: false, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="np" style="color:' + c.barva + ';transform:rotate(' + kot + 'deg);">➤</div>', iconSize: [22, 22], iconAnchor: [11, 11] }) });
+                    const p = L.marker(b, { interactive: false, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="np" style="color:' + barva + ';transform:rotate(' + kot + 'deg);">➤</div>', iconSize: [22, 22], iconAnchor: [11, 11] }) });
                     cilj.addLayer(p);
                 }
             } else if (e.vrsta === 'obmocje') {
                 const po = L.polygon(e.tocke, { color: e.barva || '#ef4444', weight: izbran ? 6 : 3, fillColor: e.barva || '#ef4444', fillOpacity: 0.22, bubblingMouseEvents: false });
-                if (e.opis) po.bindTooltip(e.opis, { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
+                if (e.opis && kazi) po.bindTooltip(e.opis, { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
                 cilj.addLayer(klik(po));
             } else if (e.vrsta === 'krog') {
                 const k = L.circle([e.lat, e.lon], { radius: e.r, color: '#dc2626', weight: izbran ? 6 : 3, dashArray: '8,8', fillColor: '#dc2626', fillOpacity: 0.15, bubblingMouseEvents: false });
-                k.bindTooltip((e.opis || 'Nevarno območje') + ' (' + Math.round(e.r) + ' m)', { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
+                if (kazi) k.bindTooltip((e.opis || 'Nevarno območje') + ' (' + Math.round(e.r) + ' m)', { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
                 cilj.addLayer(klik(k));
             }
         });
@@ -214,6 +223,115 @@
     }
 
     function osveziZemljevid() { narisi(skica(), sloj, map, true); narisiRocice(); osveziLegendo(); }
+
+    // ---------- stalna osnova: območje zveze in gasilski domovi ----------
+    function shraniOsnovo() {
+        try { localStorage.setItem(KLJUC_OSNOVA, JSON.stringify(osnova)); localStorage.setItem(KLJUC_OSNOVA_VIDNA, osnovaVidna ? '1' : '0'); } catch (e) { /* nedostopen pomnilnik */ }
+    }
+    function narisiOsnovo(cilj, interaktivno) {
+        cilj.clearLayers();
+        if (!osnovaVidna) return;
+        osnova.obrisi.forEach(function (b) {
+            cilj.addLayer(L.polyline(b.zaprto ? b.tocke.concat([b.tocke[0]]) : b.tocke, { color: '#0f172a', weight: 6, opacity: 0.8, interactive: false }));
+            cilj.addLayer(L.polyline(b.zaprto ? b.tocke.concat([b.tocke[0]]) : b.tocke, { color: '#f59e0b', weight: 3, dashArray: '10,7', opacity: 1, interactive: false }));
+        });
+        osnova.tocke.forEach(function (t) {
+            const m = L.marker([t.lat, t.lon], { zIndexOffset: 100, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nd"><span class="nd-znak">🏠</span>' + (t.naziv ? '<span class="nd-napis">' + esc(t.naziv) + '</span>' : '') + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) });
+            m.osnovaDom = t.naziv;
+            // klik na dom med risanjem (npr. dovoz od PGD) postavi točko natanko na dom
+            if (interaktivno) m.on('click', function () { if (orodje) postavi(t.lat, t.lon); });
+            cilj.addLayer(m);
+        });
+    }
+    function osveziOsnovo() {
+        if (slojOsnove) narisiOsnovo(slojOsnove, true);
+        const chk = $('osnova-vidna');
+        if (chk) chk.checked = osnovaVidna;
+        const st = $('osnova-stanje');
+        if (st) st.textContent = 'Domov: ' + osnova.tocke.length + ' · obrisov: ' + osnova.obrisi.length;
+        const seznam = $('osnova-seznam');
+        if (seznam) {
+            seznam.innerHTML = (osnova.tocke.map(function (t, i) { return '<div class="os-vrstica"><span>🏠 ' + esc(t.naziv || '(brez imena)') + '</span><button type="button" data-os-tocka="' + i + '">🗑</button></div>'; }).join('') +
+                osnova.obrisi.map(function (b, i) { return '<div class="os-vrstica"><span>▱ ' + esc(b.naziv || 'Obris') + ' (' + b.tocke.length + ' točk)</span><button type="button" data-os-obris="' + i + '">🗑</button></div>'; }).join('')) || '<div class="namig">Še ni vnosov. Uvozi KML/KMZ iz Google Earth ali dodaj domove s klikom na zemljevid.</div>';
+            Array.prototype.forEach.call(seznam.querySelectorAll('[data-os-tocka]'), function (b) { b.addEventListener('click', function () { osnova.tocke.splice(parseInt(b.dataset.osTocka, 10), 1); shraniOsnovo(); osveziOsnovo(); osveziLegendo(); }); });
+            Array.prototype.forEach.call(seznam.querySelectorAll('[data-os-obris]'), function (b) { b.addEventListener('click', function () { osnova.obrisi.splice(parseInt(b.dataset.osObris, 10), 1); shraniOsnovo(); osveziOsnovo(); osveziLegendo(); }); });
+        }
+    }
+
+    /** KML (besedilo) -> { tocke, obrisi }. Točke postanejo gasilski domovi, poligoni in črte obrisi. */
+    function osnovaIzKml(besedilo) {
+        const dok = new DOMParser().parseFromString(besedilo, 'text/xml');
+        if (dok.getElementsByTagName('parsererror').length) throw new Error('Datoteka ni veljaven KML.');
+        const prvi = function (el, ime) { const n = el.getElementsByTagName(ime); return n.length ? n[0] : null; };
+        const izhod = { tocke: [], obrisi: [] };
+        Array.prototype.forEach.call(dok.getElementsByTagName('Placemark'), function (pm) {
+            const imeEl = prvi(pm, 'name');
+            const naziv = imeEl ? imeEl.textContent.trim() : '';
+            Array.prototype.forEach.call(pm.getElementsByTagName('Point'), function (pt) {
+                const k = M.kmlKoordinate((prvi(pt, 'coordinates') || {}).textContent);
+                if (k.length) izhod.tocke.push({ naziv: naziv, lat: k[0][0], lon: k[0][1] });
+            });
+            Array.prototype.forEach.call(pm.getElementsByTagName('Polygon'), function (pg) {
+                const zunanji = prvi(pg, 'outerBoundaryIs') || pg;
+                const k = M.kmlKoordinate((prvi(zunanji, 'coordinates') || {}).textContent);
+                if (k.length >= 3) izhod.obrisi.push({ naziv: naziv, tocke: k, zaprto: true });
+            });
+            Array.prototype.forEach.call(pm.getElementsByTagName('LineString'), function (ls) {
+                const k = M.kmlKoordinate((prvi(ls, 'coordinates') || {}).textContent);
+                if (k.length >= 2) izhod.obrisi.push({ naziv: naziv, tocke: k, zaprto: false });
+            });
+        });
+        return M.ocistiOsnovo(izhod);
+    }
+
+    /** KMZ je arhiv ZIP: poišče prvo datoteko .kml in jo razširi (brez dodatnih knjižnic). */
+    function kmlIzKmz(buf) {
+        const dv = new DataView(buf);
+        let eocd = -1;
+        for (let i = buf.byteLength - 22; i >= 0 && i > buf.byteLength - 70000; i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+        if (eocd < 0) return Promise.reject(new Error('Datoteka ni veljaven KMZ.'));
+        const stevilo = dv.getUint16(eocd + 10, true);
+        let poz = dv.getUint32(eocd + 16, true);
+        const dekoder = new TextDecoder('utf-8');
+        for (let n = 0; n < stevilo && poz + 46 <= buf.byteLength; n++) {
+            if (dv.getUint32(poz, true) !== 0x02014b50) break;
+            const metoda = dv.getUint16(poz + 10, true), stisnjeno = dv.getUint32(poz + 20, true);
+            const dIme = dv.getUint16(poz + 28, true), dDod = dv.getUint16(poz + 30, true), dKom = dv.getUint16(poz + 32, true), lokalno = dv.getUint32(poz + 42, true);
+            const ime = dekoder.decode(new Uint8Array(buf, poz + 46, dIme));
+            if (/\.kml$/i.test(ime)) {
+                const zacetek = lokalno + 30 + dv.getUint16(lokalno + 26, true) + dv.getUint16(lokalno + 28, true);
+                const bajti = new Uint8Array(buf, zacetek, stisnjeno);
+                if (metoda === 0) return Promise.resolve(dekoder.decode(bajti));
+                if (metoda !== 8 || typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Tega KMZ brskalnik ne zna odpreti. V Google Earth izvozi kot KML.'));
+                return new Response(new Blob([bajti]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+            }
+            poz += 46 + dIme + dDod + dKom;
+        }
+        return Promise.reject(new Error('V datoteki KMZ ni datoteke KML.'));
+    }
+
+    function uvoziOsnovoIzDatoteke(f) {
+        const stanje = $('osnova-uvoz-stanje');
+        const koncaj = function (besedilo) {
+            const nova = osnovaIzKml(besedilo);
+            if (!nova.tocke.length && !nova.obrisi.length) throw new Error('V datoteki ni točk ali območij.');
+            // združi z obstoječim: enaka točka (ime in lega) se ne podvoji
+            nova.tocke.forEach(function (t) { if (!osnova.tocke.some(function (x) { return x.naziv === t.naziv && Math.abs(x.lat - t.lat) < 1e-6 && Math.abs(x.lon - t.lon) < 1e-6; })) osnova.tocke.push(t); });
+            nova.obrisi.forEach(function (b) { if (!osnova.obrisi.some(function (x) { return x.naziv === b.naziv && x.tocke.length === b.tocke.length; })) osnova.obrisi.push(b); });
+            osnovaVidna = true;
+            shraniOsnovo(); osveziOsnovo(); osveziLegendo();
+            if (stanje) stanje.textContent = '✔ Uvoženo: domov ' + nova.tocke.length + ', obrisov ' + nova.obrisi.length + '.';
+        };
+        const napaka = function (err) { if (stanje) stanje.textContent = '⚠️ ' + (err && err.message ? err.message : 'Uvoz ni uspel.'); };
+        const br = new FileReader();
+        br.onerror = function () { napaka(new Error('Datoteke ni mogoče prebrati.')); };
+        br.onload = function () {
+            const buf = br.result, dv = new DataView(buf);
+            const jeZip = buf.byteLength > 4 && dv.getUint32(0, true) === 0x04034b50;
+            Promise.resolve(jeZip ? kmlIzKmz(buf) : new TextDecoder('utf-8').decode(new Uint8Array(buf))).then(koncaj).catch(napaka);
+        };
+        br.readAsArrayBuffer(f);
+    }
 
     // ---------- paleta ----------
     function gumbPalete(html, podatki, naslov) {
@@ -274,6 +392,17 @@
     function postavi(lat, lon) {
         if (!orodje) return;
         const o = orodje;
+        if (o.vrsta === 'osnovaDom') {
+            const zeIma = osnova.tocke.map(function (t) { return t.naziv; });
+            const predlog = (M.DRUSTVA.filter(function (d) { return zeIma.indexOf(d[1]) < 0; })[0] || ['', ''])[1];
+            const naziv = window.prompt('Ime gasilskega doma / društva:', predlog);
+            nastaviOrodje(null);
+            if (naziv === null) return;
+            osnova.tocke.push({ naziv: naziv.trim(), lat: lat, lon: lon });
+            osnovaVidna = true;
+            shraniOsnovo(); osveziOsnovo(); osveziLegendo();
+            return;
+        }
         if (o.vrsta === 'crta' || o.vrsta === 'obmocje') {
             risanje.tocke.push([lat, lon]);
             if (risanje.predogled) sloj.removeLayer(risanje.predogled);
@@ -359,7 +488,9 @@
             h += '<div><b>' + esc(M.ZNAKI[e.znak].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis);
             if (M.ZNAKI[e.znak].vrti) h += kot;
         } else if (e.vrsta === 'crta') {
-            h += '<div><b>' + esc(M.CRTE[e.slog].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis) + urejanjeTock(e, 2);
+            const trenutnaBarva = e.barva || M.CRTE[e.slog].barva;
+            h += '<div><b>' + esc(M.CRTE[e.slog].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis) +
+                '<label>Barva črte</label><div class="barve">' + M.BARVE_CRT.map(function (b) { return '<button type="button" data-barva="' + b + '" class="' + (b === trenutnaBarva ? 'izbrana' : '') + '" style="background:' + b + '"></button>'; }).join('') + '</div>' + urejanjeTock(e, 2);
         } else if (e.vrsta === 'obmocje') {
             h += polje('Naziv sektorja', 'opis', e.opis) + '<label>Barva</label><div class="barve">' + M.BARVE_SEKTORJEV.map(function (b) { return '<button type="button" data-barva="' + b + '" class="' + (b === e.barva ? 'izbrana' : '') + '" style="background:' + b + '"></button>'; }).join('') + '</div>' + urejanjeTock(e, 3);
         } else if (e.vrsta === 'krog') {
@@ -367,6 +498,7 @@
         } else if (e.vrsta === 'besedilo') {
             h += polje('Besedilo', 'opis', e.opis);
         }
+        if (e.vrsta !== 'besedilo') h += '<label class="os-preklop" style="margin-top:10px;color:#f1f5f9;"><input type="checkbox" id="chk-el-napis"' + (e.skrijNapis ? '' : ' checked') + '> prikaži napis pri tem elementu</label>';
         h += '<div class="vrstica" style="margin-top:12px;"><button type="button" id="btn-el-izbrisi" class="nevaren" style="flex:1;">🗑 Izbriši</button></div>';
         el.innerHTML = h;
 
@@ -403,6 +535,12 @@
                 e.roka = ((zdaj + parseInt(b.dataset.roka, 10)) % 360 + 360) % 360;
                 samodejnoShrani(); osveziZemljevid();
             });
+        });
+        const chkNapis = $('chk-el-napis');
+        if (chkNapis) chkNapis.addEventListener('change', function () {
+            zapomni();
+            if (chkNapis.checked) delete e.skrijNapis; else e.skrijNapis = true;
+            samodejnoShrani(); osveziZemljevid();
         });
         const btnTocka = $('btn-tocka-odstrani');
         if (btnTocka) btnTocka.addEventListener('click', function () {
@@ -460,6 +598,7 @@
 
     function osveziVse(tudiPogled) {
         $('naziv-nacrta').value = nacrt.naziv;
+        $('napisi-vidni').checked = nacrt.napisi !== false;
         document.title = 'EPV Načrt - ' + nacrt.naziv;
         if (tudiPogled) {
             const p = skica().pogled;
@@ -472,7 +611,8 @@
     function shraniVDatoteko() {
         skica().pogled = trenutniPogled();
         samodejnoShrani();
-        const blob = new Blob([JSON.stringify(nacrt, null, 1)], { type: 'application/json' });
+        const zaDatoteko = Object.assign({}, nacrt, { osnova: (osnova.tocke.length || osnova.obrisi.length) ? osnova : undefined });
+        const blob = new Blob([JSON.stringify(zaDatoteko, null, 1)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = M.imeDatoteke(nacrt);
@@ -484,6 +624,9 @@
         if (!r.ok) { alert(r.napaka); return false; }
         zapomni();
         nacrt = r.nacrt; idxSkice = 0; izbranId = null;
+        // območje zveze in domovi iz datoteke: prevzamemo jih samo, če jih ta naprava še nima
+        if (r.nacrt.osnova && !osnova.tocke.length && !osnova.obrisi.length) { osnova = r.nacrt.osnova; osnovaVidna = true; shraniOsnovo(); osveziOsnovo(); }
+        delete nacrt.osnova;
         samodejnoShrani();
         osveziVse(true);
         if (r.izpusceno) alert('Načrt je odprt. Izpuščenih poškodovanih elementov: ' + r.izpusceno + '.');
@@ -555,17 +698,21 @@
         });
         const crte = {};
         sk.elementi.forEach(function (e) {
-            if (e.vrsta !== 'crta' || crte[e.slog]) return;
-            crte[e.slog] = true;
+            if (e.vrsta !== 'crta') return;
             const c = M.CRTE[e.slog];
-            const barva = c.barva === '#f8fafc' ? '#475569' : c.barva;
-            dodaj('<span style="display:inline-block;width:22px;border-top:3px ' + (c.crtkano ? 'dashed' : 'solid') + ' ' + barva + ';vertical-align:middle;"></span>' + (c.puscica ? '<span style="color:' + barva + ';font-size:9px;">▶</span>' : ''), c.naziv);
+            const barva = e.barva || c.barva;
+            if (crte[e.slog + barva]) return;
+            crte[e.slog + barva] = true;
+            const obroba = 'box-shadow:0 0 0 1px #0f172a;';
+            dodaj('<span style="display:inline-block;width:22px;height:3px;background:' + barva + ';' + obroba + 'vertical-align:middle;"></span>' + (c.puscica ? '<span style="color:#0f172a;font-size:9px;">▶</span>' : ''), c.naziv);
         });
         sk.elementi.forEach(function (e) {
             if (e.vrsta === 'obmocje') dodaj('<span style="display:inline-block;width:17px;height:12px;background:' + (e.barva || '#ef4444') + '55;border:2px solid ' + (e.barva || '#ef4444') + ';"></span>', e.opis || 'Sektor');
         });
         if (sk.elementi.some(function (e) { return e.vrsta === 'krog'; })) dodaj('<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:2px dashed #dc2626;background:#dc262633;"></span>', 'Nevarno območje');
-        if (!vrstice.length) return '';
+        if (osnovaVidna && osnova.tocke.length) dodaj('<span style="font-size:13px;">🏠</span>', 'Gasilski dom');
+        if (osnovaVidna && osnova.obrisi.length) dodaj('<span style="display:inline-block;width:22px;border-top:3px dashed #f59e0b;vertical-align:middle;"></span>', 'Območje zveze');
+        if (!sk.elementi.length) return '';
         return '<div class="nacrt-legenda"><div class="nl-naslov">Legenda</div><table>' + vrstice.join('') + '</table></div>';
     }
     function osveziLegendo() {
@@ -673,6 +820,7 @@
             if (s.pogled) m.setView([s.pogled.lat, s.pogled.lon], s.pogled.z);
             else if (meje) m.fitBounds(meje, { padding: [30, 30], maxZoom: 18 });
             else { const p = trenutniPogled(); m.setView([p.lat, p.lon], p.z); }
+            narisiOsnovo(L.layerGroup().addTo(m), false);
             const g = L.layerGroup().addTo(m);
             narisi(s, g, m, false);
             return new Promise(function (resolve) { plast.once('load', resolve); });
@@ -714,6 +862,11 @@
         L.control.layers(podlage, null, { position: 'topright' }).addTo(map);
         if (L.control.scale) L.control.scale({ imperial: false }).addTo(map);
         map.on('baselayerchange', function (ev) { trenutnaPodlaga = ev && ev.name === 'Cestna karta' ? 'cesta' : 'ortofoto'; });
+        try {
+            osnova = M.ocistiOsnovo(JSON.parse(localStorage.getItem(KLJUC_OSNOVA)));
+            osnovaVidna = localStorage.getItem(KLJUC_OSNOVA_VIDNA) !== '0';
+        } catch (e) { osnova = { tocke: [], obrisi: [] }; }
+        slojOsnove = L.layerGroup().addTo(map);
         sloj = L.layerGroup().addTo(map);
 
         map.on('click', function (ev) {
@@ -787,6 +940,22 @@
         $('btn-elaborat-zapri').addEventListener('click', function () { $('elaborat-okno').style.display = 'none'; });
         $('btn-elaborat-tisk').addEventListener('click', function () { $('elaborat-okno').style.display = 'none'; natisni(true); });
         $('btn-tisk-skice').addEventListener('click', function () { natisni(false); });
+        $('napisi-vidni').addEventListener('change', function () { zapomni(); nacrt.napisi = $('napisi-vidni').checked; samodejnoShrani(); osveziZemljevid(); });
+        $('osnova-vidna').addEventListener('change', function () { osnovaVidna = $('osnova-vidna').checked; shraniOsnovo(); osveziOsnovo(); osveziLegendo(); });
+        $('btn-osnova').addEventListener('click', function () { $('osnova-uvoz-stanje').textContent = ''; osveziOsnovo(); $('osnova-okno').style.display = 'flex'; });
+        $('btn-osnova-zapri').addEventListener('click', function () { $('osnova-okno').style.display = 'none'; });
+        $('btn-osnova-uvozi').addEventListener('click', function () { $('osnova-datoteka').click(); });
+        $('osnova-datoteka').addEventListener('change', function () { const f = $('osnova-datoteka').files[0]; if (f) uvoziOsnovoIzDatoteke(f); $('osnova-datoteka').value = ''; });
+        $('btn-osnova-dodaj').addEventListener('click', function () {
+            $('osnova-okno').style.display = 'none';
+            nastaviOrodje({ kljuc: 'osnova:dom', vrsta: 'osnovaDom' });
+            $('orodje-besedilo').textContent = 'Tapni na zemljevid, kjer je gasilski dom';
+        });
+        $('btn-osnova-pocisti').addEventListener('click', function () {
+            if (!window.confirm('Odstraniti vse domove in obrise območja s te naprave?')) return;
+            osnova = { tocke: [], obrisi: [] }; shraniOsnovo(); osveziOsnovo(); osveziLegendo();
+        });
+        osveziOsnovo();
         $('btn-obrazec').addEventListener('click', odpriObrazec);
         $('btn-obrazec-zapri').addEventListener('click', function () { $('obrazec-okno').style.display = 'none'; });
         $('btn-obrazec-tisk').addEventListener('click', function () { $('obrazec-okno').style.display = 'none'; natisniObrazec(); });
@@ -798,7 +967,7 @@
         window.addEventListener('beforeunload', samodejnoShrani);
 
         // za teste in diagnostiko
-        window.EPVNacrt = { stanje: function () { return { nacrt: nacrt, idxSkice: idxSkice, izbranId: izbranId, orodje: orodje }; }, postavi: postavi, nalozi: nalozi };
+        window.EPVNacrt = { stanje: function () { return { nacrt: nacrt, idxSkice: idxSkice, izbranId: izbranId, orodje: orodje, osnova: osnova, osnovaVidna: osnovaVidna }; }, postavi: postavi, nalozi: nalozi };
         osveziVse(false);
     }
 

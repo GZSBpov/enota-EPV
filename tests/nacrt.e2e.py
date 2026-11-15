@@ -1,7 +1,7 @@
 # E2E test taktične table (nacrtEPV.html) v Chromiumu z nadomestkom za Leaflet.
 # Preizkusi logiko (postavljanje, lastnosti, skice, shranjevanje, elaborat, izpis); NE preizkuša dejanskega izrisa zemljevida.
 # Zagon: python3 tests/nacrt.e2e.py
-import functools, http.server, json, os, re, sys, threading, time
+import functools, http.server, json, os, re, sys, tempfile, threading, time, zipfile
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -112,6 +112,14 @@ with sync_playwright() as pw:
     p.evaluate("EPVNacrt.postavi(46.41, 15.61)"); p.evaluate("EPVNacrt.postavi(46.42, 15.62)")
     p.click('#btn-koncaj')
     pri('cevovod s tremi točkami', el()[6]['vrsta'] == 'crta' and el()[6]['slog'] == 'cevovod' and len(el()[6]['tocke']) == 3, el()[6])
+    # črta: črna obroba in izbira barve
+    crte = lambda: p.evaluate("window.__L.polylines.slice(-2).map(l => [l.options.color, l.options.weight, l.options.interactive])")
+    pri('črta ima temno obrobo pod barvo', crte()[0][0] == '#0f172a' and crte()[0][2] is False and crte()[0][1] > crte()[1][1] and crte()[1][0] == '#38bdf8', crte())
+    pri('črta: izbira barve v lastnostih', p.locator('#lastnosti [data-barva]').count() == 9)
+    p.click('#lastnosti [data-barva="#fde047"]')
+    pri('črta: barva spremenjena', el()[6]['barva'] == '#fde047' and crte()[1][0] == '#fde047' and crte()[0][0] == '#0f172a', (el()[6].get('barva'), crte()))
+    p.click('#btn-razveljavi')
+    pri('črta: sprememba barve se da razveljaviti', 'barva' not in el()[6])
     # sektor
     p.click('.pal[data-kljuc="o:sektor"]')
     for a, c in ((46.40, 15.60), (46.41, 15.60), (46.41, 15.61)): p.evaluate(f"EPVNacrt.postavi({a}, {c})")
@@ -206,6 +214,94 @@ with sync_playwright() as pw:
     p.click('#btn-tisk-skice'); time.sleep(1.5)
     t2 = p.inner_text('#tisk')
     pri('izpis samo skic: brez elaborata', p.evaluate("window.__natisnjeno") == 2 and '1. Uvod' not in t2 and 'Skica 1: Lokacija' in t2)
+
+    # ---- napisi: skupno stikalo in izklop pri posameznem elementu ----
+    p.click('.skica-vrstica[data-i="2"]')
+    napisi = lambda: p.evaluate("(() => { const n = EPVNacrt.stanje().nacrt.skice[2].elementi.length; return window.__L.markers.slice(-60).map(m => (m.options.icon && m.options.icon.html) || '').filter(h => h.includes('class=\"nv') || h.includes('class=\"nz')).slice(-6); })()")
+    pri('napisi so privzeto vidni', p.is_checked('#napisi-vidni') and any('nv-napis' in h for h in napisi()), napisi()[:1])
+    p.uncheck('#napisi-vidni')
+    pri('napisi skriti pri vozilih in oznakah', st()['nacrt']['napisi'] is False and all('nv-napis' not in h for h in napisi()), napisi()[:2])
+    pri('napisi skriti pri črtah, sektorjih in krogu', p.evaluate("(() => { const k = window.__L.circles.slice(-1)[0]; return k.tooltip === null; })()"))
+    p.check('#napisi-vidni')
+    pri('napisi spet vidni', st()['nacrt']['napisi'] is True and any('1 · IMP · GVC-1' in h for h in napisi()))
+    p.evaluate("window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('1 · IMP')).slice(-1)[0].handlers.click[0]({})")
+    p.uncheck('#chk-el-napis')
+    pri('napis skrit samo pri enem vozilu', el()[0].get('skrijNapis') is True and not any('1 · IMP' in h for h in napisi()) and any('nv-napis' in h for h in napisi()), napisi())
+    p.check('#chk-el-napis')
+    pri('napis pri vozilu spet viden', 'skrijNapis' not in el()[0] and any('1 · IMP · GVC-1' in h for h in napisi()))
+
+    # ---- območje zveze in gasilski domovi: KML, KMZ, ročno, prikaz, shranjevanje ----
+    kml = '''<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gasilska Zveza</name>
+      <Folder><Placemark><name>PGD Slovenska Bistrica</name><Point><coordinates>15.5746,46.3934,0</coordinates></Point></Placemark>
+      <Placemark><name>PGD Kebelj &amp; okolica</name><Point><coordinates> 15.44,46.43,0 </coordinates></Point></Placemark></Folder>
+      <Placemark><name>Območje GZ</name><Polygon><outerBoundaryIs><LinearRing><coordinates>15.4,46.3,0 15.7,46.3,0 15.7,46.5,0 15.4,46.5,0 15.4,46.3,0</coordinates></LinearRing></outerBoundaryIs>
+        <innerBoundaryIs><LinearRing><coordinates>15.5,46.35,0 15.6,46.35,0 15.6,46.4,0</coordinates></LinearRing></innerBoundaryIs></Polygon></Placemark>
+      <Placemark><name>Meja sektorja</name><LineString><coordinates>15.5,46.3,0 15.5,46.5,0</coordinates></LineString></Placemark></Document></kml>'''
+    tmp = tempfile.mkdtemp()
+    pot_kml = os.path.join(tmp, 'gz.kml'); open(pot_kml, 'w', encoding='utf-8').write(kml)
+    os_ = lambda: st()['osnova']
+    p.click('#btn-osnova')
+    pri('osnova: okno z navodilom za Google Earth', p.is_visible('#osnova-okno') and 'Google Earth' in p.inner_text('#osnova-okno'))
+    p.set_input_files('#osnova-datoteka', pot_kml)
+    pri('KML: uvoženi domovi in obrisi', (lambda: (time.sleep(0.6), len(os_()['tocke']) == 2 and len(os_()['obrisi']) == 2)[1])(), os_())
+    pri('KML: ime in lega doma (lon,lat pravilno obrnjena)', os_()['tocke'][0] == {'naziv': 'PGD Slovenska Bistrica', 'lat': 46.3934, 'lon': 15.5746} and os_()['tocke'][1]['naziv'] == 'PGD Kebelj & okolica', os_()['tocke'])
+    pri('KML: poligon vzame zunanji rob, črta ostane odprta', os_()['obrisi'][0]['zaprto'] is True and len(os_()['obrisi'][0]['tocke']) == 5 and os_()['obrisi'][1]['zaprto'] is False, os_()['obrisi'])
+    pri('osnova: sporočilo o uvozu', 'Uvoženo: domov 2, obrisov 2' in p.inner_text('#osnova-uvoz-stanje'), p.inner_text('#osnova-uvoz-stanje'))
+    p.set_input_files('#osnova-datoteka', pot_kml); time.sleep(0.5)
+    pri('osnova: ponovni uvoz ne podvaja', len(os_()['tocke']) == 2 and len(os_()['obrisi']) == 2)
+    # KMZ (stisnjen arhiv)
+    kml2 = kml.replace('PGD Slovenska Bistrica', 'PGD Oplotnica').replace('15.5746,46.3934', '15.4467,46.3878')
+    pot_kmz = os.path.join(tmp, 'gz.kmz')
+    with zipfile.ZipFile(pot_kmz, 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr('files/ikona.txt', 'x' * 50); z.writestr('doc.kml', kml2)
+    p.set_input_files('#osnova-datoteka', pot_kmz)
+    pri('KMZ: razširjen in uvožen', (lambda: (time.sleep(0.8), any(t['naziv'] == 'PGD Oplotnica' and abs(t['lat'] - 46.3878) < 1e-9 for t in os_()['tocke']) and len(os_()['tocke']) == 3)[1])(), (os_()['tocke'], p.inner_text('#osnova-uvoz-stanje')))
+    slaba_kml = os.path.join(tmp, 'slaba.kml'); open(slaba_kml, 'w').write('to ni kml <<<')
+    p.set_input_files('#osnova-datoteka', slaba_kml); time.sleep(0.5)
+    pri('osnova: napačna datoteka javi napako in ne pokvari', '⚠️' in p.inner_text('#osnova-uvoz-stanje') and len(os_()['tocke']) == 3, p.inner_text('#osnova-uvoz-stanje'))
+    # ročno dodajanje s klikom
+    odgovori['prompt'] = 'PGD Tinje'
+    p.click('#btn-osnova-dodaj')
+    pri('osnova: dodajanje s klikom - okno se zapre, pasica', not p.is_visible('#osnova-okno') and 'gasilski dom' in p.inner_text('#orodje-besedilo'))
+    p.evaluate("EPVNacrt.postavi(46.41, 15.48)")
+    odgovori['prompt'] = None
+    pri('osnova: dom dodan ročno', os_()['tocke'][-1] == {'naziv': 'PGD Tinje', 'lat': 46.41, 'lon': 15.48} and st()['orodje'] is None, os_()['tocke'][-1])
+    pri('osnova: ročni dom ni element skice', all(x.get('opis') != 'PGD Tinje' for x in el()))
+    domovi = lambda: p.evaluate("(() => { const vse = window.__L.markers.filter(m => m.osnovaDom !== undefined); return vse.slice(-4).map(m => m.osnovaDom); })()")
+    pri('osnova: domovi so narisani', 'PGD Tinje' in domovi() and 'PGD Oplotnica' in domovi(), domovi())
+    pri('osnova: stanje v stranskem stolpcu', 'Domov: 4 · obrisov: 2' in p.inner_text('#osnova-stanje'), p.inner_text('#osnova-stanje'))
+    p.click('.skica-vrstica[data-i="2"]')
+    pri('legenda: gasilski dom in območje zveze', 'Gasilski dom' in p.inner_text('#legenda') and 'Območje zveze' in p.inner_text('#legenda'), p.inner_text('#legenda'))
+    # dovoz od doma: klik na dom med risanjem postavi točko natanko na dom
+    p.click('.pal[data-kljuc="c:dovoz"]')
+    p.evaluate("window.__L.markers.filter(m => m.osnovaDom === 'PGD Oplotnica').slice(-1)[0].handlers.click[0]()")
+    p.evaluate("EPVNacrt.postavi(46.40, 15.60)"); p.click('#btn-koncaj')
+    pri('dovoz se začne natanko na gasilskem domu', el()[-1]['slog'] == 'dovoz' and el()[-1]['tocke'][0] == [46.3878, 15.4467], el()[-1])
+    # prikaz izklopljen
+    stevilo_pred = p.evaluate("window.__L.markers.filter(m => m.osnovaDom !== undefined).length")
+    p.uncheck('#osnova-vidna')
+    pri('osnova: izklop prikaza', st()['osnovaVidna'] is False and p.evaluate("window.__L.markers.filter(m => m.osnovaDom !== undefined).length") == stevilo_pred and 'Gasilski dom' not in p.inner_text('#legenda'))
+    p.check('#osnova-vidna')
+    # v datoteki in po osvežitvi
+    with p.expect_download() as dl2:
+        p.click('#btn-shrani')
+    shr2 = json.load(open(dl2.value.path(), encoding='utf-8'))
+    pri('osnova je shranjena v datoteki načrta', len(shr2['osnova']['tocke']) == 4 and len(shr2['osnova']['obrisi']) == 2)
+    p.reload()
+    p.add_script_tag(content='window.print = function () { window.__natisnjeno = (window.__natisnjeno || 0) + 1; };')
+    pri('osnova ostane po osvežitvi strani', len(os_()['tocke']) == 4 and st()['osnovaVidna'] is True)
+    p.evaluate("window.__natisnjeno = 2")
+    # brisanje posameznega vnosa
+    p.click('#btn-osnova'); p.click('[data-os-tocka="0"]')
+    pri('osnova: brisanje enega doma', len(os_()['tocke']) == 3 and os_()['tocke'][0]['naziv'] != 'PGD Slovenska Bistrica')
+    p.click('#btn-osnova-zapri')
+    # druga naprava brez osnove jo prevzame iz datoteke
+    p.evaluate("localStorage.removeItem('epv_nacrt_osnova')"); p.reload()
+    p.add_script_tag(content='window.print = function () { window.__natisnjeno = (window.__natisnjeno || 0) + 1; };')
+    p.evaluate("window.__natisnjeno = 2")
+    pri('prazna naprava: brez osnove', len(os_()['tocke']) == 0)
+    p.set_input_files('#datoteka', dl2.value.path()); time.sleep(0.6)
+    pri('prazna naprava prevzame osnovo iz datoteke načrta', len(os_()['tocke']) == 4 and 'osnova' not in st()['nacrt'], os_())
 
     # obrazec za prijavo vaje (ReCO)
     p.evaluate("window.dispatchEvent(new Event('afterprint'))")
