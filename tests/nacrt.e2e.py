@@ -60,11 +60,24 @@ with sync_playwright() as pw:
     p.select_option('#drustvo', 'SLB')
     p.click('.pal[data-kljuc="v:ALK32"]'); p.evaluate("EPVNacrt.postavi(46.402, 15.602)")
     pri('drugo vozilo dobi št. 2 in drugo kratico', el()[1]['st'] == 2 and el()[1]['kratica'] == 'SLB' and el()[1]['oblika'] == 'lestev', el()[1])
+    # lestvenik se suka neodvisno od vozila; zasuk vozila ga nese s seboj
+    zadnja = lambda: p.evaluate("window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('nv-napis')).slice(-1)[0].options.icon.html")
+    pri('ALK: gumbi za smer lestvenika', p.locator('#lastnosti [data-roka]').count() == 4 and 'lestvenika' in p.inner_text('#lastnosti'))
+    p.click('#lastnosti [data-roka="45"]'); p.click('#lastnosti [data-roka="45"]')
+    pri('lestvenik zasukan za 90° glede na vozilo', el()[1]['roka'] == 90 and el()[1]['kot'] == 0 and 'rotate(90 28 40)' in zadnja(), (el()[1], zadnja()[:200]))
+    p.click('#lastnosti [data-kot="45"]')
+    pri('zasuk vozila nese lestvenik s seboj', el()[1]['kot'] == 45 and el()[1]['roka'] == 135 and 'rotate(45 28 28)' in zadnja() and 'rotate(90 28 40)' in zadnja(), el()[1])
+    p.click('#lastnosti [data-kot="-45"]')
     p.click('.pal[data-kljuc="s:resevalci"]'); p.evaluate("EPVNacrt.postavi(46.403, 15.603)")
     pri('reševalno vozilo: služba, brez kratice društva, št. 3', el()[2]['sluzba'] == 'resevalci' and el()[2]['kratica'] == '' and el()[2]['st'] == 3 and el()[2]['tip'] == 'NMP', el()[2])
     ikone = p.evaluate("window.__L.markers.map(m => (m.options.icon && m.options.icon.html) || '')")
     pri('ikona: napis s številko, kratico in tipom', any('1 · IMP · GVC-1' in i for i in ikone), ikone[-3:])
     pri('ikona: rumeno reševalno vozilo', any('#facc15' in i and '3 · NMP' in i for i in ikone))
+    x_crt = lambda h: h.count('stroke="#fff" stroke-width="2.6"')
+    pri('ikona: cisterna ima X, ostala vozila ne', any('1 · IMP · GVC-1' in i and x_crt(i) == 2 for i in ikone) and all(x_crt(i) == 0 for i in ikone if 'ALK32' in i or 'NMP' in i))
+    pri('ikona: temno vetrobransko steklo', all('#1f2937' in i for i in ikone if 'nv-napis' in i))
+    pri('paleta: GVC z X, GV-1 brez', 'stroke-width="2.6"' in p.inner_html('.pal[data-kljuc="v:GVC-2"]') and 'stroke-width="2.6"' not in p.inner_html('.pal[data-kljuc="v:GV-1"]'))
+    pri('paleta: nove oznake in črte', p.locator('.pal[data-kljuc="z:nevsnov"], .pal[data-kljuc="z:repetitor"], .pal[data-kljuc="z:prazen"], .pal[data-kljuc="c:preiskovanje"]').count() == 4)
 
     # posebno vozilo od drugod: ročni vpis
     p.fill('#drustvo-rocno', 'ce')
@@ -85,6 +98,11 @@ with sync_playwright() as pw:
     p.click('.pal[data-kljuc="k:krog"]'); p.evaluate("EPVNacrt.postavi(46.406, 15.606)")
     p.fill('#lastnosti [data-k="r"]', '120')
     pri('oznaka in nevarno območje', el()[4]['znak'] == 'pm' and el()[5]['vrsta'] == 'krog' and el()[5]['r'] == 120, el()[4:])
+    # nevarno območje: središče se premakne z ročico
+    p.evaluate("(() => { const r = window.__L.markers.filter(m => m.rocica === 'sredisce').slice(-1)[0]; r.handlers.dragstart[0](); r.setLatLng([46.45, 15.65]); r.handlers.dragend[0](); })()")
+    pri('nevarno območje: premik središča', el()[5]['lat'] == 46.45 and el()[5]['lon'] == 15.65 and el()[5]['r'] == 120, el()[5])
+    p.click('#btn-razveljavi')
+    pri('premik središča se da razveljaviti', el()[5]['lat'] == 46.406)
 
     # črta: premalo točk, nato končano
     p.click('.pal[data-kljuc="c:cevovod"]')
@@ -99,9 +117,26 @@ with sync_playwright() as pw:
     for a, c in ((46.40, 15.60), (46.41, 15.60), (46.41, 15.61)): p.evaluate(f"EPVNacrt.postavi({a}, {c})")
     p.click('#btn-koncaj')
     pri('sektor z imenom in barvo', el()[7]['vrsta'] == 'obmocje' and el()[7]['opis'] == 'Sektor 1' and el()[7]['barva'].startswith('#'), el()[7])
+    # urejanje točk sektorja: premik, dodajanje, odstranjevanje
+    rocice = lambda vrsta: p.evaluate("(v) => { const vse = window.__L.markers.filter(m => m.rocica === v); const zadnji = []; for (let i = vse.length - 1; i >= 0; i--) { if (zadnji.some(z => z === vse[i].indeks)) break; zadnji.push(vse[i].indeks); } return zadnji.length; }", vrsta)
+    pri('sektor: ročice za 3 točke in 3 vmesne', rocice('tocka') == 3 and rocice('nova') == 3, (rocice('tocka'), rocice('nova')))
+    pri('sektor: gumb za odstranitev je onemogočen brez izbrane točke', p.is_disabled('#btn-tocka-odstrani'))
+    p.evaluate("(() => { const r = window.__L.markers.filter(m => m.rocica === 'tocka' && m.indeks === 1).slice(-1)[0]; r.handlers.dragstart[0](); r.setLatLng([46.415, 15.595]); r.handlers.dragend[0](); })()")
+    pri('sektor: premik točke', el()[7]['tocke'][1] == [46.415, 15.595], el()[7]['tocke'])
+    p.evaluate("window.__L.markers.filter(m => m.rocica === 'nova' && m.indeks === 2).slice(-1)[0].handlers.click[0]()")
+    pri('sektor: nova točka na sredini zadnjega odseka', len(el()[7]['tocke']) == 4 and abs(el()[7]['tocke'][3][0] - 46.405) < 1e-9 and abs(el()[7]['tocke'][3][1] - 15.605) < 1e-9, el()[7]['tocke'])
+    pri('sektor: nova točka je izbrana, odstranitev omogočena', not p.is_disabled('#btn-tocka-odstrani'))
+    p.click('#btn-tocka-odstrani')
+    pri('sektor: odstranitev točke', len(el()[7]['tocke']) == 3 and el()[7]['tocke'][1] == [46.415, 15.595], el()[7]['tocke'])
+    p.evaluate("window.__L.markers.filter(m => m.rocica === 'tocka' && m.indeks === 0).slice(-1)[0].handlers.click[0]()")
+    pri('sektor: pod 3 točke ne gre', p.is_disabled('#btn-tocka-odstrani'))
+    # legenda na zaslonu
+    leg = p.inner_text('#legenda')
+    pri('legenda na zaslonu: uporabljeni znaki', p.is_visible('#legenda') and all(x in leg for x in ['Legenda', 'Gasilsko vozilo', 'Cisterna (X)', 'Vozilo: Reševalci (NMP)', 'Poveljniško mesto', 'Cevovod', 'Sektor 1', 'Nevarno območje', 'Vrstni red prihoda']) and 'Napad' not in leg and 'Policija' not in leg, leg)
     # prekinitev risanja
     p.click('.pal[data-kljuc="c:napad"]'); p.evaluate("EPVNacrt.postavi(46.40, 15.60)"); p.keyboard.press('Escape')
     pri('Esc prekliče risanje', st()['orodje'] is None and len(el()) == 8)
+    pri('napad je moder', '#1d4ed8' in p.inner_html('.pal[data-kljuc="c:napad"]') and '#dc2626' in p.inner_html('.pal[data-kljuc="c:preiskovanje"]'))
 
     # izbira s klikom na element in brisanje, razveljavi
     p.evaluate("window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('1 · IMP')).slice(-1)[0].handlers.click[0]({})")
@@ -163,11 +198,28 @@ with sync_playwright() as pw:
     pri('elaborat: časovnica razdeljena na čas in aktivnost', '<td>16:06</td><td>prihod GE Impol</td>' in h and '<td></td><td>zaključek vaje</td>' in h, h[h.find('16:06')-40:h.find('16:06')+80])
     pri('elaborat: tabela vozil iz skic', 'PGD Slovenska Bistrica' in t and 'ALK32' in t and 'Reševalci (NMP)' in t and 'tehnično reševanje' in t)
     pri('elaborat: skice na koncu', p.locator('#tisk .tisk-zemljevid').count() == 4 and 'Skica 3: Posredovanje' in t and 'Skica 4: 16:08 prihod ALK' in t)
-    pri('elaborat: legenda skice', 'Poveljniško mesto' in t and 'Nevarno območje (120 m)' in t and 'Cevovod' in t)
+    pri('izpis: legenda v okvirju zemljevida vsake skice z elementi', p.locator('#tisk .tisk-zemljevid-okvir .nacrt-legenda').count() == 2 and 'Poveljniško mesto' in p.inner_text('#tisk .tisk-skica:nth-of-type(n) .nacrt-legenda >> nth=0') and 'Cisterna (X)' in t, p.locator('#tisk .tisk-zemljevid-okvir .nacrt-legenda').count())
+    tisk_ikone = p.evaluate("window.__L.markers.slice(-40).map(m => (m.options.icon && m.options.icon.html) || '').filter(h => h.includes('nv-napis'))")
+    pri('izpis: pod vozili samo številke', len(tisk_ikone) > 0 and all(re.search(r'nv-napis">\d+</span>', h) for h in tisk_ikone[-9:]), tisk_ikone[-2:])
+    pri('izpis: tabela vozil pod skico ostane', '<td>SLB</td><td>ALK32</td>' in h)
     p.evaluate("window.dispatchEvent(new Event('afterprint'))")
     p.click('#btn-tisk-skice'); time.sleep(1.5)
     t2 = p.inner_text('#tisk')
     pri('izpis samo skic: brez elaborata', p.evaluate("window.__natisnjeno") == 2 and '1. Uvod' not in t2 and 'Skica 1: Lokacija' in t2)
+
+    # obrazec za prijavo vaje (ReCO)
+    p.evaluate("window.dispatchEvent(new Event('afterprint'))")
+    p.click('#btn-obrazec')
+    pri('obrazec: prazen s stalnimi besedili', p.is_visible('#obrazec-okno') and p.input_value('[data-o="gz"]') == 'Slovenska Bistrica' and p.input_value('[data-o="dne"]') == '' and p.input_value('[data-o="vodja"]') == '' and p.input_value('[data-o="kanal"]') == '')
+    p.fill('[data-o="dne"]', '3. 7. 2026'); p.fill('[data-o="ob"]', '19.45'); p.fill('[data-o="lokacija"]', 'Kovača vas <108>')
+    p.fill('[data-o="scenarij"]', 'Odkritje in prijava | Opazovalec | 19:45\nEvakuacija, gašenje | GE | ')
+    p.click('#btn-obrazec-tisk'); time.sleep(0.6)
+    ob = p.inner_text('#tisk'); obh = p.inner_html('#tisk')
+    pri('obrazec: izpis sprožen', p.evaluate("window.__natisnjeno") == 3)
+    pri('obrazec: razdelki', all(x in ob for x in ['GASILSKA ZVEZA: Slovenska Bistrica', 'VODSTVO VAJE', 'SCENARIJ VAJE', 'Imitacija', 'Načrt zavarovanja', 'NAČRT ZVEZ', 'Zaključek vaje', 'Poveljstvo', 'Uradni list RS']), ob[:300])
+    pri('obrazec: vnosi in scenarij po stolpcih', '3. 7. 2026' in ob and '<td>Odkritje in prijava</td><td>Opazovalec</td><td>19:45</td>' in obh and 'Kovača vas &lt;108&gt;' in obh)
+    pri('obrazec: sodelujoča PGD iz skic', 'PIGD Impol' in ob and 'PGD Slovenska Bistrica' in ob)
+    pri('obrazec: je del načrta', st()['nacrt']['obrazec']['dne'] == '3. 7. 2026')
 
     # elaborat se shrani z načrtom
     pri('elaborat je del načrta', st()['nacrt']['elaborat']['krajDatum'] == 'Slovenska Bistrica, 26. 9. 2026')

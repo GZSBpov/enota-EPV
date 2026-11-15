@@ -43,26 +43,48 @@
     }
 
     // ---------- ikone ----------
-    function svgVozila(oblika, sluzba) {
+    /**
+     * Tloris vozila (obrnjen navzgor): pravokotnik s temnim vetrobranskim steklom spredaj in barvno črto.
+     * o.cisterna: X na zadnjem delu (za črto). o.roka: zasuk lestvenika/roke v stopinjah glede na vozilo.
+     */
+    function svgVozila(oblika, sluzba, o) {
+        o = o || {};
         const s = M.SLUZBE[sluzba] || M.SLUZBE.gasilci;
         const r = 'stroke="#0f172a" stroke-width="1.5"';
-        const okno = '#bfdbfe';
-        let t = '';
-        if (oblika === 'avto') {
-            t = '<rect x="19" y="13" width="18" height="30" rx="5" fill="' + s.barva + '" ' + r + '/><rect x="21.5" y="17" width="13" height="6" rx="1.5" fill="' + okno + '"/><rect x="19" y="30" width="18" height="3.5" fill="' + s.proga + '"/>';
-        } else if (oblika === 'dron') {
-            t = '<line x1="14" y1="14" x2="42" y2="42" stroke="#0f172a" stroke-width="4"/><line x1="42" y1="14" x2="14" y2="42" stroke="#0f172a" stroke-width="4"/>' +
+        const steklo = '#1f2937';
+        const telo = function (x, y, w, h) {
+            const crtaY = y + Math.round(h * 0.52);
+            let t = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="2" fill="' + s.barva + '" ' + r + '/>' +
+                '<polygon points="' + (x + 2) + ',' + (y + 5) + ' ' + (x + w - 2) + ',' + (y + 5) + ' ' + (x + w - 4) + ',' + (y + 11) + ' ' + (x + 4) + ',' + (y + 11) + '" fill="' + steklo + '"/>' +
+                '<rect x="' + x + '" y="' + crtaY + '" width="' + w + '" height="3.5" fill="' + s.proga + '"/>';
+            if (o.cisterna) {
+                const y1 = crtaY + 6, y2 = y + h - 3;
+                t += '<line x1="' + (x + 3) + '" y1="' + y1 + '" x2="' + (x + w - 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/><line x1="' + (x + w - 3) + '" y1="' + y1 + '" x2="' + (x + 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/>';
+            }
+            return t;
+        };
+        if (oblika === 'avto') return telo(19, 13, 18, 30);
+        if (oblika === 'dron') {
+            return '<line x1="14" y1="14" x2="42" y2="42" stroke="#0f172a" stroke-width="4"/><line x1="42" y1="14" x2="14" y2="42" stroke="#0f172a" stroke-width="4"/>' +
                 [[14, 14], [42, 14], [14, 42], [42, 42]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="7" fill="#e2e8f0" ' + r + '/>'; }).join('') +
                 '<rect x="21" y="21" width="14" height="14" rx="3" fill="' + s.barva + '" ' + r + '/>';
-        } else if (oblika === 'coln') {
-            t = '<path d="M28 5 Q41 22 38 50 L18 50 Q15 22 28 5 Z" fill="' + s.barva + '" ' + r + '/><rect x="21" y="30" width="14" height="4" fill="' + s.proga + '"/>';
-        } else if (oblika === 'priklopnik') {
-            t = '<line x1="28" y1="6" x2="28" y2="18" stroke="#0f172a" stroke-width="3"/><rect x="19" y="18" width="18" height="26" rx="2" fill="' + s.barva + '" ' + r + '/><rect x="19" y="30" width="18" height="3.5" fill="' + s.proga + '"/>';
-        } else {
-            t = '<rect x="18" y="5" width="20" height="46" rx="3" fill="' + s.barva + '" ' + r + '/><rect x="20.5" y="8" width="15" height="7" rx="1.5" fill="' + okno + '"/><rect x="18" y="29" width="20" height="4" fill="' + s.proga + '"/>';
+        }
+        if (oblika === 'coln') return '<path d="M28 5 Q41 22 38 50 L18 50 Q15 22 28 5 Z" fill="' + s.barva + '" ' + r + '/><rect x="21" y="30" width="14" height="4" fill="' + s.proga + '"/>';
+        if (oblika === 'priklopnik') return '<line x1="28" y1="6" x2="28" y2="18" stroke="#0f172a" stroke-width="3"/><rect x="19" y="18" width="18" height="26" rx="2" fill="' + s.barva + '" ' + r + '/><rect x="19" y="30" width="18" height="3.5" fill="' + s.proga + '"/>';
+        let t = telo(18, 5, 20, 46);
+        if (M.imaRoko(oblika)) {
+            // vrtišče na zadnjem delu vozila; lestvenik/roka sega od vrtišča 42 enot v nastavljeno smer
+            const vx = 28, vy = 40, kot = o.roka || 0;
+            let roka;
             if (oblika === 'lestev') {
-                t += '<rect x="24.5" y="2" width="7" height="40" fill="#e5e7eb" ' + r + '/>' + [8, 14, 20, 26, 32, 38].map(function (y) { return '<line x1="24.5" y1="' + y + '" x2="31.5" y2="' + y + '" stroke="#0f172a" stroke-width="1.2"/>'; }).join('');
+                roka = '<rect x="' + (vx - 3.5) + '" y="' + (vy - 42) + '" width="7" height="42" fill="#e5e7eb" ' + r + '/>' +
+                    [6, 12, 18, 24, 30, 36].map(function (d) { return '<line x1="' + (vx - 3.5) + '" y1="' + (vy - d) + '" x2="' + (vx + 3.5) + '" y2="' + (vy - d) + '" stroke="#0f172a" stroke-width="1.2"/>'; }).join('') +
+                    '<rect x="' + (vx - 5) + '" y="' + (vy - 48) + '" width="10" height="7" fill="#fde047" ' + r + '/>';
+            } else {
+                roka = '<line x1="' + vx + '" y1="' + vy + '" x2="' + vx + '" y2="' + (vy - 42) + '" stroke="#0f172a" stroke-width="6.5" stroke-linecap="round"/><line x1="' + vx + '" y1="' + vy + '" x2="' + vx + '" y2="' + (vy - 42) + '" stroke="#facc15" stroke-width="3.5" stroke-linecap="round"/>' +
+                    '<rect x="' + (vx - 5) + '" y="' + (vy - 49) + '" width="10" height="8" fill="#fde047" ' + r + '/>';
             }
+            t += '<g transform="rotate(' + kot + ' ' + vx + ' ' + vy + ')">' + roka + '</g><circle cx="' + vx + '" cy="' + vy + '" r="4.5" fill="#475569" ' + r + '/>';
         }
         return t;
     }
@@ -71,15 +93,19 @@
         if (najden) return najden.oblika;
         return (M.VOZILA_SLUZB[sluzba] || { oblika: 'tovorno' }).oblika;
     }
-    function ikonaVozila(e, izbran) {
-        const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(e.oblika || oblikaZaTip(e.tip, e.sluzba), e.sluzba) + '</g></svg>' +
-            '<span class="nv-napis">' + esc(M.oznakaVozila(e) || '?') + '</span></div>';
+    /** samoStevilka: v izpisu je pod vozilom samo zaporedna številka (podrobnosti so v tabeli pod skico). */
+    function ikonaVozila(e, izbran, samoStevilka) {
+        const oblika = e.oblika || oblikaZaTip(e.tip, e.sluzba);
+        const zasukRoke = (((e.roka === undefined ? (e.kot || 0) : e.roka) - (e.kot || 0)) % 360 + 360) % 360;
+        const napis = samoStevilka ? String(e.st === undefined || e.st === null ? '' : e.st) : (M.oznakaVozila(e) || '?');
+        const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(oblika, e.sluzba, { cisterna: M.jeCisterna(e), roka: zasukRoke }) + '</g></svg>' +
+            (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [60, 76], iconAnchor: [30, 28] });
     }
     function ikonaZnaka(e, izbran) {
         const z = M.ZNAKI[e.znak];
         const napis = e.opis || z.napis || '';
-        const html = '<div class="nz' + (izbran ? ' izbran' : '') + '"><div class="nz-telo' + (z.krog ? ' krog' : '') + '" style="background:' + z.barva + ';' + (z.vrti ? 'transform:rotate(' + ((e.kot || 0) - 90) + 'deg);' : '') + '">' + esc(z.znak) + '</div>' +
+        const html = '<div class="nz' + (izbran ? ' izbran' : '') + '"><div class="nz-telo' + (z.krog ? ' krog' : '') + (z.prazen ? ' prazen' : '') + '" style="background:' + z.barva + ';' + (z.vrti ? 'transform:rotate(' + ((e.kot || 0) - 90) + 'deg);' : '') + '">' + esc(z.znak) + '</div>' +
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [40, 56], iconAnchor: [20, 19] });
     }
@@ -116,7 +142,7 @@
                 });
             };
             if (e.vrsta === 'vozilo' || e.vrsta === 'znak' || e.vrsta === 'besedilo') {
-                const ikona = e.vrsta === 'vozilo' ? ikonaVozila(e, izbran) : e.vrsta === 'znak' ? ikonaZnaka(e, izbran) : ikonaBesedila(e, izbran);
+                const ikona = e.vrsta === 'vozilo' ? ikonaVozila(e, izbran, !interaktivno) : e.vrsta === 'znak' ? ikonaZnaka(e, izbran) : ikonaBesedila(e, izbran);
                 const m = L.marker([e.lat, e.lon], { icon: ikona, draggable: !!interaktivno, zIndexOffset: e.vrsta === 'vozilo' ? 500 : 300 });
                 if (e.vrsta === 'vozilo' && e.opis) m.bindTooltip(e.opis, { direction: 'top', offset: [0, -24] });
                 premik(m); cilj.addLayer(klik(m));
@@ -148,7 +174,46 @@
         });
     }
 
-    function osveziZemljevid() { narisi(skica(), sloj, map, true); }
+    // Ročice za urejanje izbranega elementa: oglišča sektorja/črte (premik, dodajanje, odstranjevanje) in središče kroga.
+    let izbranaTocka = -1;
+    function rocica(latlon, razred, znak, velikost) {
+        return L.marker(latlon, { draggable: true, zIndexOffset: 2000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="' + razred + '">' + (znak || '') + '</div>', iconSize: [velikost, velikost], iconAnchor: [velikost / 2, velikost / 2] }) });
+    }
+    function narisiRocice() {
+        const e = izbranId ? najdi(izbranId) : null;
+        if (!e || orodje) return;
+        if (e.vrsta === 'krog') {
+            const r = rocica([e.lat, e.lon], 'nt nt-sredisce', '✥', 30);
+            r.rocica = 'sredisce';
+            r.on('dragstart', function () { zapomni(); });
+            r.on('dragend', function () { const ll = r.getLatLng(); e.lat = ll.lat; e.lon = ll.lng; samodejnoShrani(); osveziZemljevid(); });
+            sloj.addLayer(r);
+            return;
+        }
+        if (e.vrsta !== 'obmocje' && e.vrsta !== 'crta') return;
+        const zaprto = e.vrsta === 'obmocje';
+        e.tocke.forEach(function (p, i) {
+            const r = rocica(p, 'nt' + (i === izbranaTocka ? ' nt-izbrana' : ''), '', 22);
+            r.rocica = 'tocka'; r.indeks = i;
+            r.on('dragstart', function () { zapomni(); });
+            r.on('dragend', function () { const ll = r.getLatLng(); e.tocke[i] = [ll.lat, ll.lng]; izbranaTocka = i; samodejnoShrani(); osveziZemljevid(); osveziLastnosti(); });
+            r.on('click', function () { izbranaTocka = i; osveziZemljevid(); osveziLastnosti(); });
+            sloj.addLayer(r);
+        });
+        const stOdsekov = zaprto ? e.tocke.length : e.tocke.length - 1;
+        for (let i = 0; i < stOdsekov; i++) {
+            (function (i) {
+                const a = e.tocke[i], b = e.tocke[(i + 1) % e.tocke.length];
+                const sred = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+                const r = L.marker(sred, { zIndexOffset: 1900, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nt nt-nova">+</div>', iconSize: [20, 20], iconAnchor: [10, 10] }) });
+                r.rocica = 'nova'; r.indeks = i;
+                r.on('click', function () { zapomni(); e.tocke.splice(i + 1, 0, sred); izbranaTocka = i + 1; samodejnoShrani(); osveziZemljevid(); osveziLastnosti(); });
+                sloj.addLayer(r);
+            })(i);
+        }
+    }
+
+    function osveziZemljevid() { narisi(skica(), sloj, map, true); narisiRocice(); osveziLegendo(); }
 
     // ---------- paleta ----------
     function gumbPalete(html, podatki, naslov) {
@@ -168,7 +233,7 @@
         const sel = $('drustvo');
         sel.innerHTML = M.DRUSTVA.map(function (d) { return '<option value="' + esc(d[0]) + '">' + esc(d[0] + ' - ' + d[1]) + '</option>'; }).join('');
         M.TIPI_VOZIL.forEach(function (v) {
-            $('pal-vozila').appendChild(gumbPalete('<svg viewBox="0 0 56 56">' + svgVozila(v.oblika, 'gasilci') + '</svg>' + esc(v.tip), { kljuc: 'v:' + v.tip, vrsta: 'vozilo', tip: v.tip, oblika: v.oblika, sluzba: 'gasilci' }, v.opis));
+            $('pal-vozila').appendChild(gumbPalete('<svg viewBox="0 0 56 56">' + svgVozila(v.oblika, 'gasilci', { cisterna: M.jeCisterna({ tip: v.tip, sluzba: 'gasilci' }) }) + '</svg>' + esc(v.tip), { kljuc: 'v:' + v.tip, vrsta: 'vozilo', tip: v.tip, oblika: v.oblika, sluzba: 'gasilci' }, v.opis));
         });
         $('pal-vozila').appendChild(gumbPalete('<svg viewBox="0 0 56 56">' + svgVozila('tovorno', 'gasilci') + '</svg>Drugo…', { kljuc: 'v:rocno', vrsta: 'vozilo', tip: '', oblika: 'tovorno', sluzba: 'gasilci', rocno: true }, 'Posebno vozilo od drugod - tip in kratico vpišeš ročno'));
         Object.keys(M.VOZILA_SLUZB).forEach(function (k) {
@@ -177,7 +242,7 @@
         });
         Object.keys(M.ZNAKI).forEach(function (k) {
             const z = M.ZNAKI[k];
-            $('pal-znaki').appendChild(gumbPalete('<span class="pal-znak" style="background:' + z.barva + ';' + (z.krog ? 'border-radius:50%;' : '') + '">' + esc(z.znak) + '</span><small>' + esc(z.naziv) + '</small>', { kljuc: 'z:' + k, vrsta: 'znak', znak: k }, z.naziv));
+            $('pal-znaki').appendChild(gumbPalete('<span class="pal-znak" style="background:' + z.barva + ';' + (z.krog ? 'border-radius:50%;' : '') + (z.prazen ? 'border:2px dashed #fff;' : '') + '">' + esc(z.znak) + '</span><small>' + esc(z.naziv) + '</small>', { kljuc: 'z:' + k, vrsta: 'znak', znak: k }, z.naziv));
         });
         Object.keys(M.CRTE).forEach(function (k) {
             const c = M.CRTE[k];
@@ -223,7 +288,7 @@
             e.tip = o.tip; e.oblika = o.oblika; e.sluzba = o.sluzba; e.kot = 0; e.opis = '';
             e.kratica = (o.sluzba === 'gasilci' && !o.rocno) ? kraticaZaNovo() : (o.rocno ? $('drustvo-rocno').value.trim().toUpperCase() : '');
             e.st = M.naslednjaStevilka(skica());
-        } else if (o.vrsta === 'znak') { e.znak = o.znak; e.kot = 0; e.opis = ''; }
+        } else if (o.vrsta === 'znak') { e.znak = o.znak; e.kot = 0; e.opis = M.ZNAKI[o.znak].prazen ? 'Opis' : ''; }
         else if (o.vrsta === 'krog') { e.r = 50; e.opis = ''; }
         else if (o.vrsta === 'besedilo') { e.opis = 'Besedilo'; }
         skica().elementi.push(e);
@@ -254,6 +319,7 @@
 
     // ---------- lastnosti izbranega elementa ----------
     function izberi(id) {
+        if (id !== izbranId) izbranaTocka = -1;
         izbranId = id;
         osveziZemljevid();
         osveziLastnosti();
@@ -261,6 +327,12 @@
 
     function polje(oznaka, kljuc, vrednost, dodatno) {
         return '<label>' + esc(oznaka) + '</label><input type="' + ((dodatno && dodatno.tip) || 'text') + '" data-k="' + kljuc + '" value="' + esc(vrednost) + '" autocomplete="off"' + ((dodatno && dodatno.atributi) || '') + '>';
+    }
+
+    function urejanjeTock(e, min) {
+        const lahko = izbranaTocka >= 0 && izbranaTocka < e.tocke.length && e.tocke.length > min;
+        return '<label>Točke (' + e.tocke.length + ')</label><div class="namig" style="margin-top:0;">Povleci belo točko za premik, tapni <b>+</b> za novo točko. Za odstranitev tapni točko (obarva se rumeno) in pritisni gumb.</div>' +
+            '<button type="button" id="btn-tocka-odstrani" style="width:100%;margin-top:6px;"' + (lahko ? '' : ' disabled') + '>➖ Odstrani izbrano točko</button>';
     }
 
     function osveziLastnosti() {
@@ -282,15 +354,16 @@
             h += '<label>Služba (barva)</label><select data-k="sluzba">' + Object.keys(M.SLUZBE).map(function (k) { return '<option value="' + k + '"' + (k === e.sluzba ? ' selected' : '') + '>' + esc(M.SLUZBE[k].naziv) + '</option>'; }).join('') + '</select>';
             h += polje('Naloga / opomba', 'opis', e.opis);
             h += kot;
+            if (M.imaRoko(e.oblika || oblikaZaTip(e.tip, e.sluzba))) h += '<label>' + ((e.oblika || oblikaZaTip(e.tip, e.sluzba)) === 'lestev' ? 'Smer lestvenika' : 'Smer roke / dvigala') + '</label><div class="gumbi-kot"><button type="button" data-roka="-45">⟲ 45°</button><button type="button" data-roka="-15">⟲ 15°</button><button type="button" data-roka="15">15° ⟳</button><button type="button" data-roka="45">45° ⟳</button></div>';
         } else if (e.vrsta === 'znak') {
             h += '<div><b>' + esc(M.ZNAKI[e.znak].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis);
             if (M.ZNAKI[e.znak].vrti) h += kot;
         } else if (e.vrsta === 'crta') {
-            h += '<div><b>' + esc(M.CRTE[e.slog].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis);
+            h += '<div><b>' + esc(M.CRTE[e.slog].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis) + urejanjeTock(e, 2);
         } else if (e.vrsta === 'obmocje') {
-            h += polje('Naziv sektorja', 'opis', e.opis) + '<label>Barva</label><div class="barve">' + M.BARVE_SEKTORJEV.map(function (b) { return '<button type="button" data-barva="' + b + '" class="' + (b === e.barva ? 'izbrana' : '') + '" style="background:' + b + '"></button>'; }).join('') + '</div>';
+            h += polje('Naziv sektorja', 'opis', e.opis) + '<label>Barva</label><div class="barve">' + M.BARVE_SEKTORJEV.map(function (b) { return '<button type="button" data-barva="' + b + '" class="' + (b === e.barva ? 'izbrana' : '') + '" style="background:' + b + '"></button>'; }).join('') + '</div>' + urejanjeTock(e, 3);
         } else if (e.vrsta === 'krog') {
-            h += polje('Napis', 'opis', e.opis) + polje('Polmer (m)', 'r', e.r, { tip: 'number', atributi: ' min="5" step="5"' });
+            h += polje('Napis', 'opis', e.opis) + polje('Polmer (m)', 'r', e.r, { tip: 'number', atributi: ' min="5" step="5"' }) + '<div class="namig">Središče premakneš z vlečenjem ročice ✥ na zemljevidu.</div>';
         } else if (e.vrsta === 'besedilo') {
             h += polje('Besedilo', 'opis', e.opis);
         }
@@ -317,9 +390,28 @@
         Array.prototype.forEach.call(el.querySelectorAll('[data-kot]'), function (b) {
             b.addEventListener('click', function () {
                 zapomni();
-                e.kot = (((e.kot || 0) + parseInt(b.dataset.kot, 10)) % 360 + 360) % 360;
+                const d = parseInt(b.dataset.kot, 10);
+                if (e.roka !== undefined) e.roka = ((e.roka + d) % 360 + 360) % 360; // roka se zasuka skupaj z vozilom
+                e.kot = (((e.kot || 0) + d) % 360 + 360) % 360;
                 samodejnoShrani(); osveziZemljevid();
             });
+        });
+        Array.prototype.forEach.call(el.querySelectorAll('[data-roka]'), function (b) {
+            b.addEventListener('click', function () {
+                zapomni();
+                const zdaj = e.roka === undefined ? (e.kot || 0) : e.roka;
+                e.roka = ((zdaj + parseInt(b.dataset.roka, 10)) % 360 + 360) % 360;
+                samodejnoShrani(); osveziZemljevid();
+            });
+        });
+        const btnTocka = $('btn-tocka-odstrani');
+        if (btnTocka) btnTocka.addEventListener('click', function () {
+            const min = e.vrsta === 'obmocje' ? 3 : 2;
+            if (izbranaTocka < 0 || izbranaTocka >= e.tocke.length || e.tocke.length <= min) return;
+            zapomni();
+            e.tocke.splice(izbranaTocka, 1);
+            izbranaTocka = -1;
+            samodejnoShrani(); osveziZemljevid(); osveziLastnosti();
         });
         Array.prototype.forEach.call(el.querySelectorAll('[data-barva]'), function (b) {
             b.addEventListener('click', function () { zapomni(); e.barva = b.dataset.barva; samodejnoShrani(); osveziZemljevid(); osveziLastnosti(); });
@@ -438,6 +530,105 @@
         return h;
     }
 
+    // ---------- legenda uporabljenih znakov (spodnji desni kot skice) ----------
+    function htmlLegende(sk) {
+        const vrstice = [];
+        const dodaj = function (ikona, besedilo) { vrstice.push('<tr><td style="padding:1px 5px 1px 0;text-align:center;vertical-align:middle;">' + ikona + '</td><td style="padding:1px 0;vertical-align:middle;">' + esc(besedilo) + '</td></tr>'); };
+        const mini = function (svg) { return '<svg viewBox="0 0 56 56" style="width:22px;height:22px;display:block;margin:0 auto;overflow:visible;">' + svg + '</svg>'; };
+        const vozila = sk.elementi.filter(function (e) { return e.vrsta === 'vozilo'; });
+        const sluzbe = {};
+        vozila.forEach(function (e) { sluzbe[e.sluzba || 'gasilci'] = true; });
+        Object.keys(M.SLUZBE).forEach(function (k) {
+            if (!sluzbe[k]) return;
+            dodaj(mini(svgVozila(k === 'policija' ? 'avto' : 'tovorno', k)), k === 'gasilci' ? 'Gasilsko vozilo' : 'Vozilo: ' + M.SLUZBE[k].naziv);
+        });
+        if (vozila.some(M.jeCisterna)) dodaj(mini(svgVozila('tovorno', 'gasilci', { cisterna: true })), 'Cisterna (X)');
+        if (vozila.length) dodaj('<b style="font-size:11px;">1, 2 …</b>', 'Vrstni red prihoda');
+        const znaki = {};
+        sk.elementi.forEach(function (e) {
+            if (e.vrsta !== 'znak') return;
+            const z = M.ZNAKI[e.znak];
+            const kljuc = z.prazen ? 'prazen:' + (e.opis || '') : e.znak;
+            if (znaki[kljuc]) return;
+            znaki[kljuc] = true;
+            dodaj('<span style="display:inline-block;width:17px;height:17px;line-height:17px;border-radius:' + (z.krog ? '50%' : '3px') + ';background:' + z.barva + ';color:#fff;font-size:10px;font-weight:bold;text-align:center;">' + esc(z.znak) + '</span>', z.prazen ? (e.opis || 'Znak') : z.naziv);
+        });
+        const crte = {};
+        sk.elementi.forEach(function (e) {
+            if (e.vrsta !== 'crta' || crte[e.slog]) return;
+            crte[e.slog] = true;
+            const c = M.CRTE[e.slog];
+            const barva = c.barva === '#f8fafc' ? '#475569' : c.barva;
+            dodaj('<span style="display:inline-block;width:22px;border-top:3px ' + (c.crtkano ? 'dashed' : 'solid') + ' ' + barva + ';vertical-align:middle;"></span>' + (c.puscica ? '<span style="color:' + barva + ';font-size:9px;">▶</span>' : ''), c.naziv);
+        });
+        sk.elementi.forEach(function (e) {
+            if (e.vrsta === 'obmocje') dodaj('<span style="display:inline-block;width:17px;height:12px;background:' + (e.barva || '#ef4444') + '55;border:2px solid ' + (e.barva || '#ef4444') + ';"></span>', e.opis || 'Sektor');
+        });
+        if (sk.elementi.some(function (e) { return e.vrsta === 'krog'; })) dodaj('<span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:2px dashed #dc2626;background:#dc262633;"></span>', 'Nevarno območje');
+        if (!vrstice.length) return '';
+        return '<div class="nacrt-legenda"><div class="nl-naslov">Legenda</div><table>' + vrstice.join('') + '</table></div>';
+    }
+    function osveziLegendo() {
+        const el = $('legenda');
+        if (!el) return;
+        const h = htmlLegende(skica());
+        el.innerHTML = h;
+        el.style.display = h ? '' : 'none';
+    }
+
+    // ---------- obrazec za prijavo vaje (ReCO) ----------
+    function odpriObrazec() {
+        if (!nacrt.obrazec) nacrt.obrazec = M.privzetiObrazec();
+        $('obrazec-polja').innerHTML = M.OBRAZEC_POLJA.map(function (p) {
+            const v = nacrt.obrazec[p.k] || '';
+            return '<label>' + esc(p.naziv) + '</label>' + (p.vrstic > 1 ? '<textarea data-o="' + p.k + '" rows="' + p.vrstic + '">' + esc(v) + '</textarea>' : '<input type="text" data-o="' + p.k + '" value="' + esc(v) + '">');
+        }).join('');
+        Array.prototype.forEach.call($('obrazec-polja').querySelectorAll('[data-o]'), function (vnos) {
+            vnos.addEventListener('input', function () { nacrt.obrazec[vnos.dataset.o] = vnos.value; samodejnoShrani(); });
+        });
+        $('obrazec-okno').style.display = 'flex';
+    }
+    function htmlObrazca() {
+        const o = nacrt.obrazec || M.privzetiObrazec();
+        const v = function (k) { return esc((o[k] || '').trim()); };
+        const vrstice = function (k) { return (o[k] || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean); };
+        const scenarij = vrstice('scenarij').map(function (x) { const d = x.split('|').map(function (y) { return y.trim(); }); return '<tr><td>' + esc(d[0] || '') + '</td><td>' + esc(d[1] || '') + '</td><td>' + esc(d[2] || '') + '</td></tr>'; }).join('');
+        let pgd = vrstice('pgd');
+        if (!pgd.length) pgd = M.drustvaVNacrtu(nacrt);
+        while (pgd.length % 4 !== 0 || pgd.length === 0) pgd.push('');
+        let pgdVrstice = '';
+        for (let i = 0; i < pgd.length; i += 4) pgdVrstice += '<tr>' + [0, 1, 2, 3].map(function (j) { return '<td class="ob-celica">' + (i + j + 1) + '. <b>' + esc(pgd[i + j] || '') + '</b></td>'; }).join('') + '</tr>';
+        const ud = vrstice('udelezenci');
+        while (ud.length < 5) ud.push('');
+        return '<div class="obrazec">' +
+            '<table><tr><td style="width:68%"><b>GASILSKA ZVEZA: ' + v('gz') + '</b></td><td>' + v('naslov') + '</td></tr></table>' +
+            '<p class="ob-drobno">Na podlagi Pravilnika o vajah na področju varstva pred naravnimi in drugimi nesrečami (Uradni list RS, številka 104/08 z dne 3.11.2008)</p>' +
+            '<table><tr><td style="width:68%"><b>Gasilsko društvo: ' + v('drustvo') + '</b></td><td class="ob-sredina">ORGANIZIRA IN IZVEDE<br>' + v('obseg') + '</td></tr>' +
+            '<tr><td colspan="2"><b>Gasilsko vajo:</b> ' + v('vaja') + '</td></tr></table>' +
+            '<table><tr><td style="width:20%"><b>dne:</b> ' + v('dne') + '</td><td style="width:30%"><b>ob:</b> ' + v('ob') + ' <b>uri</b></td><td><b>na lokaciji:</b> ' + v('lokacija') + '</td></tr></table>' +
+            '<table class="ob-odmik"><tr><th colspan="3">VODSTVO VAJE</th></tr><tr><td class="ob-sredina" style="width:50%">Vodja vaje</td><td class="ob-sredina">Pomočnik</td><td class="ob-sredina">Pomočnik</td></tr>' +
+            '<tr><td class="ob-sredina ob-visina">' + v('vodja') + '</td><td class="ob-sredina">' + v('pomocnik1') + '</td><td class="ob-sredina">' + v('pomocnik2') + '</td></tr></table>' +
+            '<table class="ob-odmik"><tr><th>SCENARIJ VAJE</th></tr></table>' +
+            '<table class="ob-odmik ob-sredinska"><tr><td style="width:55%">Aktivnosti</td><td>Nosilec</td><td style="width:16%">Čas izvedbe</td></tr>' + scenarij + '</table>' +
+            '<table class="ob-odmik"><tr><th style="width:50%">Imitacija</th><th>Načrt zavarovanja</th></tr>' +
+            '<tr><td>Vrsta: ' + v('imVrsta') + '</td><td>Način: ' + v('zavNacin') + '</td></tr><tr><td>Obseg: ' + v('imObseg') + '</td><td>Obseg: ' + v('zavObseg') + '</td></tr>' +
+            '<tr><td>Čas izvedbe: ' + v('imCas') + '</td><td>Izvajalec: ' + v('zavIzvajalec') + '</td></tr><tr><td>Izvajalec: ' + v('imIzvajalec') + '</td><td></td></tr></table>' +
+            '<table class="ob-odmik"><tr><th colspan="3">NAČRT ZVEZ<br><span style="font-weight:normal;">(' + v('zvezeOpis') + ')</span></th></tr>' +
+            '<tr><td>Vodstvo vaje: ' + v('zvezeVodstvo') + '</td><td>delovni kanal: ' + v('kanal') + '</td><td>Rezervni kanal: ' + v('rezervniKanal') + '</td></tr>' +
+            '<tr><th colspan="3">' + v('aktiviranje') + '<br>Dne: ' + v('dne') + ' ob ' + v('ob') + ' uri naslednje PGD:</th></tr></table>' +
+            '<table class="ob-brez-zgornje">' + pgdVrstice + '<tr><td colspan="4">Vsebina poziva se glasi: ' + v('poziv') + '</td></tr>' +
+            '<tr><th colspan="4">Organizator obvešča ostale udeležence vaje <span style="font-weight:normal;">(policijo, zdravstvo, elektro, … itd.)</span></th></tr></table>' +
+            '<table class="ob-brez-zgornje"><tr>' + ud.map(function (x, i) { return '<td class="ob-celica">' + (i + 1) + ' ' + esc(x) + '</td>'; }).join('') + '</tr></table>' +
+            '<p style="margin-top:4mm;"><b>Zaključek vaje</b> je predviden ob: ' + v('zakljucek') + ' uri.</p>' +
+            '<p style="text-align:right;margin:8mm 12mm 0 0;"><b>Poveljstvo</b></p></div>';
+    }
+    function natisniObrazec() {
+        $('tisk').innerHTML = htmlObrazca();
+        const pocisti = function () { window.removeEventListener('afterprint', pocisti); if (!window.EPV_TISK_OHRANI) $('tisk').innerHTML = ''; };
+        window.addEventListener('afterprint', pocisti);
+        setTimeout(function () { window.print(); }, 100);
+    }
+
     // ---------- izpis ----------
     function mejeSkice(sk) {
         const t = [];
@@ -458,11 +649,6 @@
                 return '<tr><td>' + esc(v.st) + '</td><td>' + esc(v.kratica) + '</td><td>' + esc(v.tip) + '</td><td>' + esc(v.opis) + '</td></tr>';
             }).join('') + '</tbody></table>';
         }
-        const ostalo = sk.elementi.filter(function (e) { return e.vrsta !== 'vozilo'; }).map(function (e) {
-            const vrsta = e.vrsta === 'znak' ? M.ZNAKI[e.znak].naziv : e.vrsta === 'crta' ? M.CRTE[e.slog].naziv : e.vrsta === 'obmocje' ? 'Sektor' : e.vrsta === 'krog' ? 'Nevarno območje (' + Math.round(e.r) + ' m)' : 'Besedilo';
-            return esc(vrsta) + (e.opis ? ': ' + esc(e.opis) : '');
-        });
-        if (ostalo.length) h += '<p style="font-size:9.5pt;"><b>Oznake:</b> ' + ostalo.join('; ') + '</p>';
         return h;
     }
 
@@ -472,7 +658,7 @@
         const cilj = $('tisk');
         let h = zElaboratom ? htmlElaborata() : '<h1>' + esc(nacrt.naziv) + '</h1>';
         nacrt.skice.forEach(function (s, i) {
-            h += '<div class="tisk-skica' + (!zElaboratom && i === 0 ? ' prva' : '') + '"><h2>Skica ' + (i + 1) + ': ' + esc(s.naziv) + '</h2><div class="tisk-zemljevid" id="tisk-z-' + i + '"></div>' + legendaSkice(s) + '</div>';
+            h += '<div class="tisk-skica' + (!zElaboratom && i === 0 ? ' prva' : '') + '"><h2>Skica ' + (i + 1) + ': ' + esc(s.naziv) + '</h2><div class="tisk-zemljevid-okvir"><div class="tisk-zemljevid" id="tisk-z-' + i + '"></div>' + htmlLegende(s) + '</div>' + legendaSkice(s) + '</div>';
         });
         h += '<p class="tisk-noga">EPV Načrt · izpis ' + esc(new Date().toLocaleString('sl-SI')) + '</p>';
         cilj.innerHTML = h;
@@ -601,6 +787,9 @@
         $('btn-elaborat-zapri').addEventListener('click', function () { $('elaborat-okno').style.display = 'none'; });
         $('btn-elaborat-tisk').addEventListener('click', function () { $('elaborat-okno').style.display = 'none'; natisni(true); });
         $('btn-tisk-skice').addEventListener('click', function () { natisni(false); });
+        $('btn-obrazec').addEventListener('click', odpriObrazec);
+        $('btn-obrazec-zapri').addEventListener('click', function () { $('obrazec-okno').style.display = 'none'; });
+        $('btn-obrazec-tisk').addEventListener('click', function () { $('obrazec-okno').style.display = 'none'; natisniObrazec(); });
         document.addEventListener('keydown', function (ev) {
             if (ev.key === 'Escape') nastaviOrodje(null);
             if ((ev.key === 'Delete') && izbranId && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) $('btn-el-izbrisi') && $('btn-el-izbrisi').click();

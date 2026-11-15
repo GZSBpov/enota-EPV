@@ -8,7 +8,8 @@
 
     const VERZIJA = 1;
 
-    // Tipi vozil v GZ. oblika: avto | tovorno | lestev | dron | coln | priklopnik
+    // Tipi vozil v GZ. oblika: avto | tovorno | lestev | roka | dron | coln | priklopnik
+    // lestev in roka imata vrtljiv lestvenik/roko (smer se nastavi posebej, neodvisno od smeri vozila)
     const TIPI_VOZIL = [
         { tip: 'PV-1', oblika: 'avto', opis: 'Poveljniško vozilo' },
         { tip: 'GVC-1', oblika: 'tovorno', opis: 'Gasilsko vozilo s cisterno' },
@@ -18,12 +19,12 @@
         { tip: 'GVV-1', oblika: 'tovorno', opis: 'Manjše gasilsko vozilo z vodo' },
         { tip: 'GVM', oblika: 'avto', opis: 'Vozilo za prevoz moštva' },
         { tip: 'ALK32', oblika: 'lestev', opis: 'Avtolestev s košaro' },
-        { tip: 'ZD28', oblika: 'lestev', opis: 'Zgibno dvigalo' },
+        { tip: 'ZD28', oblika: 'roka', opis: 'Zglobno dvigalo' },
         { tip: 'OVVO', oblika: 'tovorno', opis: 'Orodno vozilo' },
         { tip: 'HTRV-1', oblika: 'tovorno', opis: 'Hitro tehnično reševalno vozilo' },
         { tip: 'GVGP-1', oblika: 'tovorno', opis: 'Vozilo za gozdne požare' },
         { tip: 'VGV', oblika: 'avto', opis: 'Večnamensko gasilsko vozilo' },
-        { tip: 'GTVD', oblika: 'tovorno', opis: 'Gasilsko tovorno vozilo' },
+        { tip: 'GTVD', oblika: 'roka', opis: 'Gasilsko tovorno vozilo z dvigalom' },
         { tip: 'UAV', oblika: 'dron', opis: 'Dron' },
         { tip: 'GČ', oblika: 'coln', opis: 'Gasilski čoln' },
         { tip: 'GP', oblika: 'priklopnik', opis: 'Gasilski priklopnik' }
@@ -62,19 +63,23 @@
         zbirno: { naziv: 'Zbirno mesto enot', znak: 'ZM', barva: '#2563eb' },
         evak: { naziv: 'Zbirno mesto evakuiranih', znak: '🏃', barva: '#16a34a' },
         pozar: { naziv: 'Požar', znak: '🔥', barva: '#b91c1c' },
-        nevarnost: { naziv: 'Nevarnost / nevarna snov', znak: '⚠', barva: '#f59e0b' },
+        nevarnost: { naziv: 'Nevarnost', znak: '⚠', barva: '#f59e0b' },
+        nevsnov: { naziv: 'Nevarna snov', znak: '☣', barva: '#ea580c' },
         oseba: { naziv: 'Ponesrečenec / ujeta oseba', znak: '🧍', barva: '#7c3aed' },
         voda: { naziv: 'Vodni vir / hidrant', znak: 'H', barva: '#0284c7' },
         vhod: { naziv: 'Vhod / dostop', znak: '➤', barva: '#475569', vrti: true },
         veter: { naziv: 'Smer vetra', znak: '➤', barva: '#0e7490', vrti: true, napis: 'veter' },
         zapora: { naziv: 'Zapora ceste', znak: '⛔', barva: '#991b1b' },
-        helo: { naziv: 'Pristajalno mesto (helikopter)', znak: 'H', barva: '#15803d', krog: true }
+        helo: { naziv: 'Pristajalno mesto (helikopter)', znak: 'H', barva: '#15803d', krog: true },
+        repetitor: { naziv: 'Mobilni repetitor', znak: '📡', barva: '#4338ca' },
+        prazen: { naziv: 'Prazen znak (z opisom)', znak: '', barva: '#64748b', prazen: true }
     };
 
     // Črte: slog -> { naziv, barva, debelina, crtkano, puscica }
     const CRTE = {
-        cevovod: { naziv: 'Cevovod', barva: '#0ea5e9', debelina: 5, crtkano: null, puscica: false },
-        napad: { naziv: 'Smer napada', barva: '#dc2626', debelina: 5, crtkano: null, puscica: true },
+        cevovod: { naziv: 'Cevovod', barva: '#38bdf8', debelina: 5, crtkano: null, puscica: false },
+        napad: { naziv: 'Napad', barva: '#1d4ed8', debelina: 4, crtkano: null, puscica: true },
+        preiskovanje: { naziv: 'Preiskovanje / reševanje', barva: '#dc2626', debelina: 4, crtkano: null, puscica: true },
         evakuacija: { naziv: 'Evakuacijska pot', barva: '#16a34a', debelina: 5, crtkano: '10,8', puscica: true },
         dovoz: { naziv: 'Dovoz / smer vožnje', barva: '#f8fafc', debelina: 4, crtkano: '4,8', puscica: true }
     };
@@ -97,6 +102,59 @@
         { k: 'casovnica', naziv: '4. Taktični nastop enot (ena vrstica = en korak, npr. »16:06 prihod GE Impol«)', vrstic: 8 },
         { k: 'zakljucek', naziv: '5. Zaključek, analiza in pomembna opozorila', vrstic: 4 }
     ];
+
+    // Obrazec za prijavo vaje (pošlje se na ReCO). vrstic > 1 = večvrstično polje.
+    const OBRAZEC_POLJA = [
+        { k: 'gz', naziv: 'Gasilska zveza', vrstic: 1, privzeto: 'Slovenska Bistrica' },
+        { k: 'naslov', naziv: 'Naslov (npr. "VAJA" požar objekta)', vrstic: 1, privzeto: '"VAJA" ' },
+        { k: 'drustvo', naziv: 'Gasilsko društvo (organizator)', vrstic: 1, privzeto: '' },
+        { k: 'obseg', naziv: 'Organizira in izvede', vrstic: 1, privzeto: 'VAJO MANJŠEGA OBSEGA' },
+        { k: 'vaja', naziv: 'Gasilsko vajo (opis)', vrstic: 1, privzeto: '' },
+        { k: 'dne', naziv: 'Dne', vrstic: 1, privzeto: '' },
+        { k: 'ob', naziv: 'Ob (ura)', vrstic: 1, privzeto: '' },
+        { k: 'lokacija', naziv: 'Na lokaciji', vrstic: 1, privzeto: '' },
+        { k: 'vodja', naziv: 'Vodja vaje', vrstic: 1, privzeto: '' },
+        { k: 'pomocnik1', naziv: 'Pomočnik', vrstic: 1, privzeto: '' },
+        { k: 'pomocnik2', naziv: 'Pomočnik', vrstic: 1, privzeto: '' },
+        { k: 'scenarij', naziv: 'Scenarij vaje - ena vrstica = Aktivnost | Nosilec | Čas izvedbe', vrstic: 6, privzeto: 'Odkritje in prijava dogodka |  | \nAktiviranje GE preko delovnega kanala |  | \nEvakuacija, gašenje, preiskovanje |  | \nZaključek intervencije | Po končani dejavnosti se poda poročilo v ReCO | ' },
+        { k: 'imVrsta', naziv: 'Imitacija - vrsta', vrstic: 1, privzeto: '' },
+        { k: 'imObseg', naziv: 'Imitacija - obseg', vrstic: 1, privzeto: '' },
+        { k: 'imCas', naziv: 'Imitacija - čas izvedbe', vrstic: 1, privzeto: '' },
+        { k: 'imIzvajalec', naziv: 'Imitacija - izvajalec', vrstic: 1, privzeto: '' },
+        { k: 'zavNacin', naziv: 'Načrt zavarovanja - način', vrstic: 1, privzeto: '' },
+        { k: 'zavObseg', naziv: 'Načrt zavarovanja - obseg', vrstic: 1, privzeto: '' },
+        { k: 'zavIzvajalec', naziv: 'Načrt zavarovanja - izvajalec', vrstic: 1, privzeto: '' },
+        { k: 'zvezeOpis', naziv: 'Načrt zvez - opis', vrstic: 1, privzeto: 'Delovni kanal ZARE …, obveščen ReCO Maribor' },
+        { k: 'zvezeVodstvo', naziv: 'Načrt zvez - vodstvo vaje', vrstic: 1, privzeto: '' },
+        { k: 'kanal', naziv: 'Delovni kanal', vrstic: 1, privzeto: '' },
+        { k: 'rezervniKanal', naziv: 'Rezervni kanal', vrstic: 1, privzeto: '' },
+        { k: 'aktiviranje', naziv: 'Aktiviranje sodelujočih (kdo in kako)', vrstic: 1, privzeto: '… aktivira sodelujoče preko GSM ali EA sistema' },
+        { k: 'pgd', naziv: 'Sodelujoča PGD - eno v vrstici (prazno = društva s skic)', vrstic: 4, privzeto: '' },
+        { k: 'poziv', naziv: 'Vsebina poziva se glasi', vrstic: 1, privzeto: '„VAJA …“' },
+        { k: 'udelezenci', naziv: 'Organizator obvešča ostale udeležence (policijo, zdravstvo, elektro …) - eden v vrstici', vrstic: 3, privzeto: '' },
+        { k: 'zakljucek', naziv: 'Zaključek vaje je predviden ob (ura)', vrstic: 1, privzeto: '' }
+    ];
+    function privzetiObrazec() {
+        const o = {};
+        OBRAZEC_POLJA.forEach(function (p) { o[p.k] = p.privzeto; });
+        return o;
+    }
+
+    /** Cisterna: gasilsko vozilo, katerega tip vsebuje C (GVC-1, GVC-2, GVC-3 ...) - na ikoni dobi X za rumeno črto. */
+    function jeCisterna(e) {
+        return (e.sluzba || 'gasilci') === 'gasilci' && /C/.test(String(e.tip || '').toUpperCase());
+    }
+    function imaRoko(oblika) { return oblika === 'lestev' || oblika === 'roka'; }
+
+    /** Različna društva (kratice) gasilskih vozil v načrtu, po vrstnem redu prihoda. */
+    function drustvaVNacrtu(nacrt) {
+        const videna = {}, izhod = [];
+        seznamVozil(nacrt).forEach(function (v) {
+            const k = String(v.kratica || '').toUpperCase();
+            if (v.sluzba === 'gasilci' && k && !videna[k]) { videna[k] = true; izhod.push(nazivDrustva(k) || k); }
+        });
+        return izhod;
+    }
 
     function privzetiElaborat() {
         return {
@@ -127,7 +185,7 @@
         return {
             vrsta: 'epv-nacrt', v: VERZIJA, naziv: naziv || 'Nov načrt',
             ustvarjeno: new Date().toISOString(), spremenjeno: new Date().toISOString(),
-            elaborat: privzetiElaborat(),
+            elaborat: privzetiElaborat(), obrazec: privzetiObrazec(),
             skice: [novaSkica('Lokacija', pogled), novaSkica('Evakuacija', pogled), novaSkica('Posredovanje', pogled)]
         };
     }
@@ -212,9 +270,11 @@
         if (skice.length === 0) skice.push(novaSkica('Skica 1', null));
         const elaborat = privzetiElaborat();
         if (o.elaborat && typeof o.elaborat === 'object') Object.keys(elaborat).forEach(function (k) { if (typeof o.elaborat[k] === 'string') elaborat[k] = o.elaborat[k]; });
+        const obrazec = privzetiObrazec();
+        if (o.obrazec && typeof o.obrazec === 'object') Object.keys(obrazec).forEach(function (k) { if (typeof o.obrazec[k] === 'string') obrazec[k] = o.obrazec[k]; });
         return {
             ok: true, izpusceno: izpusceno,
-            nacrt: { vrsta: 'epv-nacrt', v: VERZIJA, naziv: String(o.naziv || 'Načrt'), ustvarjeno: o.ustvarjeno || new Date().toISOString(), spremenjeno: o.spremenjeno || new Date().toISOString(), elaborat: elaborat, skice: skice }
+            nacrt: { vrsta: 'epv-nacrt', v: VERZIJA, naziv: String(o.naziv || 'Načrt'), ustvarjeno: o.ustvarjeno || new Date().toISOString(), spremenjeno: o.spremenjeno || new Date().toISOString(), elaborat: elaborat, obrazec: obrazec, skice: skice }
         };
     }
 
@@ -225,7 +285,8 @@
 
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
-        BARVE_SEKTORJEV: BARVE_SEKTORJEV, ELABORAT_POLJA: ELABORAT_POLJA,
+        BARVE_SEKTORJEV: BARVE_SEKTORJEV, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
+        privzetiObrazec: privzetiObrazec, jeCisterna: jeCisterna, imaRoko: imaRoko, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,
         uvozi: uvozi, imeDatoteke: imeDatoteke

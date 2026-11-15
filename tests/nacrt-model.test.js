@@ -30,6 +30,18 @@ pri('seznam vozil brez dvojnikov prek skic', vozila.length === 3 && vozila.map(v
 pri('seznam ohrani opis', vozila[0].opis === 'notranji napad');
 pri('naziv društva', M.nazivDrustva('slb') === 'PGD Slovenska Bistrica' && M.nazivDrustva('XYZ') === '');
 
+// cisterne, roke, nove oznake in črte, obrazec
+pri('cisterna samo za gasilska vozila s C', M.jeCisterna({ tip: 'GVC-1' }) && M.jeCisterna({ tip: 'gvc-3', sluzba: 'gasilci' }) && !M.jeCisterna({ tip: 'GV-1' }) && !M.jeCisterna({ tip: 'CZ', sluzba: 'cz' }) && !M.jeCisterna({ tip: 'GČ' }));
+pri('vrtljiva roka: ALK, ZD, GTVD', ['ALK32', 'ZD28', 'GTVD'].every(x => M.imaRoko(M.TIPI_VOZIL.find(v => v.tip === x).oblika)) && !M.imaRoko('tovorno'));
+pri('nove oznake', M.ZNAKI.nevsnov && M.ZNAKI.repetitor && M.ZNAKI.prazen.prazen === true);
+pri('napad je moder, preiskovanje rdeče', M.CRTE.napad.barva === '#1d4ed8' && M.CRTE.preiskovanje.barva === '#dc2626' && M.CRTE.preiskovanje.puscica);
+pri('obrazec: prazen, s stalnimi besedili', n.obrazec.gz === 'Slovenska Bistrica' && n.obrazec.dne === '' && n.obrazec.vodja === '' && n.obrazec.scenarij.split('\n').length === 4);
+pri('društva v načrtu po vrstnem redu prihoda', JSON.stringify(M.drustvaVNacrtu(n)) === JSON.stringify(['PIGD Impol', 'PGD Slovenska Bistrica']), M.drustvaVNacrtu(n));
+const stari = JSON.parse(JSON.stringify(n)); delete stari.obrazec;
+pri('načrt brez obrazca (starejša datoteka) dobi praznega', M.uvozi(JSON.stringify(stari)).nacrt.obrazec.gz === 'Slovenska Bistrica');
+const zObr = JSON.parse(JSON.stringify(n)); zObr.obrazec.dne = '3. 7. 2026';
+pri('obrazec se shrani z načrtom', M.uvozi(JSON.stringify(zObr)).nacrt.obrazec.dne === '3. 7. 2026');
+
 // shrani -> odpri
 const r = M.uvozi(JSON.stringify(n));
 pri('uvoz lastnega izvoza', r.ok && r.izpusceno === 0 && r.nacrt.skice.length === 4 && r.nacrt.skice[2].elementi.length === 3 && r.nacrt.naziv === 'Vaja Impol', r);
