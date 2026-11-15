@@ -147,6 +147,10 @@
     function jeCisterna(e) {
         return (e.sluzba || 'gasilci') === 'gasilci' && /C/.test(String(e.tip || '').toUpperCase());
     }
+    /** Število koles na ikoni: triosna vozila (GVC-3, GTVD) imajo 6 koles, vsa ostala 4. */
+    function steviloKoles(tip) {
+        return /^(GVC-3|GTVD)$/i.test(String(tip || '').trim()) ? 6 : 4;
+    }
     function imaRoko(oblika) { return oblika === 'lestev' || oblika === 'roka'; }
 
     /** Različna društva (kratice) gasilskih vozil v načrtu, po vrstnem redu prihoda. */
@@ -317,7 +321,7 @@
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
         BARVE_SEKTORJEV: BARVE_SEKTORJEV, BARVE_CRT: BARVE_CRT, ocistiOsnovo: ocistiOsnovo, kmlKoordinate: kmlKoordinate, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
-        privzetiObrazec: privzetiObrazec, jeCisterna: jeCisterna, imaRoko: imaRoko, drustvaVNacrtu: drustvaVNacrtu,
+        privzetiObrazec: privzetiObrazec, jeCisterna: jeCisterna, imaRoko: imaRoko, steviloKoles: steviloKoles, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,
         uvozi: uvozi, imeDatoteke: imeDatoteke

@@ -54,6 +54,8 @@ pri('barve črt vsebujejo belo in črno', M.BARVE_CRT.includes('#f8fafc') && M.B
 
 pri('napisi: privzeto vidni, izklop se ohrani v datoteki', n.napisi === true && M.uvozi(JSON.stringify(Object.assign({}, n, { napisi: false }))).nacrt.napisi === false && M.uvozi(JSON.stringify(stari)).nacrt.napisi === true);
 
+pri('kolesa: GVC-3 in GTVD 6, ostala 4', M.steviloKoles('GVC-3') === 6 && M.steviloKoles('GTVD') === 6 && M.TIPI_VOZIL.filter(v => !['GVC-3', 'GTVD'].includes(v.tip)).every(v => M.steviloKoles(v.tip) === 4) && M.steviloKoles('NMP') === 4 && M.steviloKoles('') === 4);
+
 // shrani -> odpri
 const r = M.uvozi(JSON.stringify(n));
 pri('uvoz lastnega izvoza', r.ok && r.izpusceno === 0 && r.nacrt.skice.length === 4 && r.nacrt.skice[2].elementi.length === 3 && r.nacrt.naziv === 'Vaja Impol', r);
