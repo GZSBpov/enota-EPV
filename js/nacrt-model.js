@@ -308,7 +308,12 @@
                 if (!ok) izpusceno++;
                 return ok;
             }).map(function (e) { if (!e.id) e.id = novId('e'); return e; });
-            const p = s.pogled && jeSt(s.pogled.lat) && jeSt(s.pogled.lon) && jeSt(s.pogled.z) ? s.pogled : null;
+            let p = null;
+            if (s.pogled && jeSt(s.pogled.lat) && jeSt(s.pogled.lon) && jeSt(s.pogled.z)) {
+                p = { lat: s.pogled.lat, lon: s.pogled.lon, z: s.pogled.z };
+                const mj = s.pogled.meje;
+                if (Array.isArray(mj) && mj.length === 2 && mj.every(function (t) { return Array.isArray(t) && jeSt(t[0]) && jeSt(t[1]); })) p.meje = [[mj[0][0], mj[0][1]], [mj[1][0], mj[1][1]]];
+            }
             return { id: s.id || novId('s'), naziv: String(s.naziv || 'Skica'), pogled: p, elementi: el };
         });
         if (skice.length === 0) skice.push(novaSkica('Skica 1', null));

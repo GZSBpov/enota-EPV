@@ -124,8 +124,9 @@ with sync_playwright() as pw:
     p.click('#btn-koncaj')
     pri('cevovod s tremi točkami', el()[6]['vrsta'] == 'crta' and el()[6]['slog'] == 'cevovod' and len(el()[6]['tocke']) == 3, el()[6])
     # črta: črna obroba in izbira barve
-    crte = lambda: p.evaluate("window.__L.polylines.slice(-2).map(l => [l.options.color, l.options.weight, l.options.interactive])")
+    crte = lambda: p.evaluate("window.__L.polylines.slice(-3).map(l => [l.options.color, l.options.weight, l.options.interactive, l.options.opacity])")
     pri('črta ima temno obrobo pod barvo', crte()[0][0] == '#0f172a' and crte()[0][2] is False and crte()[0][1] > crte()[1][1] and crte()[1][0] == '#38bdf8', crte())
+    pri('črta: nevidna široka črta za lažji klik', crte()[2][3] == 0 and crte()[2][1] >= 24, crte())
     pri('črta: izbira barve v lastnostih', p.locator('#lastnosti [data-barva]').count() == 9)
     p.click('#lastnosti [data-barva="#fde047"]')
     pri('črta: barva spremenjena', el()[6]['barva'] == '#fde047' and crte()[1][0] == '#fde047' and crte()[0][0] == '#0f172a', (el()[6].get('barva'), crte()))
@@ -217,6 +218,7 @@ with sync_playwright() as pw:
     pri('elaborat: časovnica razdeljena na čas in aktivnost', '<td>16:06</td><td>prihod GE Impol</td>' in h and '<td></td><td>zaključek vaje</td>' in h, h[h.find('16:06')-40:h.find('16:06')+80])
     pri('elaborat: tabela vozil iz skic', 'PGD Slovenska Bistrica' in t and 'ALK32' in t and 'Reševalci (NMP)' in t and 'tehnično reševanje' in t)
     pri('elaborat: skice na koncu', p.locator('#tisk .tisk-zemljevid').count() == 4 and 'Skica 3: Posredovanje' in t and 'Skica 4: 16:08 prihod ALK' in t)
+    pri('izpis: legenda v treh stolpcih', p.evaluate("getComputedStyle(document.querySelector('#tisk .nl-vrsta')).gridTemplateColumns.split(' ').length") == 3)
     pri('izpis: legenda je pod skico in nad tabelo vozil, ne na zemljevidu', p.locator('#tisk .tisk-zemljevid-okvir .nacrt-legenda').count() == 0 and p.locator('#tisk .tisk-skica > .nacrt-legenda.nl-vrsta').count() == 2 and p.evaluate("Array.from(document.querySelectorAll('#tisk .tisk-skica')).filter(s => s.querySelector('.nl-vrsta')).every(s => { const d = Array.from(s.children); const l = d.findIndex(x => x.classList.contains('nl-vrsta')); return d[l - 1].classList.contains('tisk-zemljevid-okvir') && d[l + 1].tagName === 'TABLE'; })"))
     pri('izpis: legenda vsebuje uporabljene znake', 'Poveljniško mesto' in p.inner_text('#tisk .nl-vrsta >> nth=0') and 'Cisterna (X)' in t)
     tisk_ikone = p.evaluate("window.__L.markers.slice(-40).map(m => (m.options.icon && m.options.icon.html) || '').filter(h => h.includes('nv-napis'))")
@@ -228,6 +230,21 @@ with sync_playwright() as pw:
     p.click('#btn-tisk-skice'); time.sleep(1.5)
     t2 = p.inner_text('#tisk')
     pri('izpis samo skic: brez elaborata', p.evaluate("window.__natisnjeno") == 2 and '1. Uvod' not in t2 and 'Skica 1: Lokacija' in t2)
+
+    # ---- vrstni red: v ozadje / v ospredje ----
+    p.click('.skica-vrstica[data-i="2"]')
+    p.evaluate("window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('1 · IMP')).slice(-1)[0].handlers.click[0]({})")
+    id_gvc = st()['izbranId']
+    plast = lambda: p.evaluate("(() => { const m = window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('1 · IMP')).slice(-1)[0]; return [m.options.pane, m.options.zIndexOffset]; })()")
+    pri('vrstni red: privzeto v ospredju', plast()[0] == 'markerPane' and 'plast' not in el()[0])
+    p.click('#btn-el-ozadje')
+    pri('ikona v ozadju: pod črtami (svoja plast), prva v seznamu', el()[0]['id'] == id_gvc and el()[0]['plast'] == 'ozadje' and plast()[0] == 'epvOzadje' and st()['izbranId'] == id_gvc and 'v ozadju' in p.inner_text('#lastnosti'), (el()[0].get('plast'), plast()))
+    p.click('#btn-el-ospredje')
+    pri('ikona v ospredju: zadnja v seznamu, nad ostalimi ikonami', el()[-1]['id'] == id_gvc and 'plast' not in el()[-1] and plast()[0] == 'markerPane' and plast()[1] == len(el()) * 3000, (plast(), len(el())))
+    p.click('#btn-razveljavi'); p.click('#btn-razveljavi')
+    pri('vrstni red se da razveljaviti', el()[0]['id'] == id_gvc and 'plast' not in el()[0])
+    sektor_id = [x for x in el() if x['vrsta'] == 'obmocje'][0]['id']
+    p.evaluate("EPVNacrt.izberi && 0")
 
     # ---- napisi: skupno stikalo in izklop pri posameznem elementu ----
     p.click('.skica-vrstica[data-i="2"]')
