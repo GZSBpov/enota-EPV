@@ -30,6 +30,9 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 - **Legenda**: samo znaki, ki so na skici uporabljeni. Na zaslonu v spodnjem desnem kotu zemljevida, v izpisu v pasu pod skico in nad tabelo vozil.
 - **Skice (koraki)**: privzeto Lokacija, Evakuacija, Posredovanje. »Naslednji korak« naredi kopijo trenutne skice za prikaz poteka po času. Vsaka skica si zapomni svoj izrez zemljevida.
 - **Shrani / Odpri**: načrt je ena datoteka (`.epvnacrt.json`), ki jo preneseš na drug računalnik in tam odpreš. Delo se sproti hrani tudi v brskalniku.
+- **Vrstni red**: izbrani element pošlješ »V ospredje« ali »V ozadje«. Ikona v ozadju je pod narisanimi črtami in območji; pri črtah in območjih gumba določata, katero je narisano čez drugo.
+- **Točke črt**: napad, cevovod, pot, dovoz in reševanje se urejajo po točkah enako kot sektor (izberi črto - zadeneš jo tudi s klikom tik ob njej).
+- **Izpis**: skica v izpisu pokaže isti izrez kot na zaslonu, v enakem razmerju ikon do zemljevida; legenda je v treh stolpcih.
 - **Posadka in poročilo**: pri vozilu vpišeš posadko kot 1 + število gasilcev. Pod vsako skico v izpisu je poročilo o sodelujočih: enote, vozila in člani po enotah ter skupno število sodelujočih (enako v elaboratu za ves načrt). Vozila brez vpisane posadke so označena in niso všteta med člane.
 - **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.
 - **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.

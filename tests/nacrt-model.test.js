@@ -68,6 +68,9 @@ pri('povzetek: prazno', M.povzetekSodelujocih([]).skupajVozil === 0 && M.povzete
 const zPos = JSON.parse(JSON.stringify(n)); zPos.skice[2].elementi[0].posadka = 5;
 pri('posadka se shrani z načrtom in pride v seznam vozil', M.uvozi(JSON.stringify(zPos)).nacrt.skice[2].elementi[0].posadka === 5 && M.seznamVozil(zPos).find(v => v.kratica === 'IMP').posadka === 5);
 
+const zMejami = JSON.parse(JSON.stringify(n)); zMejami.skice[0].pogled.meje = [[46.38, 15.56], [46.40, 15.59]]; zMejami.skice[1].pogled.meje = [[1, 2], 'x'];
+pri('izrez skice (meje) se ohrani, pokvarjen se izpusti', JSON.stringify(M.uvozi(JSON.stringify(zMejami)).nacrt.skice[0].pogled.meje) === '[[46.38,15.56],[46.4,15.59]]' && M.uvozi(JSON.stringify(zMejami)).nacrt.skice[1].pogled.meje === undefined);
+
 // shrani -> odpri
 const r = M.uvozi(JSON.stringify(n));
 pri('uvoz lastnega izvoza', r.ok && r.izpusceno === 0 && r.nacrt.skice.length === 4 && r.nacrt.skice[2].elementi.length === 3 && r.nacrt.naziv === 'Vaja Impol', r);

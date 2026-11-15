@@ -131,7 +131,7 @@
     // ---------- risanje skice na zemljevid (uporablja ga tudi izpis) ----------
     function narisi(sk, cilj, naMapo, interaktivno) {
         cilj.clearLayers();
-        sk.elementi.forEach(function (e) {
+        sk.elementi.forEach(function (e, indeks) {
             const izbran = interaktivno && e.id === izbranId;
             // napisi: skupno stikalo za ves načrt in izklop pri posameznem elementu
             const kazi = nacrt.napisi !== false && !e.skrijNapis;
@@ -155,7 +155,8 @@
             };
             if (e.vrsta === 'vozilo' || e.vrsta === 'znak' || e.vrsta === 'besedilo') {
                 const ikona = e.vrsta === 'vozilo' ? ikonaVozila(e, izbran, !interaktivno, !kazi) : e.vrsta === 'znak' ? ikonaZnaka(e, izbran, !kazi) : ikonaBesedila(e, izbran);
-                const m = L.marker([e.lat, e.lon], { icon: ikona, draggable: !!interaktivno, zIndexOffset: e.vrsta === 'vozilo' ? 500 : 300 });
+                // vrstni red: poznejši element v seznamu je nad prejšnjim; plast 'ozadje' je pod narisanimi črtami in območji
+                const m = L.marker([e.lat, e.lon], { icon: ikona, draggable: !!interaktivno, zIndexOffset: (indeks + 1) * 3000, pane: e.plast === 'ozadje' ? 'epvOzadje' : 'markerPane' });
                 if (e.vrsta === 'vozilo' && e.opis) m.bindTooltip(e.opis, { direction: 'top', offset: [0, -24] });
                 premik(m); cilj.addLayer(klik(m));
             } else if (e.vrsta === 'crta') {
@@ -166,6 +167,8 @@
                 const pl = L.polyline(e.tocke, { color: barva, weight: c.debelina + (izbran ? 4 : 0), dashArray: c.crtkano, opacity: 1, bubblingMouseEvents: false });
                 if (e.opis && kazi) pl.bindTooltip(e.opis, { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
                 cilj.addLayer(klik(pl));
+                // nevidna široka črta: črto je lažje zadeti s prstom ali miško
+                if (interaktivno) cilj.addLayer(klik(L.polyline(e.tocke, { color: '#000', weight: 26, opacity: 0, bubblingMouseEvents: false })));
                 if (c.puscica && e.tocke.length >= 2) {
                     const a = e.tocke[e.tocke.length - 2], b = e.tocke[e.tocke.length - 1];
                     let kot = 0;
@@ -183,7 +186,7 @@
                 cilj.addLayer(klik(po));
             } else if (e.vrsta === 'krog') {
                 const k = L.circle([e.lat, e.lon], { radius: e.r, color: '#dc2626', weight: izbran ? 6 : 3, dashArray: '8,8', fillColor: '#dc2626', fillOpacity: 0.15, bubblingMouseEvents: false });
-                if (kazi) k.bindTooltip((e.opis || 'Nevarno območje') + ' (' + Math.round(e.r) + ' m)', { permanent: true, direction: 'center', className: 'nacrt-oznaka' });
+                if (kazi) k.bindTooltip((e.opis || 'Nevarno območje') + ' (' + Math.round(e.r) + ' m)', { permanent: true, direction: 'bottom', className: 'nacrt-oznaka' });
                 cilj.addLayer(klik(k));
             }
         });
@@ -192,7 +195,7 @@
     // Ročice za urejanje izbranega elementa: oglišča sektorja/črte (premik, dodajanje, odstranjevanje) in središče kroga.
     let izbranaTocka = -1;
     function rocica(latlon, razred, znak, velikost) {
-        return L.marker(latlon, { draggable: true, zIndexOffset: 2000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="' + razred + '">' + (znak || '') + '</div>', iconSize: [velikost, velikost], iconAnchor: [velikost / 2, velikost / 2] }) });
+        return L.marker(latlon, { draggable: true, zIndexOffset: 90000000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="' + razred + '">' + (znak || '') + '</div>', iconSize: [velikost, velikost], iconAnchor: [velikost / 2, velikost / 2] }) });
     }
     function narisiRocice() {
         const e = izbranId ? najdi(izbranId) : null;
@@ -220,7 +223,7 @@
             (function (i) {
                 const a = e.tocke[i], b = e.tocke[(i + 1) % e.tocke.length];
                 const sred = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-                const r = L.marker(sred, { zIndexOffset: 1900, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nt nt-nova">+</div>', iconSize: [20, 20], iconAnchor: [10, 10] }) });
+                const r = L.marker(sred, { zIndexOffset: 80000000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nt nt-nova">+</div>', iconSize: [20, 20], iconAnchor: [10, 10] }) });
                 r.rocica = 'nova'; r.indeks = i;
                 r.on('click', function () { zapomni(); e.tocke.splice(i + 1, 0, sred); izbranaTocka = i + 1; samodejnoShrani(); osveziZemljevid(); osveziLastnosti(); });
                 sloj.addLayer(r);
@@ -505,6 +508,8 @@
         } else if (e.vrsta === 'besedilo') {
             h += polje('Besedilo', 'opis', e.opis);
         }
+        h += '<label>Vrstni red</label><div class="vrstica"><button type="button" id="btn-el-ospredje" style="flex:1;">⬆ V ospredje</button><button type="button" id="btn-el-ozadje" style="flex:1;">⬇ V ozadje</button></div>' +
+            '<div class="namig" style="margin-top:4px;">' + (e.plast === 'ozadje' ? 'Ikona je v ozadju: pod črtami in območji.' : (e.vrsta === 'vozilo' || e.vrsta === 'znak' || e.vrsta === 'besedilo') ? 'V ozadju je ikona pod narisanimi črtami in območji.' : 'Določa, katera črta ali območje je narisano čez drugo.') + '</div>';
         if (e.vrsta !== 'besedilo') h += '<label class="os-preklop" style="margin-top:10px;color:#f1f5f9;"><input type="checkbox" id="chk-el-napis"' + (e.skrijNapis ? '' : ' checked') + '> prikaži napis pri tem elementu</label>';
         h += '<div class="vrstica" style="margin-top:12px;"><button type="button" id="btn-el-izbrisi" class="nevaren" style="flex:1;">🗑 Izbriši</button></div>';
         el.innerHTML = h;
@@ -544,6 +549,17 @@
                 samodejnoShrani(); osveziZemljevid();
             });
         });
+        const prestavi = function (naprej) {
+            zapomni();
+            const seznam = skica().elementi;
+            const i = seznam.indexOf(e);
+            if (i >= 0) seznam.splice(i, 1);
+            if (naprej) { seznam.push(e); delete e.plast; }
+            else { seznam.unshift(e); if (e.vrsta === 'vozilo' || e.vrsta === 'znak' || e.vrsta === 'besedilo') e.plast = 'ozadje'; }
+            samodejnoShrani(); osveziZemljevid(); osveziLastnosti();
+        };
+        $('btn-el-ospredje').addEventListener('click', function () { prestavi(true); });
+        $('btn-el-ozadje').addEventListener('click', function () { prestavi(false); });
         const chkNapis = $('chk-el-napis');
         if (chkNapis) chkNapis.addEventListener('change', function () {
             zapomni();
@@ -582,7 +598,14 @@
     }
     function trenutniPogled() {
         const c = map.getCenter(), z = map.getZoom();
-        return { lat: c.lat, lon: c.lng, z: typeof z === 'number' ? z : ZACETEK.z };
+        const pogled = { lat: c.lat, lon: c.lng, z: typeof z === 'number' ? z : ZACETEK.z };
+        // vidni izrez: izpis pokaže vsaj vse, kar je vidno na zaslonu (list ima drugačno razmerje stranic)
+        try {
+            const b = map.getBounds();
+            const meje = [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]];
+            if (meje.every(function (t) { return isFinite(t[0]) && isFinite(t[1]); })) pogled.meje = meje;
+        } catch (e) { /* izrez ni na voljo */ }
+        return pogled;
     }
     function preklopiSkico(i) {
         if (i < 0 || i >= nacrt.skice.length) return;
@@ -839,13 +862,21 @@
         cilj.innerHTML = h;
         $('tisk-priprava').style.display = 'flex';
 
+        // velikost izrisa = širina zemljevida na zaslonu (razmerje stranic lista), nato pomanjšano na 180 mm (680,3 px)
+        const sirinaZaslona = Math.max(700, Math.min(1600, $('zemljevid').clientWidth || 1000));
+        const visinaIzrisa = Math.round(sirinaZaslona * 125 / 180);
+        const merilo = 680.3 / sirinaZaslona;
         const zemljevidi = [];
         const cakanja = nacrt.skice.map(function (s, i) {
+            const okvir = $('tisk-z-' + i);
+            okvir.style.width = sirinaZaslona + 'px'; okvir.style.height = visinaIzrisa + 'px'; okvir.style.transform = 'scale(' + merilo + ')';
             const m = L.map('tisk-z-' + i, { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, zoomSnap: 0.25, fadeAnimation: false, zoomAnimation: false });
             zemljevidi.push(m);
+            m.createPane('epvOzadje').style.zIndex = 350;
             const plast = ustvariPodlago(trenutnaPodlaga).addTo(m);
             const meje = mejeSkice(s);
-            if (s.pogled) m.setView([s.pogled.lat, s.pogled.lon], s.pogled.z);
+            if (s.pogled && s.pogled.meje) m.fitBounds(s.pogled.meje, { padding: [0, 0] });
+            else if (s.pogled) m.setView([s.pogled.lat, s.pogled.lon], s.pogled.z);
             else if (meje) m.fitBounds(meje, { padding: [30, 30], maxZoom: 18 });
             else { const p = trenutniPogled(); m.setView([p.lat, p.lon], p.z); }
             narisiOsnovo(L.layerGroup().addTo(m), false);
@@ -894,6 +925,7 @@
             osnova = M.ocistiOsnovo(JSON.parse(localStorage.getItem(KLJUC_OSNOVA)));
             osnovaVidna = localStorage.getItem(KLJUC_OSNOVA_VIDNA) !== '0';
         } catch (e) { osnova = { tocke: [], obrisi: [] }; }
+        map.createPane('epvOzadje').style.zIndex = 350; // pod črtami in območji (400), nad podlago
         slojOsnove = L.layerGroup().addTo(map);
         sloj = L.layerGroup().addTo(map);
 
