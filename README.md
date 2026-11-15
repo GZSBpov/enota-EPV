@@ -20,14 +20,19 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 
 - **Vozila**: izbereš društvo (kratica), tapneš tip vozila in nato mesto na zemljevidu (ali ga povlečeš). Zaporedna številka prihoda se dodeli sama;
   napis je npr. `3 · SLB · GVC-1`. Vse se da popraviti v desnem stolpcu (številka, kratica, tip, naloga, zasuk). »Drugo…« je za posebno vozilo od drugod.
+  Vozila so tlorisi s temnim vetrobranskim steklom; **cisterne (tip s črko C) imajo X** za rumeno črto. Pri **ALK, ZD in GTVD** se lestvenik oziroma roka suka posebej (»Smer lestvenika / roke«).
 - **Druge službe**: CZ (modro-rumeno), policija (belo-modro), reševalci (rumeno), vojska (temno zeleno), drugo (roza).
-- **Oznake in črte**: poveljniško mesto, triaža, zbirna mesta, požar, nevarnost, vodni vir, veter …; cevovod, smer napada, evakuacijska pot, sektor, nevarno območje, besedilo.
+- **Oznake in črte**: poveljniško mesto, triaža, zbirna mesta, požar, nevarnost, nevarna snov, mobilni repetitor, vodni vir, veter, prazen znak z opisom …; cevovod, napad (modro), preiskovanje/reševanje (rdeče), evakuacijska pot, sektor, nevarno območje, besedilo.
+- **Urejanje**: sektorju in črti premakneš točko z vlečenjem, **+** doda točko, izbrano točko odstraniš z gumbom. Nevarnemu območju premakneš središče z ročico ✥.
+- **Legenda**: v spodnjem desnem kotu skice so samo znaki, ki so na njej uporabljeni (na zaslonu in v izpisu).
 - **Skice (koraki)**: privzeto Lokacija, Evakuacija, Posredovanje. »Naslednji korak« naredi kopijo trenutne skice za prikaz poteka po času. Vsaka skica si zapomni svoj izrez zemljevida.
 - **Shrani / Odpri**: načrt je ena datoteka (`.epvnacrt.json`), ki jo preneseš na drug računalnik in tam odpreš. Delo se sproti hrani tudi v brskalniku.
+- **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.
 - **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.
+- **Obrazec ReCO**: prazen obrazec za prijavo vaje (vodstvo, scenarij, imitacija, zavarovanje, zveze, sodelujoča PGD). Sodelujoča društva se predlagajo iz skic. Shrani se z načrtom.
 - Seznam društev, tipov vozil in oznak je na vrhu `js/nacrt-model.js`.
 
-Omejitve prve različice: črt in sektorjev se po risanju ne da preoblikovati (izbriši in nariši znova); podlaga zemljevida potrebuje internet; več naprav ne ureja istega načrta hkrati.
+Omejitve: podlaga zemljevida potrebuje internet; več naprav ne ureja istega načrta hkrati; živih enot iz EPV tabla še ne prikazuje.
 
 ## Prehod na novo različico (isti Sheet)
 

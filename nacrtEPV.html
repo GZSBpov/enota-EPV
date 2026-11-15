@@ -20,6 +20,7 @@
             <button type="button" id="btn-razveljavi" title="Razveljavi zadnjo spremembo">↩️ Razveljavi</button>
             <button type="button" id="btn-tisk-skice" title="Natisni vse skice (ali shrani kot PDF)">🖨️ Skice</button>
             <button type="button" id="btn-elaborat" title="Predloga elaborata s skicami na koncu">📑 Elaborat</button>
+            <button type="button" id="btn-obrazec" title="Obrazec za prijavo vaje na ReCO">📋 Obrazec ReCO</button>
             <input type="file" id="datoteka" accept=".json,application/json" hidden>
         </div>
     </header>
@@ -56,6 +57,7 @@
         <!-- SREDINA: zemljevid -->
         <main class="zemljevid-okvir">
             <div id="zemljevid"></div>
+            <div id="legenda" class="legenda-zaslon" style="display:none;"></div>
             <div id="orodje-pasica" class="orodje-pasica" style="display:none;">
                 <span id="orodje-besedilo"></span>
                 <button type="button" id="btn-koncaj" style="display:none;">✔ Končaj</button>
@@ -97,6 +99,21 @@
             <div class="okno-vsebina" id="elaborat-polja"></div>
             <div class="okno-noga">
                 <button type="button" id="btn-elaborat-tisk" class="poudarjen">🖨️ Natisni / shrani PDF (s skicami)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OBRAZEC ZA PRIJAVO VAJE (ReCO) -->
+    <div id="obrazec-okno" class="okno-ozadje" style="display:none;">
+        <div class="okno">
+            <div class="okno-glava">
+                <b>📋 Obrazec za prijavo vaje (ReCO)</b>
+                <span class="namig">Prazen obrazec: izpolni polja, natisni ali shrani kot PDF.</span>
+                <button type="button" id="btn-obrazec-zapri">✕</button>
+            </div>
+            <div class="okno-vsebina" id="obrazec-polja"></div>
+            <div class="okno-noga">
+                <button type="button" id="btn-obrazec-tisk" class="poudarjen">🖨️ Natisni / shrani PDF</button>
             </div>
         </div>
     </div>
