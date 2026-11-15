@@ -90,6 +90,14 @@ with sync_playwright() as pw:
     pri('ročno vozilo: kratica in tip', el()[3]['kratica'] == 'CE' and el()[3]['tip'] == 'TRV-2' and el()[3]['opis'] == 'tehnično reševanje' and el()[3]['st'] == 4, el()[3])
     p.fill('#drustvo-rocno', '')
 
+    # posadka 1 + N
+    p.fill('#lastnosti [data-k="posadka"]', '3')
+    pri('posadka: vnos 1 + 3', el()[3]['posadka'] == 3 and '(1+3)' in p.inner_text('#seznam-vozil') and 'članov: 4' in p.inner_text('#povzetek-zaslon') and 'brez posadke: 3' in p.inner_text('#povzetek-zaslon'), (el()[3].get('posadka'), p.inner_text('#povzetek-zaslon')))
+    p.fill('#lastnosti [data-k="posadka"]', '-4')
+    pri('posadka: negativna vrednost se ne sprejme', el()[3]['posadka'] == '' and 'članov: 0' in p.inner_text('#povzetek-zaslon'), el()[3].get('posadka'))
+    p.fill('#lastnosti [data-k="posadka"]', '3')
+    for i, n in ((0, 5), (1, 2), (2, 1)):
+        p.evaluate(f"(() => {{ const s = EPVNacrt.stanje(); s.nacrt.skice[s.idxSkice].elementi[{i}].posadka = {n}; }})()")
     # lastnosti: številka, zasuk
     p.fill('#lastnosti [data-k="st"]', '7')
     p.click('#lastnosti [data-kot="45"]'); p.click('#lastnosti [data-kot="45"]'); p.click('#lastnosti [data-kot="-15"]')
@@ -213,7 +221,9 @@ with sync_playwright() as pw:
     pri('izpis: legenda vsebuje uporabljene znake', 'Poveljniško mesto' in p.inner_text('#tisk .nl-vrsta >> nth=0') and 'Cisterna (X)' in t)
     tisk_ikone = p.evaluate("window.__L.markers.slice(-40).map(m => (m.options.icon && m.options.icon.html) || '').filter(h => h.includes('nv-napis'))")
     pri('izpis: pod vozili samo številke', len(tisk_ikone) > 0 and all(re.search(r'nv-napis">\d+</span>', h) for h in tisk_ikone[-9:]), tisk_ikone[-2:])
-    pri('izpis: tabela vozil pod skico ostane', '<td>SLB</td><td>ALK32</td>' in h)
+    pri('izpis: tabela vozil pod skico s posadko', '<td>SLB</td><td>ALK32</td><td>1+2</td>' in h and '<th>Posadka</th>' in h, h[h.find('ALK32')-60:h.find('ALK32')+60])
+    pri('izpis: poročilo o sodelujočih pod skico', 'Poročilo o sodelujočih' in t and 'Skupno število sodelujočih: 15' in t and 'enot: 4, vozil: 4' in t and '<td>PGD Slovenska Bistrica</td><td>1</td><td>ALK32</td><td>3</td>' in h and 'Skupaj enot: 4' in t, t[t.find('Poročilo o'):t.find('Poročilo o')+400])
+    pri('elaborat: skupni povzetek sodelujočih', 'Sodelujoči skupaj' in t)
     p.evaluate("window.dispatchEvent(new Event('afterprint'))")
     p.click('#btn-tisk-skice'); time.sleep(1.5)
     t2 = p.inner_text('#tisk')

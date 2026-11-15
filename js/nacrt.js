@@ -487,6 +487,7 @@
             h += polje('Tip vozila', 'tip', e.tip, { atributi: ' list="dl-tipi" maxlength="12"' });
             h += '<datalist id="dl-tipi">' + M.TIPI_VOZIL.map(function (v) { return '<option value="' + esc(v.tip) + '">'; }).join('') + '</datalist>';
             h += '<label>Služba (barva)</label><select data-k="sluzba">' + Object.keys(M.SLUZBE).map(function (k) { return '<option value="' + k + '"' + (k === e.sluzba ? ' selected' : '') + '>' + esc(M.SLUZBE[k].naziv) + '</option>'; }).join('') + '</select>';
+            h += '<label>Posadka (voznik + število gasilcev)</label><div class="vrstica"><b style="white-space:nowrap;font-size:17px;">1 +</b><input type="number" data-k="posadka" min="0" max="60" step="1" inputmode="numeric" placeholder="npr. 5" value="' + esc(e.posadka === undefined || e.posadka === null ? '' : e.posadka) + '"></div>';
             h += polje('Naloga / opomba', 'opis', e.opis);
             h += kot;
             if (M.imaRoko(e.oblika || oblikaZaTip(e.tip, e.sluzba))) h += '<label>' + ((e.oblika || oblikaZaTip(e.tip, e.sluzba)) === 'lestev' ? 'Smer lestvenika' : 'Smer roke / dvigala') + '</label><div class="gumbi-kot"><button type="button" data-roka="-45">⟲ 45°</button><button type="button" data-roka="-15">⟲ 15°</button><button type="button" data-roka="15">15° ⟳</button><button type="button" data-roka="45">45° ⟳</button></div>';
@@ -516,6 +517,7 @@
                 let v = vnos.value;
                 if (k === 'r') { v = Math.max(5, parseFloat(String(v).replace(',', '.')) || 5); }
                 if (k === 'kratica') v = v.toUpperCase();
+                if (k === 'posadka') { const n = parseInt(v, 10); v = isNaN(n) || n < 0 ? '' : Math.min(60, n); }
                 e[k] = v;
                 if (k === 'tip' || k === 'sluzba') e.oblika = oblikaZaTip(e.tip, e.sluzba);
                 samodejnoShrani();
@@ -590,10 +592,23 @@
         if (p) map.setView([p.lat, p.lon], p.z);
         osveziVse(false);
     }
+    /** Tabela povzetka: enote, vozila, člani in skupno število sodelujočih. */
+    function htmlPovzetka(vozila, naslov) {
+        const p = M.povzetekSodelujocih(vozila);
+        if (!p.skupajVozil) return '';
+        let h = '<table class="povzetek"><thead><tr><th>' + esc(naslov || 'Enota') + '</th><th>Vozil</th><th>Vozila</th><th>Članov</th></tr></thead><tbody>' + p.enote.map(function (en) {
+            return '<tr><td>' + esc(en.enota) + '</td><td>' + en.vozil + '</td><td>' + esc(en.tipi.join(', ')) + '</td><td>' + en.clanov + (en.brezPosadke ? ' *' : '') + '</td></tr>';
+        }).join('') + '</tbody><tfoot><tr><th>Skupaj enot: ' + p.skupajEnot + '</th><th>' + p.skupajVozil + '</th><th></th><th>' + p.skupajClanov + '</th></tr></tfoot></table>';
+        h += '<p class="povzetek-skupaj"><b>Skupno število sodelujočih: ' + p.skupajClanov + '</b> (enot: ' + p.skupajEnot + ', vozil: ' + p.skupajVozil + ')' + (p.brezPosadke ? '<br>* vozil brez vpisane posadke: ' + p.brezPosadke + ' (niso všteta med člane)' : '') + '</p>';
+        return h;
+    }
+
     function osveziSeznamVozil() {
         const el = $('seznam-vozil');
         const vozila = skica().elementi.filter(function (e) { return e.vrsta === 'vozilo'; }).sort(function (a, b) { return (parseInt(a.st, 10) || 999) - (parseInt(b.st, 10) || 999); });
-        el.innerHTML = vozila.length ? vozila.map(function (e) { return '<div data-id="' + esc(e.id) + '">' + esc(M.oznakaVozila(e)) + (e.opis ? ' - <span style="color:#94a3b8;">' + esc(e.opis) + '</span>' : '') + '</div>'; }).join('') : '<div class="namig">Na tej skici še ni vozil.</div>';
+        const pov = M.povzetekSodelujocih(vozila);
+        $('povzetek-zaslon').innerHTML = vozila.length ? 'Enot: <b>' + pov.skupajEnot + '</b> · vozil: <b>' + pov.skupajVozil + '</b> · članov: <b>' + pov.skupajClanov + '</b>' + (pov.brezPosadke ? ' <span title="Vozila brez vpisane posadke niso všteta med člane">(brez posadke: ' + pov.brezPosadke + ')</span>' : '') : '';
+        el.innerHTML = vozila.length ? vozila.map(function (e) { return '<div data-id="' + esc(e.id) + '">' + esc(M.oznakaVozila(e)) + (M.zapisPosadke(e) ? ' <b>(' + esc(M.zapisPosadke(e)) + ')</b>' : '') + (e.opis ? ' - <span style="color:#94a3b8;">' + esc(e.opis) + '</span>' : '') + '</div>'; }).join('') : '<div class="namig">Na tej skici še ni vozil.</div>';
         Array.prototype.forEach.call(el.querySelectorAll('[data-id]'), function (v) {
             v.addEventListener('click', function () {
                 const e = najdi(v.dataset.id);
@@ -661,9 +676,9 @@
         const vozila = M.seznamVozil(nacrt);
         h += '<h3>3.4 Sodelujoče enote in vozila</h3>';
         if (vozila.length) {
-            h += '<table><thead><tr><th>Št.</th><th>Enota</th><th>Vozilo</th><th>Služba</th><th>Naloga / opomba</th></tr></thead><tbody>' + vozila.map(function (v) {
-                return '<tr><td>' + esc(v.st) + '</td><td>' + esc(v.kratica) + (M.nazivDrustva(v.kratica) ? ' - ' + esc(M.nazivDrustva(v.kratica)) : '') + '</td><td>' + esc(v.tip) + '</td><td>' + esc((M.SLUZBE[v.sluzba] || {}).naziv || '') + '</td><td>' + esc(v.opis) + '</td></tr>';
-            }).join('') + '</tbody></table>';
+            h += '<table><thead><tr><th>Št.</th><th>Enota</th><th>Vozilo</th><th>Posadka</th><th>Služba</th><th>Naloga / opomba</th></tr></thead><tbody>' + vozila.map(function (v) {
+                return '<tr><td>' + esc(v.st) + '</td><td>' + esc(v.kratica) + (M.nazivDrustva(v.kratica) ? ' - ' + esc(M.nazivDrustva(v.kratica)) : '') + '</td><td>' + esc(v.tip) + '</td><td>' + esc(M.zapisPosadke(v)) + '</td><td>' + esc((M.SLUZBE[v.sluzba] || {}).naziv || '') + '</td><td>' + esc(v.opis) + '</td></tr>';
+            }).join('') + '</tbody></table>' + '<h3>Sodelujoči skupaj</h3>' + htmlPovzetka(vozila);
         } else h += '<p>Na skicah še ni vozil.</p>';
         if (e.drugeSluzbe && e.drugeSluzbe.trim()) h += '<p>' + esc(e.drugeSluzbe.trim()) + '</p>';
         const koraki = (e.casovnica || '').split('\n').map(function (v) { return v.trim(); }).filter(Boolean);
@@ -804,9 +819,10 @@
         const vozila = sk.elementi.filter(function (e) { return e.vrsta === 'vozilo'; }).sort(function (a, b) { return (parseInt(a.st, 10) || 999) - (parseInt(b.st, 10) || 999); });
         let h = '';
         if (vozila.length) {
-            h += '<table><thead><tr><th>Št.</th><th>Enota</th><th>Vozilo</th><th>Naloga / opomba</th></tr></thead><tbody>' + vozila.map(function (v) {
-                return '<tr><td>' + esc(v.st) + '</td><td>' + esc(v.kratica) + '</td><td>' + esc(v.tip) + '</td><td>' + esc(v.opis) + '</td></tr>';
+            h += '<table><thead><tr><th>Št.</th><th>Enota</th><th>Vozilo</th><th>Posadka</th><th>Naloga / opomba</th></tr></thead><tbody>' + vozila.map(function (v) {
+                return '<tr><td>' + esc(v.st) + '</td><td>' + esc(v.kratica) + '</td><td>' + esc(v.tip) + '</td><td>' + esc(M.zapisPosadke(v)) + '</td><td>' + esc(v.opis) + '</td></tr>';
             }).join('') + '</tbody></table>';
+            h += '<h3>Poročilo o sodelujočih</h3>' + htmlPovzetka(vozila);
         }
         return h;
     }

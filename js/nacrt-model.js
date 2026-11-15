@@ -221,6 +221,42 @@
         return [e.st, e.kratica, e.tip].filter(function (x) { return x !== undefined && x !== null && String(x).trim() !== ''; }).join(' · ');
     }
 
+    /** Posadka vozila je zapisana kot 1 + N (voznik + N). Vrne N (celo število >= 0) ali null, če ni vpisana. */
+    function steviloPosadke(e) {
+        if (!e || e.posadka === undefined || e.posadka === null || String(e.posadka).trim() === '') return null;
+        const n = parseInt(e.posadka, 10);
+        return isNaN(n) || n < 0 ? null : n;
+    }
+    function zapisPosadke(e) {
+        const n = steviloPosadke(e);
+        return n === null ? '' : '1+' + n;
+    }
+
+    /**
+     * Povzetek sodelujočih iz seznama vozil: enote (društvo ali služba), število vozil in članov po enotah ter skupaj.
+     * Člani vozila = 1 + N. Vozila brez vpisane posadke se štejejo med vozila, med člane pa ne (brezPosadke pove, koliko jih je).
+     */
+    function povzetekSodelujocih(vozila) {
+        const poEnoti = {}, vrstniRed = [];
+        let skupajVozil = 0, skupajClanov = 0, brezPosadke = 0;
+        (vozila || []).forEach(function (v) {
+            const sluzba = v.sluzba || 'gasilci';
+            const kratica = String(v.kratica || '').trim().toUpperCase();
+            const kljuc = kratica ? 'k:' + kratica : 's:' + sluzba;
+            if (!poEnoti[kljuc]) {
+                poEnoti[kljuc] = { enota: kratica ? (nazivDrustva(kratica) || kratica) : (sluzba === 'gasilci' ? 'Gasilci (brez oznake enote)' : SLUZBE[sluzba].naziv), kratica: kratica, vozil: 0, clanov: 0, tipi: [], brezPosadke: 0 };
+                vrstniRed.push(kljuc);
+            }
+            const en = poEnoti[kljuc];
+            en.vozil++; skupajVozil++;
+            if (v.tip) en.tipi.push(v.tip);
+            const n = steviloPosadke(v);
+            if (n === null) { en.brezPosadke++; brezPosadke++; }
+            else { en.clanov += 1 + n; skupajClanov += 1 + n; }
+        });
+        return { enote: vrstniRed.map(function (k) { return poEnoti[k]; }), skupajEnot: vrstniRed.length, skupajVozil: skupajVozil, skupajClanov: skupajClanov, brezPosadke: brezPosadke };
+    }
+
     /** Vsa različna vozila v načrtu (prek vseh skic), urejena po številki prihoda. */
     function seznamVozil(nacrt) {
         const poKljucu = {};
@@ -228,7 +264,8 @@
             (s.elementi || []).forEach(function (e) {
                 if (e.vrsta !== 'vozilo') return;
                 const k = [e.sluzba, (e.kratica || '').toUpperCase(), e.tip, e.st].join('|');
-                if (!poKljucu[k]) poKljucu[k] = { st: e.st, kratica: e.kratica || '', tip: e.tip || '', sluzba: e.sluzba || 'gasilci', opis: e.opis || '' };
+                if (!poKljucu[k]) poKljucu[k] = { st: e.st, kratica: e.kratica || '', tip: e.tip || '', sluzba: e.sluzba || 'gasilci', opis: e.opis || '', posadka: e.posadka };
+                else if (steviloPosadke(poKljucu[k]) === null && steviloPosadke(e) !== null) poKljucu[k].posadka = e.posadka;
                 else if (!poKljucu[k].opis && e.opis) poKljucu[k].opis = e.opis;
             });
         });
@@ -321,7 +358,8 @@
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
         BARVE_SEKTORJEV: BARVE_SEKTORJEV, BARVE_CRT: BARVE_CRT, ocistiOsnovo: ocistiOsnovo, kmlKoordinate: kmlKoordinate, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
-        privzetiObrazec: privzetiObrazec, jeCisterna: jeCisterna, imaRoko: imaRoko, steviloKoles: steviloKoles, drustvaVNacrtu: drustvaVNacrtu,
+        privzetiObrazec: privzetiObrazec, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
+        jeCisterna: jeCisterna, imaRoko: imaRoko, steviloKoles: steviloKoles, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,
         uvozi: uvozi, imeDatoteke: imeDatoteke

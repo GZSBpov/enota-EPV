@@ -153,3 +153,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 #tisk .nl-vrsta .nl-znak { display: inline-block; white-space: nowrap; margin-right: 5mm; vertical-align: middle; }
 #tisk .nl-vrsta .nl-ikona { display: inline-block; vertical-align: middle; margin-right: 1.5mm; min-width: 5mm; text-align: center; }
 #tisk .nl-vrsta .nl-ikona svg { display: inline-block !important; vertical-align: middle; }
+
+/* Posadka in poročilo o sodelujočih */
+.povzetek-zaslon { font-size: 13px; padding: 5px 6px; margin-bottom: 4px; background: #1e293b; border-radius: 5px; }
+.povzetek-zaslon:empty { display: none; }
+#tisk table.povzetek tfoot th { background: #d1d5db; }
+#tisk .povzetek-skupaj { font-size: 10.5pt; margin-top: 1mm; }
