@@ -56,6 +56,18 @@ pri('napisi: privzeto vidni, izklop se ohrani v datoteki', n.napisi === true && 
 
 pri('kolesa: GVC-3 in GTVD 6, ostala 4', M.steviloKoles('GVC-3') === 6 && M.steviloKoles('GTVD') === 6 && M.TIPI_VOZIL.filter(v => !['GVC-3', 'GTVD'].includes(v.tip)).every(v => M.steviloKoles(v.tip) === 4) && M.steviloKoles('NMP') === 4 && M.steviloKoles('') === 4);
 
+// posadka in povzetek sodelujočih
+pri('posadka: zapis 1+N', M.zapisPosadke({ posadka: 5 }) === '1+5' && M.zapisPosadke({ posadka: '0' }) === '1+0' && M.zapisPosadke({}) === '' && M.zapisPosadke({ posadka: '' }) === '' && M.zapisPosadke({ posadka: -2 }) === '' && M.zapisPosadke({ posadka: 'abc' }) === '');
+const pv = M.povzetekSodelujocih([
+    { kratica: 'SLB', tip: 'GVC-1', sluzba: 'gasilci', posadka: 5 }, { kratica: 'slb', tip: 'ALK32', sluzba: 'gasilci', posadka: 2 },
+    { kratica: 'IMP', tip: 'GVC-2', sluzba: 'gasilci', posadka: '1' }, { kratica: 'KEB', tip: 'GV-1', sluzba: 'gasilci' },
+    { kratica: '', tip: 'NMP', sluzba: 'resevalci', posadka: 2 }, { kratica: '', tip: 'POL', sluzba: 'policija', posadka: 1 }, { kratica: '', tip: 'POL', sluzba: 'policija', posadka: 1 }]);
+pri('povzetek: enote, vozila, člani', pv.skupajEnot === 5 && pv.skupajVozil === 7 && pv.skupajClanov === (6 + 3) + 2 + 0 + 3 + 4 && pv.brezPosadke === 1, pv);
+pri('povzetek: po enotah', pv.enote[0].enota === 'PGD Slovenska Bistrica' && pv.enote[0].vozil === 2 && pv.enote[0].clanov === 9 && pv.enote[0].tipi.join() === 'GVC-1,ALK32' && pv.enote[2].brezPosadke === 1 && pv.enote[2].clanov === 0 && pv.enote[3].enota === 'Reševalci (NMP)' && pv.enote[4].vozil === 2 && pv.enote[4].clanov === 4, pv.enote);
+pri('povzetek: prazno', M.povzetekSodelujocih([]).skupajVozil === 0 && M.povzetekSodelujocih(null).skupajEnot === 0);
+const zPos = JSON.parse(JSON.stringify(n)); zPos.skice[2].elementi[0].posadka = 5;
+pri('posadka se shrani z načrtom in pride v seznam vozil', M.uvozi(JSON.stringify(zPos)).nacrt.skice[2].elementi[0].posadka === 5 && M.seznamVozil(zPos).find(v => v.kratica === 'IMP').posadka === 5);
+
 // shrani -> odpri
 const r = M.uvozi(JSON.stringify(n));
 pri('uvoz lastnega izvoza', r.ok && r.izpusceno === 0 && r.nacrt.skice.length === 4 && r.nacrt.skice[2].elementi.length === 3 && r.nacrt.naziv === 'Vaja Impol', r);
