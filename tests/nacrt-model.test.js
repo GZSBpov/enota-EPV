@@ -42,6 +42,18 @@ pri('načrt brez obrazca (starejša datoteka) dobi praznega', M.uvozi(JSON.strin
 const zObr = JSON.parse(JSON.stringify(n)); zObr.obrazec.dne = '3. 7. 2026';
 pri('obrazec se shrani z načrtom', M.uvozi(JSON.stringify(zObr)).nacrt.obrazec.dne === '3. 7. 2026');
 
+// osnova (območje zveze, domovi) in KML koordinate
+pri('KML koordinate: lon,lat,višina -> lat,lon', JSON.stringify(M.kmlKoordinate(' 15.5746,46.3934,0 15.6,46.4,120\n15.7,46.5 ')) === '[[46.3934,15.5746],[46.4,15.6],[46.5,15.7]]', M.kmlKoordinate('15.5746,46.3934,0'));
+pri('KML koordinate: smeti se izpustijo', M.kmlKoordinate('abc 15.6,46.4 ,').length === 1);
+const os = M.ocistiOsnovo({ tocke: [{ naziv: 'PGD A', lat: 46.4, lon: 15.6 }, { naziv: 'slab', lat: 'x', lon: 1 }, { lat: 95, lon: 1 }], obrisi: [{ naziv: 'GZ', tocke: [[46, 15], [46.1, 15], [46.1, 15.1]], zaprto: true }, { tocke: [[1, 2]] }, null] });
+pri('osnova: neveljavni vnosi se izpustijo', os.tocke.length === 1 && os.obrisi.length === 1 && os.obrisi[0].zaprto === true, os);
+pri('osnova: prazno', M.ocistiOsnovo(null).tocke.length === 0 && M.ocistiOsnovo('x').obrisi.length === 0);
+const zOsnovo = JSON.parse(JSON.stringify(n)); zOsnovo.osnova = os;
+pri('osnova potuje z datoteko načrta', M.uvozi(JSON.stringify(zOsnovo)).nacrt.osnova.tocke[0].naziv === 'PGD A' && M.uvozi(JSON.stringify(n)).nacrt.osnova === null);
+pri('barve črt vsebujejo belo in črno', M.BARVE_CRT.includes('#f8fafc') && M.BARVE_CRT.includes('#111827'));
+
+pri('napisi: privzeto vidni, izklop se ohrani v datoteki', n.napisi === true && M.uvozi(JSON.stringify(Object.assign({}, n, { napisi: false }))).nacrt.napisi === false && M.uvozi(JSON.stringify(stari)).nacrt.napisi === true);
+
 // shrani -> odpri
 const r = M.uvozi(JSON.stringify(n));
 pri('uvoz lastnega izvoza', r.ok && r.izpusceno === 0 && r.nacrt.skice.length === 4 && r.nacrt.skice[2].elementi.length === 3 && r.nacrt.naziv === 'Vaja Impol', r);

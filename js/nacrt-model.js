@@ -84,6 +84,9 @@
         dovoz: { naziv: 'Dovoz / smer vožnje', barva: '#f8fafc', debelina: 4, crtkano: '4,8', puscica: true }
     };
 
+    // Barve, ki jih lahko dobi posamezna črta (namesto privzete barve svoje vrste)
+    const BARVE_CRT = ['#f8fafc', '#fde047', '#f97316', '#dc2626', '#ec4899', '#1d4ed8', '#38bdf8', '#16a34a', '#111827'];
+
     const BARVE_SEKTORJEV = ['#ef4444', '#3b82f6', '#10b981', '#eab308', '#f97316', '#a855f7'];
 
     const ELABORAT_POLJA = [
@@ -185,7 +188,7 @@
         return {
             vrsta: 'epv-nacrt', v: VERZIJA, naziv: naziv || 'Nov načrt',
             ustvarjeno: new Date().toISOString(), spremenjeno: new Date().toISOString(),
-            elaborat: privzetiElaborat(), obrazec: privzetiObrazec(),
+            elaborat: privzetiElaborat(), obrazec: privzetiObrazec(), napisi: true,
             skice: [novaSkica('Lokacija', pogled), novaSkica('Evakuacija', pogled), novaSkica('Posredovanje', pogled)]
         };
     }
@@ -270,12 +273,40 @@
         if (skice.length === 0) skice.push(novaSkica('Skica 1', null));
         const elaborat = privzetiElaborat();
         if (o.elaborat && typeof o.elaborat === 'object') Object.keys(elaborat).forEach(function (k) { if (typeof o.elaborat[k] === 'string') elaborat[k] = o.elaborat[k]; });
+        const osnova = o.osnova ? ocistiOsnovo(o.osnova) : null;
         const obrazec = privzetiObrazec();
         if (o.obrazec && typeof o.obrazec === 'object') Object.keys(obrazec).forEach(function (k) { if (typeof o.obrazec[k] === 'string') obrazec[k] = o.obrazec[k]; });
         return {
             ok: true, izpusceno: izpusceno,
-            nacrt: { vrsta: 'epv-nacrt', v: VERZIJA, naziv: String(o.naziv || 'Načrt'), ustvarjeno: o.ustvarjeno || new Date().toISOString(), spremenjeno: o.spremenjeno || new Date().toISOString(), elaborat: elaborat, obrazec: obrazec, skice: skice }
+            nacrt: { vrsta: 'epv-nacrt', v: VERZIJA, naziv: String(o.naziv || 'Načrt'), ustvarjeno: o.ustvarjeno || new Date().toISOString(), spremenjeno: o.spremenjeno || new Date().toISOString(), elaborat: elaborat, obrazec: obrazec, osnova: osnova, napisi: o.napisi !== false, skice: skice }
         };
+    }
+
+    /**
+     * Stalna osnova (območje zveze in gasilski domovi): { tocke: [{ naziv, lat, lon }], obrisi: [{ naziv, tocke, zaprto }] }.
+     * Preveri in očisti; neveljavni vnosi se izpustijo.
+     */
+    function ocistiOsnovo(o) {
+        const izhod = { tocke: [], obrisi: [] };
+        if (!o || typeof o !== 'object') return izhod;
+        (Array.isArray(o.tocke) ? o.tocke : []).forEach(function (t) {
+            if (t && jeSt(t.lat) && jeSt(t.lon) && Math.abs(t.lat) <= 90 && Math.abs(t.lon) <= 180) izhod.tocke.push({ naziv: String(t.naziv || '').slice(0, 80), lat: t.lat, lon: t.lon });
+        });
+        (Array.isArray(o.obrisi) ? o.obrisi : []).forEach(function (b) {
+            if (!b || !Array.isArray(b.tocke)) return;
+            const tocke = b.tocke.filter(function (p) { return Array.isArray(p) && jeSt(p[0]) && jeSt(p[1]); }).map(function (p) { return [p[0], p[1]]; });
+            if (tocke.length >= 2) izhod.obrisi.push({ naziv: String(b.naziv || '').slice(0, 80), tocke: tocke, zaprto: !!b.zaprto });
+        });
+        return izhod;
+    }
+
+    /** Niz koordinat iz KML ("lon,lat,visina lon,lat,visina ...") -> [[lat, lon], ...] */
+    function kmlKoordinate(besedilo) {
+        return String(besedilo || '').trim().split(/\s+/).map(function (del) {
+            const d = del.split(',');
+            const lon = parseFloat(d[0]), lat = parseFloat(d[1]);
+            return jeSt(lat) && jeSt(lon) ? [lat, lon] : null;
+        }).filter(Boolean);
     }
 
     function imeDatoteke(nacrt) {
@@ -285,7 +316,7 @@
 
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
-        BARVE_SEKTORJEV: BARVE_SEKTORJEV, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
+        BARVE_SEKTORJEV: BARVE_SEKTORJEV, BARVE_CRT: BARVE_CRT, ocistiOsnovo: ocistiOsnovo, kmlKoordinate: kmlKoordinate, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
         privzetiObrazec: privzetiObrazec, jeCisterna: jeCisterna, imaRoko: imaRoko, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,

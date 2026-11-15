@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPV Načrt - taktična tabla</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="nacrt.css?v=3">
+    <link rel="stylesheet" href="nacrt.css?v=4">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/nacrt-model.js?v=3"></script>
+    <script src="js/nacrt-model.js?v=4"></script>
 </head>
 <body>
     <header class="vrh">
-        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r3</span></div>
+        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r4</span></div>
         <input type="text" id="naziv-nacrta" placeholder="Naziv vaje / intervencije" autocomplete="off">
         <div class="vrh-gumbi">
             <button type="button" id="btn-novo" title="Nov prazen načrt">📄 Nov</button>
@@ -77,6 +77,17 @@
                     <button type="button" id="btn-skica-izbrisi" title="Izbriši skico">🗑</button>
                 </div>
             </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Napisi</div>
+                <label class="os-preklop"><input type="checkbox" id="napisi-vidni" checked> prikaži napise pri ikonah in objektih</label>
+                <div class="namig">Velja za zaslon in izpis. Posamezen napis skriješ pri izbranem elementu.</div>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Območje zveze in gasilski domovi</div>
+                <label class="os-preklop"><input type="checkbox" id="osnova-vidna" checked> prikaži na zemljevidu</label>
+                <div class="vrstica" style="margin-top:6px;"><button type="button" id="btn-osnova" style="flex:1;">🏠 Uredi / uvozi…</button></div>
+                <div class="namig" id="osnova-stanje"></div>
+            </div>
             <div class="skupina" id="lastnosti-okvir">
                 <div class="skupina-naslov">Izbrani element</div>
                 <div id="lastnosti"><div class="namig">Tapni element na zemljevidu, da ga urediš ali izbrišeš. Vozila in oznake premikaš z vlečenjem.</div></div>
@@ -118,9 +129,30 @@
         </div>
     </div>
 
+    <!-- OBMOČJE ZVEZE IN GASILSKI DOMOVI -->
+    <div id="osnova-okno" class="okno-ozadje" style="display:none;">
+        <div class="okno">
+            <div class="okno-glava">
+                <b>🏠 Območje zveze in gasilski domovi</b>
+                <button type="button" id="btn-osnova-zapri">✕</button>
+            </div>
+            <div class="okno-vsebina">
+                <div class="namig" style="margin-top:0;">Vnosi so stalni: ostanejo na tej napravi za vse načrte in se shranijo tudi v datoteko načrta. Iz Google Earth: projekt → ⋮ → <b>Izvozi kot datoteko KML</b>, nato jo uvozi tukaj. Točke postanejo gasilski domovi, območja in črte obris zveze.</div>
+                <div class="vrstica" style="margin:10px 0; flex-wrap:wrap;">
+                    <button type="button" id="btn-osnova-uvozi" class="poudarjen">📥 Uvozi KML / KMZ</button>
+                    <button type="button" id="btn-osnova-dodaj">＋ Dodaj dom s klikom na zemljevid</button>
+                    <button type="button" id="btn-osnova-pocisti" class="nevaren">Počisti vse</button>
+                    <input type="file" id="osnova-datoteka" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden>
+                </div>
+                <div id="osnova-uvoz-stanje" class="namig" style="font-weight:bold;"></div>
+                <div id="osnova-seznam"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="tisk-priprava" class="tisk-priprava" style="display:none;">Pripravljam izpis … (nalagam zemljevide)</div>
     <div id="tisk"></div>
 
-    <script src="js/nacrt.js?v=3"></script>
+    <script src="js/nacrt.js?v=4"></script>
 </body>
 </html>

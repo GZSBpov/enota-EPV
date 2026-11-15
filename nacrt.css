@@ -137,3 +137,12 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 #tisk .obrazec .ob-celica { height: 11mm; width: 20%; font-size: 9.5pt; }
 #tisk .obrazec .ob-drobno { font-size: 8pt; text-align: center; margin: 3mm 0 1mm; }
 .razlicica { font-size: 11px; color: #94a3b8; }
+
+/* Območje zveze in gasilski domovi */
+.nd { position: relative; width: 30px; height: 30px; text-align: center; }
+.nd-znak { display: inline-block; width: 28px; height: 28px; line-height: 26px; font-size: 17px; background: #fff; border: 2px solid #b91c1c; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.7); }
+.nd-napis { position: absolute; left: 50%; top: 30px; transform: translateX(-50%); white-space: nowrap; font: bold 11px Arial, sans-serif; color: #fff; background: rgba(127,29,29,.92); border: 1px solid #fff; border-radius: 4px; padding: 1px 5px; }
+.os-preklop { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.os-preklop input { width: 20px; height: 20px; min-height: 0; }
+.os-vrstica { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid #334155; }
+.os-vrstica button { min-height: 34px; padding: 4px 10px; }
