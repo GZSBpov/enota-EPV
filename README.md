@@ -27,7 +27,7 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 - **Območje zveze in gasilski domovi**: stalni sloj za vse načrte. Uvoz iz Google Earth (projekt → Izvozi kot datoteko KML; deluje tudi KMZ): točke postanejo gasilski domovi, območja in črte obris zveze. Domove lahko dodaš tudi s klikom na zemljevid. Sloj ostane na napravi in se shrani v datoteko načrta; prikaz se vklopi/izklopi. Med risanjem dovoza klik na dom postavi točko natanko nanj.
 - **Črte**: vsaka črta ima temno obrobo (bela se vidi na vsaki podlagi) in ji lahko izbereš barvo.
 - **Napisi**: stikalo »prikaži napise« skrije ali pokaže vse napise pri ikonah in objektih (zaslon in izpis); posamezen napis skriješ pri izbranem elementu.
-- **Legenda**: v spodnjem desnem kotu skice so samo znaki, ki so na njej uporabljeni (na zaslonu in v izpisu).
+- **Legenda**: samo znaki, ki so na skici uporabljeni. Na zaslonu v spodnjem desnem kotu zemljevida, v izpisu v pasu pod skico in nad tabelo vozil.
 - **Skice (koraki)**: privzeto Lokacija, Evakuacija, Posredovanje. »Naslednji korak« naredi kopijo trenutne skice za prikaz poteka po času. Vsaka skica si zapomni svoj izrez zemljevida.
 - **Shrani / Odpri**: načrt je ena datoteka (`.epvnacrt.json`), ki jo preneseš na drug računalnik in tam odpreš. Delo se sproti hrani tudi v brskalniku.
 - **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.

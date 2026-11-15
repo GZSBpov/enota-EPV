@@ -674,9 +674,14 @@
     }
 
     // ---------- legenda uporabljenih znakov (spodnji desni kot skice) ----------
-    function htmlLegende(sk) {
+    /** vVrsti: legenda za izpis - znaki drug ob drugem v pasu pod skico (namesto okvirčka v kotu zemljevida). */
+    function htmlLegende(sk, vVrsti) {
         const vrstice = [];
-        const dodaj = function (ikona, besedilo) { vrstice.push('<tr><td style="padding:1px 5px 1px 0;text-align:center;vertical-align:middle;">' + ikona + '</td><td style="padding:1px 0;vertical-align:middle;">' + esc(besedilo) + '</td></tr>'); };
+        const dodaj = function (ikona, besedilo) {
+            vrstice.push(vVrsti
+                ? '<span class="nl-znak"><span class="nl-ikona">' + ikona + '</span>' + esc(besedilo) + '</span>'
+                : '<tr><td style="padding:1px 5px 1px 0;text-align:center;vertical-align:middle;">' + ikona + '</td><td style="padding:1px 0;vertical-align:middle;">' + esc(besedilo) + '</td></tr>');
+        };
         const mini = function (svg) { return '<svg viewBox="0 0 56 56" style="width:22px;height:22px;display:block;margin:0 auto;overflow:visible;">' + svg + '</svg>'; };
         const vozila = sk.elementi.filter(function (e) { return e.vrsta === 'vozilo'; });
         const sluzbe = {};
@@ -713,6 +718,7 @@
         if (osnovaVidna && osnova.tocke.length) dodaj('<span style="font-size:13px;">🏠</span>', 'Gasilski dom');
         if (osnovaVidna && osnova.obrisi.length) dodaj('<span style="display:inline-block;width:22px;border-top:3px dashed #f59e0b;vertical-align:middle;"></span>', 'Območje zveze');
         if (!sk.elementi.length) return '';
+        if (vVrsti) return '<div class="nacrt-legenda nl-vrsta"><span class="nl-naslov">Legenda:</span>' + vrstice.join('') + '</div>';
         return '<div class="nacrt-legenda"><div class="nl-naslov">Legenda</div><table>' + vrstice.join('') + '</table></div>';
     }
     function osveziLegendo() {
@@ -805,7 +811,7 @@
         const cilj = $('tisk');
         let h = zElaboratom ? htmlElaborata() : '<h1>' + esc(nacrt.naziv) + '</h1>';
         nacrt.skice.forEach(function (s, i) {
-            h += '<div class="tisk-skica' + (!zElaboratom && i === 0 ? ' prva' : '') + '"><h2>Skica ' + (i + 1) + ': ' + esc(s.naziv) + '</h2><div class="tisk-zemljevid-okvir"><div class="tisk-zemljevid" id="tisk-z-' + i + '"></div>' + htmlLegende(s) + '</div>' + legendaSkice(s) + '</div>';
+            h += '<div class="tisk-skica' + (!zElaboratom && i === 0 ? ' prva' : '') + '"><h2>Skica ' + (i + 1) + ': ' + esc(s.naziv) + '</h2><div class="tisk-zemljevid-okvir"><div class="tisk-zemljevid" id="tisk-z-' + i + '"></div></div>' + htmlLegende(s, true) + legendaSkice(s) + '</div>';
         });
         h += '<p class="tisk-noga">EPV Načrt · izpis ' + esc(new Date().toLocaleString('sl-SI')) + '</p>';
         cilj.innerHTML = h;

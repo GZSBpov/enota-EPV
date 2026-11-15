@@ -146,3 +146,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .os-preklop input { width: 20px; height: 20px; min-height: 0; }
 .os-vrstica { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid #334155; }
 .os-vrstica button { min-height: 34px; padding: 4px 10px; }
+
+/* Legenda v izpisu: pas pod skico, nad tabelo vozil */
+#tisk .nacrt-legenda.nl-vrsta { position: static; max-width: 180mm; width: 180mm; box-sizing: border-box; margin: 2mm 0 3mm; padding: 1.5mm 2.5mm; border: 1px solid #555; background: #fff; font-size: 9pt; line-height: 1.9; }
+#tisk .nl-vrsta .nl-naslov { display: inline; margin-right: 3mm; }
+#tisk .nl-vrsta .nl-znak { display: inline-block; white-space: nowrap; margin-right: 5mm; vertical-align: middle; }
+#tisk .nl-vrsta .nl-ikona { display: inline-block; vertical-align: middle; margin-right: 1.5mm; min-width: 5mm; text-align: center; }
+#tisk .nl-vrsta .nl-ikona svg { display: inline-block !important; vertical-align: middle; }
