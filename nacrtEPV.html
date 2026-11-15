@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPV Načrt - taktična tabla</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="nacrt.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/nacrt-model.js"></script>
+</head>
+<body>
+    <header class="vrh">
+        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span></div>
+        <input type="text" id="naziv-nacrta" placeholder="Naziv vaje / intervencije" autocomplete="off">
+        <div class="vrh-gumbi">
+            <button type="button" id="btn-novo" title="Nov prazen načrt">📄 Nov</button>
+            <button type="button" id="btn-odpri" title="Odpri načrt iz datoteke">📂 Odpri</button>
+            <button type="button" id="btn-shrani" class="poudarjen" title="Shrani načrt v datoteko (prenosljiva na drug računalnik)">💾 Shrani</button>
+            <button type="button" id="btn-razveljavi" title="Razveljavi zadnjo spremembo">↩️ Razveljavi</button>
+            <button type="button" id="btn-tisk-skice" title="Natisni vse skice (ali shrani kot PDF)">🖨️ Skice</button>
+            <button type="button" id="btn-elaborat" title="Predloga elaborata s skicami na koncu">📑 Elaborat</button>
+            <input type="file" id="datoteka" accept=".json,application/json" hidden>
+        </div>
+    </header>
+
+    <div class="delovni-prostor">
+        <!-- LEVO: paleta -->
+        <aside class="paleta" id="paleta">
+            <div class="skupina">
+                <div class="skupina-naslov">Društvo (kratica na vozilu)</div>
+                <div class="vrstica">
+                    <select id="drustvo"></select>
+                    <input type="text" id="drustvo-rocno" placeholder="ali vpiši" maxlength="8" autocomplete="off">
+                </div>
+                <div class="namig">Izberi vozilo, nato tapni na zemljevid (ali ga povleci). Številka prihoda se dodeli sama.</div>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Gasilska vozila</div>
+                <div class="mreza" id="pal-vozila"></div>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Druge službe</div>
+                <div class="mreza" id="pal-sluzbe"></div>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Oznake</div>
+                <div class="mreza mreza-znaki" id="pal-znaki"></div>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Črte in območja</div>
+                <div class="mreza mreza-crte" id="pal-crte"></div>
+            </div>
+        </aside>
+
+        <!-- SREDINA: zemljevid -->
+        <main class="zemljevid-okvir">
+            <div id="zemljevid"></div>
+            <div id="orodje-pasica" class="orodje-pasica" style="display:none;">
+                <span id="orodje-besedilo"></span>
+                <button type="button" id="btn-koncaj" style="display:none;">✔ Končaj</button>
+                <button type="button" id="btn-preklici">✕ Prekliči</button>
+            </div>
+        </main>
+
+        <!-- DESNO: skice in lastnosti -->
+        <aside class="desno">
+            <div class="skupina">
+                <div class="skupina-naslov">Skice (koraki)</div>
+                <div id="seznam-skic"></div>
+                <div class="vrstica gumbi-skice">
+                    <button type="button" id="btn-skica-nova" title="Nova prazna skica">＋ Nova</button>
+                    <button type="button" id="btn-skica-podvoji" title="Kopija trenutne skice - naslednji korak">⧉ Naslednji korak</button>
+                    <button type="button" id="btn-skica-preimenuj" title="Preimenuj">✎</button>
+                    <button type="button" id="btn-skica-izbrisi" title="Izbriši skico">🗑</button>
+                </div>
+            </div>
+            <div class="skupina" id="lastnosti-okvir">
+                <div class="skupina-naslov">Izbrani element</div>
+                <div id="lastnosti"><div class="namig">Tapni element na zemljevidu, da ga urediš ali izbrišeš. Vozila in oznake premikaš z vlečenjem.</div></div>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Vozila na skici</div>
+                <div id="seznam-vozil" class="seznam-vozil"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- ELABORAT -->
+    <div id="elaborat-okno" class="okno-ozadje" style="display:none;">
+        <div class="okno">
+            <div class="okno-glava">
+                <b>📑 Elaborat</b>
+                <span class="namig">Predloga: spremeni besedila; seznam vozil in skice se dodajo sami.</span>
+                <button type="button" id="btn-elaborat-zapri">✕</button>
+            </div>
+            <div class="okno-vsebina" id="elaborat-polja"></div>
+            <div class="okno-noga">
+                <button type="button" id="btn-elaborat-tisk" class="poudarjen">🖨️ Natisni / shrani PDF (s skicami)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tisk-priprava" class="tisk-priprava" style="display:none;">Pripravljam izpis … (nalagam zemljevide)</div>
+    <div id="tisk"></div>
+
+    <script src="js/nacrt.js"></script>
+</body>
+</html>
