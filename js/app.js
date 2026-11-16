@@ -99,6 +99,9 @@ async function naloziVsebinoAplikacije() {
     // znotraj naloziSeznamDogodkov() (v events.js), zato ga tu ne podvajamo.
 }
 
+// ime okna: gumb »EPV štab« na taktični tabli se vrne v to okno, namesto da odpre novega
+try { window.name = 'epv-stab'; } catch (e) { /* ni bistveno */ }
+
 function preveriGeslo() {
     const modal = document.getElementById('vstopno-geslo-modal');
     const input = document.getElementById('input-geslo');
