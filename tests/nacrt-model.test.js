@@ -52,6 +52,17 @@ const zOsnovo = JSON.parse(JSON.stringify(n)); zOsnovo.osnova = os;
 pri('osnova potuje z datoteko načrta', M.uvozi(JSON.stringify(zOsnovo)).nacrt.osnova.tocke[0].naziv === 'PGD A' && M.uvozi(JSON.stringify(n)).nacrt.osnova === null);
 pri('barve črt vsebujejo belo in črno', M.BARVE_CRT.includes('#f8fafc') && M.BARVE_CRT.includes('#111827'));
 
+pri('novi znaki: lestev, črpalka, elektrika, skupina', ['lestev', 'crpalka', 'elektrika', 'skupina'].every(k => M.ZNAKI[k] && M.ZNAKI[k].svg && M.ZNAKI[k].naziv) && M.ZNAKI.lestev.vrti === true && M.ZNAKI.crpalka.kvadrat === true);
+{
+  const zMerilom = JSON.parse(JSON.stringify(n)); zMerilom.skice[0].merilo = 0.7; zMerilom.skice[1].merilo = 9; zMerilom.skice[2].merilo = 'x';
+  zMerilom.skice[0].elementi.push({ id: 'b1', vrsta: 'besedilo', lat: 46.4, lon: 15.6, opis: 'Dolg napis', velikost: 19, sirina: 180 });
+  const u = M.uvozi(JSON.stringify(zMerilom)).nacrt;
+  pri('velikost ikon na skici se ohrani in omeji', u.skice[0].merilo === 0.7 && u.skice[1].merilo === 1.5 && u.skice[2].merilo === undefined && M.omejiMerilo(0.1) === 0.5 && M.omejiMerilo('abc') === 1);
+  const b = u.skice[0].elementi.find(e => e.id === 'b1');
+  pri('velikost pisave in širina okvirja napisa se ohranita', b && b.velikost === 19 && b.sirina === 180);
+  pri('podvojena skica obdrži velikost ikon', M.podvojiSkico(u.skice[0], 'K').merilo === 0.7);
+}
+pri('požar z dimom in veter sta prosti risbi, velikost znaka omejena', M.ZNAKI.pozar.prosto && M.ZNAKI.pozar.svg && M.ZNAKI.veter.prosto && M.ZNAKI.veter.vrti && M.omejiVelikostZnaka(9) === 2.6 && M.omejiVelikostZnaka(0.1) === 0.6 && M.omejiVelikostZnaka(undefined) === 1);
 pri('smeri neba: privzeto izklopljene, vklop se ohrani v datoteki', n.sever === false && M.uvozi(JSON.stringify(Object.assign({}, n, { sever: true }))).nacrt.sever === true && M.uvozi(JSON.stringify(stari)).nacrt.sever === false);
 pri('napisi: privzeto vidni, izklop se ohrani v datoteki', n.napisi === true && M.uvozi(JSON.stringify(Object.assign({}, n, { napisi: false }))).nacrt.napisi === false && M.uvozi(JSON.stringify(stari)).nacrt.napisi === true);
 

@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPV Načrt - taktična tabla</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="nacrt.css?v=10">
+    <link rel="stylesheet" href="nacrt.css?v=11">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/shared-config.js?v=10"></script>
-    <script src="js/prijava.js?v=10"></script>
-    <script src="js/koordinate.js?v=10"></script>
-    <script src="js/nacrt-model.js?v=10"></script>
+    <script src="js/shared-config.js?v=11"></script>
+    <script src="js/prijava.js?v=11"></script>
+    <script src="js/koordinate.js?v=11"></script>
+    <script src="js/nacrt-model.js?v=11"></script>
 </head>
 <body>
     <header class="vrh">
-        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r10</span></div>
+        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r11</span></div>
         <input type="text" id="naziv-nacrta" placeholder="Naziv vaje / intervencije" autocomplete="off">
         <div class="vrh-gumbi">
             <a href="mapeEPV.html" target="epv-stab" id="btn-epv" class="gumb-povezava" title="Odpri štab EPV (zemljevid enot). Načrt ostane odprt in shranjen.">🗺️ EPV štab</a>
@@ -24,6 +24,7 @@
             <button type="button" id="btn-splet" title="Shrani načrt na splet (v tabelo EPV) ali odpri shranjenega z drugega računalnika">☁️ Splet</button>
             <button type="button" id="btn-razveljavi" title="Razveljavi zadnjo spremembo">↩️ Razveljavi</button>
             <button type="button" id="btn-tisk-skice" title="Natisni vse skice (ali shrani kot PDF)">🖨️ Skice</button>
+            <button type="button" id="btn-slika" title="Shrani trenutno skico kot sliko JPG (za vstavljanje v elaborat ali Word)">🖼️ Slika</button>
             <button type="button" id="btn-elaborat" title="Predloga elaborata s skicami na koncu">📑 Elaborat</button>
             <button type="button" id="btn-obrazec" title="Obrazec za prijavo vaje na ReCO">📋 Obrazec ReCO</button>
             <input type="file" id="datoteka" accept=".json,application/json" hidden>
@@ -97,6 +98,9 @@
                 <label class="os-preklop"><input type="checkbox" id="napisi-vidni" checked> prikaži napise pri ikonah in objektih</label>
                 <div class="namig">Velja za zaslon in izpis. Posamezen napis skriješ pri izbranem elementu.</div>
                 <label class="os-preklop" style="margin-top:6px;"><input type="checkbox" id="sever-viden"> prikaži smeri neba na skici</label>
+                <label for="merilo-skice" style="display:block; margin-top:10px;">Velikost ikon in napisov na tej skici: <b id="merilo-vrednost">100 %</b></label>
+                <input type="range" id="merilo-skice" min="50" max="150" step="10" value="100" style="width:100%;">
+                <div class="namig">Velja za zaslon in izpis te skice. Pri širšem izrezu (manjši povečavi) ikone pomanjšaj.</div>
             </div>
             <div class="skupina">
                 <div class="skupina-naslov">Naslov in koordinate</div>
@@ -212,6 +216,6 @@
     <div id="tisk-priprava" class="tisk-priprava" style="display:none;">Pripravljam izpis … (nalagam zemljevide)</div>
     <div id="tisk"></div>
 
-    <script src="js/nacrt.js?v=10"></script>
+    <script src="js/nacrt.js?v=11"></script>
 </body>
 </html>

@@ -37,6 +37,11 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 - **Smeri neba**: kljukica »prikaži smeri neba na skici« doda vetrovnico v kot skice (zaslon in izpis); shrani se z načrtom.
 - **Naslov in koordinate**: gumb »📍 Pokaži naslov in koordinate točke«, nato klik na objekt. Pokaže najbližji naslov (javna storitev OpenStreetMap Nominatim, potreben je internet) ter koordinate WGS84 in D96/TM; rezultat se lahko kopira ali doda kot napis na skico.
 - **Načrti na spletu**: gumb »☁️ Splet« shrani načrt v tabelo EPV (list `Nacrti`) in ga odpre na drugem računalniku (geslo EPV). Zahteva posodobljeno skripto `apps-script/Code.gs`.
+- **Novi znaki**: napad po lestvi, črpalka, elektrika, skupina gasilcev / reševalcev, požar z dimom, smer vetra. Vsakemu znaku se nastavi velikost (npr. večji požar, močnejši veter).
+- **Napis v okvirčku**: velikost pisave in širina okvirja; pri nastavljeni širini se besedilo zalomi.
+- **Velikost ikon na skici**: drsnik pri »Napisi« pomanjša ali poveča vse ikone in napise ene skice (zaslon, izpis, slika).
+- **Slika skice**: gumb »🖼️ Slika« shrani trenutno skico z legendo kot JPG za vstavljanje v elaborat.
+- **Posadka iz EPV**: ko so vklopljene žive enote, se vozilo poveže z enoto s terena; število članov, ki ga enota vpiše na telefonu, se vpiše kot posadka.
 - **Posadka in poročilo**: pri vozilu vpišeš posadko kot 1 + število gasilcev. Pod vsako skico v izpisu je poročilo o sodelujočih: enote, vozila in člani po enotah ter skupno število sodelujočih (enako v elaboratu za ves načrt). Vozila brez vpisane posadke so označena in niso všteta med člane.
 - **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.
 - **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.

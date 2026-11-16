@@ -62,7 +62,8 @@ input[type=text], input[type=number], select, textarea { background: #0b1220; co
 .nz-telo { width: 34px; height: 34px; margin: 0 auto; border-radius: 7px; border: 2px solid #fff; color: #fff; font: bold 16px Arial, sans-serif; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,.7); }
 .nz-telo.krog { border-radius: 50%; }
 .nz.izbran .nz-telo { box-shadow: 0 0 0 3px #fde047, 0 2px 5px rgba(0,0,0,.7); }
-.nb { display: inline-block; padding: 3px 7px; border-radius: 4px; background: rgba(254,249,195,.96); color: #1f2937; font: bold 13px Arial, sans-serif; white-space: nowrap; border: 1px solid #854d0e; transform: translate(-50%, -50%); }
+.nb { display: inline-block; box-sizing: border-box; padding: 3px 7px; border-radius: 4px; background: rgba(254,249,195,.96); color: #1f2937; font: bold 13px Arial, sans-serif; line-height: 1.25; text-align: center; white-space: pre; border: 1px solid #854d0e; transform: translate(-50%, -50%) scale(var(--nm, 1)); }
+.nb.zalomljen { white-space: pre-wrap; overflow-wrap: anywhere; }
 .nb.izbran { box-shadow: 0 0 0 3px #fde047; }
 .np { font-size: 22px; line-height: 22px; width: 22px; height: 22px; text-align: center; text-shadow: 0 0 3px #000; }
 .nacrt-oznaka { background: rgba(15,23,42,.9); color: #fff; border: 1px solid #f8fafc; font-weight: bold; box-shadow: none; }
@@ -202,3 +203,19 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .splet-vrstica .splet-ime { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
 .splet-vrstica small { display: block; font-weight: normal; color: #94a3b8; }
 #splet-stanje.napaka { color: #fca5a5; }
+
+/* Velikost ikon in napisov na skici (--nm nastavi nacrt.js na zemljevidu oziroma na okvirju izpisa) */
+.nv { transform: scale(var(--nm, 1)); transform-origin: 30px 28px; }
+.nz { transform: scale(var(--nm, 1)); transform-origin: 20px 19px; }
+.nacrt-oznaka { font-size: calc(12px * var(--nm, 1)); }
+/* znaki z lastno risbo */
+.nz-telo svg, .pal-znak svg { width: 82%; height: 82%; display: block; }
+.nz-telo.kvadrat { border-radius: 2px; }
+.gumbi-bes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.nz-telo.prosto { border: none; box-shadow: none; border-radius: 0; background: none !important; width: 38px; height: 38px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.8)); }
+.nz-telo.prosto svg, .pal-znak svg { width: 100%; height: 100%; }
+.nz.izbran .nz-telo.prosto { box-shadow: none; outline: 3px solid #fde047; outline-offset: 2px; border-radius: 6px; }
+#tisk .tisk-slika { width: 180mm; background: #fff; padding: 0; }
+#tisk .tisk-slika .nacrt-legenda { margin-bottom: 0; }
+.vrh-gumbi button, .vrh-gumbi .gumb-povezava { padding-left: 8px; padding-right: 8px; }
+#naziv-nacrta { min-width: 120px; }

@@ -62,16 +62,28 @@
         triaza: { naziv: 'Triaža / prva pomoč', znak: '✚', barva: '#16a34a' },
         zbirno: { naziv: 'Zbirno mesto enot', znak: 'ZM', barva: '#2563eb' },
         evak: { naziv: 'Zbirno mesto evakuiranih', znak: '🏃', barva: '#16a34a' },
-        pozar: { naziv: 'Požar', znak: '🔥', barva: '#b91c1c' },
+        // "prosto": risba brez barvnega polja; velikost znaka (e.vel) pove obseg požara oziroma moč vetra
+        pozar: { naziv: 'Požar z dimom', znak: '', barva: 'transparent', prosto: true,
+            svg: '<g stroke="#111" stroke-width="0.7" stroke-linejoin="round"><path d="M14.5 10.5c-1.6 0-2.9-1.2-2.9-2.7 0-1.2.8-2.2 1.9-2.5.3-1.7 1.8-3 3.6-3 1.6 0 2.9 1 3.4 2.4 1.5.2 2.6 1.4 2.6 2.9 0 1.6-1.4 2.9-3.1 2.9z" fill="#9ca3af"/><path d="M12 23c-4 0-6.8-2.6-6.8-6.2 0-2.6 1.6-4.3 2.9-6 .5 1.3 1 2 1.9 2.6-.2-2.7.9-5.2 3.4-6.9-.3 2.2.6 3.4 2.2 5.1 1.7 1.8 3.2 3.2 3.2 5.6C18.800 20.500 16 23 12 23z" fill="#dc2626"/><path d="M12 22c-1.900 0-3.200-1.200-3.200-2.900 0-1.500 1-2.400 1.900-3.600.400 1 .9 1.400 1.600 1.800.1-1.400.6-2.300 1.500-3.200.1 1.300.7 2 1.300 2.900.600.800 1.100 1.500 1.100 2.400C16.200 20.900 14.300 22 12 22z" fill="#fbbf24" stroke="none"/></g>' },
         nevarnost: { naziv: 'Nevarnost', znak: '⚠', barva: '#f59e0b' },
         nevsnov: { naziv: 'Nevarna snov', znak: '☣', barva: '#ea580c' },
         oseba: { naziv: 'Ponesrečenec / ujeta oseba', znak: '🧍', barva: '#7c3aed' },
         voda: { naziv: 'Vodni vir / hidrant', znak: 'H', barva: '#0284c7' },
         vhod: { naziv: 'Vhod / dostop', znak: '➤', barva: '#475569', vrti: true },
-        veter: { naziv: 'Smer vetra', znak: '➤', barva: '#0e7490', vrti: true, napis: 'veter' },
+        veter: { naziv: 'Smer vetra', znak: '', barva: 'transparent', vrti: true, prosto: true, napis: 'veter',
+            svg: '<circle cx="12" cy="12" r="10.800" fill="rgba(255,255,255,.93)" stroke="#111" stroke-width="1"/><path d="M3.500 12H15" stroke="#0e7490" stroke-width="3" stroke-linecap="round"/><path d="M13 6.500L21 12l-8 5.500z" fill="#0e7490" stroke="#111" stroke-width="0.6" stroke-linejoin="round"/><path d="M4 7.500h5M4 16.500h5" stroke="#0e7490" stroke-width="1.400" stroke-linecap="round"/>' },
         zapora: { naziv: 'Zapora ceste', znak: '⛔', barva: '#991b1b' },
         helo: { naziv: 'Pristajalno mesto (helikopter)', znak: 'H', barva: '#15803d', krog: true },
         repetitor: { naziv: 'Mobilni repetitor', znak: '📡', barva: '#4338ca' },
+        // znaki z lastno risbo (svg, risano v polju 24 x 24); pri "vrti" risba kaže v desno
+        lestev: { naziv: 'Napad po lestvi', znak: '', barva: '#1d4ed8', vrti: true, napis: 'lestev',
+            svg: '<g stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"><path d="M2 8H22M2 16H22"/><path d="M6 8V16M10.5 8V16M15 8V16M19.5 8V16"/></g>' },
+        crpalka: { naziv: 'Črpalka', znak: '', barva: '#dc2626', kvadrat: true,
+            svg: '<path d="M5 5L19 19M19 5L5 19" stroke="#fff" stroke-width="3" stroke-linecap="round"/>' },
+        elektrika: { naziv: 'Elektrika (odklop / nevarnost)', znak: '', barva: '#facc15',
+            svg: '<path d="M13.5 2L5 13.5h5.5L9.5 22 19 9.5h-5.5z" fill="#111" stroke="#111" stroke-width="1" stroke-linejoin="round"/>' },
+        skupina: { naziv: 'Skupina gasilcev / reševalcev', znak: '', barva: '#b91c1c',
+            svg: '<g fill="#fff"><circle cx="5.5" cy="8.5" r="2.3"/><path d="M1.8 20v-4.6a3.7 3.7 0 0 1 7.4 0V20z"/><circle cx="18.5" cy="8.5" r="2.3"/><path d="M14.8 20v-4.6a3.7 3.7 0 0 1 7.4 0V20z"/></g><g fill="#fff" stroke="#b91c1c" stroke-width="1"><circle cx="12" cy="6.3" r="2.8"/><path d="M7.6 21v-5.6a4.4 4.4 0 0 1 8.8 0V21z"/></g>' },
         prazen: { naziv: 'Prazen znak (z opisom)', znak: '', barva: '#64748b', prazen: true }
     };
 
@@ -222,6 +234,18 @@
     }
 
     /** Posadka vozila je zapisana kot 1 + N (voznik + N). Vrne N (celo število >= 0) ali null, če ni vpisana. */
+    /** Velikost ikon in napisov na skici: 0,5 do 1,5 (1 = običajna). */
+    function omejiMerilo(m) {
+        const n = parseFloat(m);
+        return isNaN(n) ? 1 : Math.round(Math.max(0.5, Math.min(1.5, n)) * 10) / 10;
+    }
+
+    /** Velikost posameznega znaka: 0,6 do 2,6 (1 = običajna). */
+    function omejiVelikostZnaka(v) {
+        const n = parseFloat(v);
+        return isNaN(n) ? 1 : Math.round(Math.max(0.6, Math.min(2.6, n)) * 10) / 10;
+    }
+
     function steviloPosadke(e) {
         if (!e || e.posadka === undefined || e.posadka === null || String(e.posadka).trim() === '') return null;
         const n = parseInt(e.posadka, 10);
@@ -314,7 +338,9 @@
                 const mj = s.pogled.meje;
                 if (Array.isArray(mj) && mj.length === 2 && mj.every(function (t) { return Array.isArray(t) && jeSt(t[0]) && jeSt(t[1]); })) p.meje = [[mj[0][0], mj[0][1]], [mj[1][0], mj[1][1]]];
             }
-            return { id: s.id || novId('s'), naziv: String(s.naziv || 'Skica'), pogled: p, elementi: el };
+            const skica = { id: s.id || novId('s'), naziv: String(s.naziv || 'Skica'), pogled: p, elementi: el };
+            if (jeSt(s.merilo) && s.merilo !== 1) skica.merilo = omejiMerilo(s.merilo); // velikost ikon in napisov na tej skici
+            return skica;
         });
         if (skice.length === 0) skice.push(novaSkica('Skica 1', null));
         const elaborat = privzetiElaborat();
@@ -363,7 +389,7 @@
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
         BARVE_SEKTORJEV: BARVE_SEKTORJEV, BARVE_CRT: BARVE_CRT, ocistiOsnovo: ocistiOsnovo, kmlKoordinate: kmlKoordinate, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
-        privzetiObrazec: privzetiObrazec, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
+        privzetiObrazec: privzetiObrazec, omejiMerilo: omejiMerilo, omejiVelikostZnaka: omejiVelikostZnaka, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
         jeCisterna: jeCisterna, imaRoko: imaRoko, steviloKoles: steviloKoles, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,
