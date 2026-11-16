@@ -182,3 +182,23 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* povezava nazaj na štab EPV, v videzu gumbov v glavi */
 .vrh-gumbi .gumb-povezava { display: inline-flex; align-items: center; padding: 0 12px; min-height: 40px; border-radius: 6px; background: #334155; color: #fff; text-decoration: none; font: inherit; font-weight: bold; white-space: nowrap; border: 1px solid #475569; }
 .vrh-gumbi .gumb-povezava:hover { background: #475569; }
+
+/* Smeri neba (zemljevid je vedno obrnjen proti severu) */
+.sever-zaslon { position: absolute; right: 66px; top: 8px; z-index: 900; pointer-events: none; }
+.nacrt-sever { width: 64px; height: 64px; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
+#tisk .tisk-zemljevid-okvir .nacrt-sever { position: absolute; right: 2mm; top: 2mm; z-index: 1000; width: 17mm; height: 17mm; filter: none; }
+
+/* Naslov in koordinate kliknjene točke */
+.pin-okno { position: absolute; left: 10px; bottom: 26px; z-index: 950; max-width: min(360px, calc(100% - 20px)); background: rgba(15,23,42,.96); color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 10px 34px 10px 12px; box-shadow: 0 4px 14px rgba(0,0,0,.6); font-size: 14px; }
+.pin-okno .pin-naslov { font-weight: bold; margin-bottom: 4px; }
+.pin-okno .pin-naslov small { display: block; font-weight: normal; color: #cbd5e1; }
+.pin-okno .pin-koordinate { font-family: Consolas, monospace; font-size: 13px; color: #e2e8f0; margin-bottom: 8px; white-space: pre-line; user-select: text; }
+.pin-okno .pin-zapri { position: absolute; right: 4px; top: 4px; width: 28px; height: 28px; padding: 0; background: transparent; border: none; color: #fff; font-size: 16px; cursor: pointer; }
+.pin-okno .vrstica { display: flex; gap: 6px; flex-wrap: wrap; }
+.pin-tocka { width: 18px; height: 18px; border-radius: 50%; background: #f43f5e; border: 3px solid #fff; box-shadow: 0 0 0 2px #881337, 0 1px 5px rgba(0,0,0,.8); }
+
+/* Načrti na spletu */
+.splet-vrstica { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid #334155; }
+.splet-vrstica .splet-ime { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+.splet-vrstica small { display: block; font-weight: normal; color: #94a3b8; }
+#splet-stanje.napaka { color: #fca5a5; }

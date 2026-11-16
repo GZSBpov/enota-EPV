@@ -5,21 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPV Načrt - taktična tabla</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="nacrt.css?v=9">
+    <link rel="stylesheet" href="nacrt.css?v=10">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/shared-config.js?v=9"></script>
-    <script src="js/prijava.js?v=9"></script>
-    <script src="js/nacrt-model.js?v=9"></script>
+    <script src="js/shared-config.js?v=10"></script>
+    <script src="js/prijava.js?v=10"></script>
+    <script src="js/koordinate.js?v=10"></script>
+    <script src="js/nacrt-model.js?v=10"></script>
 </head>
 <body>
     <header class="vrh">
-        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r9</span></div>
+        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r10</span></div>
         <input type="text" id="naziv-nacrta" placeholder="Naziv vaje / intervencije" autocomplete="off">
         <div class="vrh-gumbi">
             <a href="mapeEPV.html" target="epv-stab" id="btn-epv" class="gumb-povezava" title="Odpri štab EPV (zemljevid enot). Načrt ostane odprt in shranjen.">🗺️ EPV štab</a>
             <button type="button" id="btn-novo" title="Nov prazen načrt">📄 Nov</button>
             <button type="button" id="btn-odpri" title="Odpri načrt iz datoteke">📂 Odpri</button>
             <button type="button" id="btn-shrani" class="poudarjen" title="Shrani načrt v datoteko (prenosljiva na drug računalnik)">💾 Shrani</button>
+            <button type="button" id="btn-splet" title="Shrani načrt na splet (v tabelo EPV) ali odpri shranjenega z drugega računalnika">☁️ Splet</button>
             <button type="button" id="btn-razveljavi" title="Razveljavi zadnjo spremembo">↩️ Razveljavi</button>
             <button type="button" id="btn-tisk-skice" title="Natisni vse skice (ali shrani kot PDF)">🖨️ Skice</button>
             <button type="button" id="btn-elaborat" title="Predloga elaborata s skicami na koncu">📑 Elaborat</button>
@@ -61,6 +63,16 @@
         <main class="zemljevid-okvir">
             <div id="zemljevid"></div>
             <div id="legenda" class="legenda-zaslon" style="display:none;"></div>
+            <div id="sever" class="sever-zaslon" style="display:none;"></div>
+            <div id="pin-okno" class="pin-okno" style="display:none;">
+                <button type="button" id="btn-pin-zapri" class="pin-zapri" title="Zapri">✕</button>
+                <div class="pin-naslov" id="pin-naslov"></div>
+                <div class="pin-koordinate" id="pin-koordinate"></div>
+                <div class="vrstica">
+                    <button type="button" id="btn-pin-kopiraj">📋 Kopiraj</button>
+                    <button type="button" id="btn-pin-napis">➕ Kot napis na skico</button>
+                </div>
+            </div>
             <div id="orodje-pasica" class="orodje-pasica" style="display:none;">
                 <span id="orodje-besedilo"></span>
                 <button type="button" id="btn-koncaj" style="display:none;">✔ Končaj</button>
@@ -84,6 +96,12 @@
                 <div class="skupina-naslov">Napisi</div>
                 <label class="os-preklop"><input type="checkbox" id="napisi-vidni" checked> prikaži napise pri ikonah in objektih</label>
                 <div class="namig">Velja za zaslon in izpis. Posamezen napis skriješ pri izbranem elementu.</div>
+                <label class="os-preklop" style="margin-top:6px;"><input type="checkbox" id="sever-viden"> prikaži smeri neba na skici</label>
+            </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Naslov in koordinate</div>
+                <button type="button" id="btn-pin" style="width:100%;">📍 Pokaži naslov in koordinate točke</button>
+                <div class="namig">Klikni gumb, nato objekt na zemljevidu. Naslov poišče javna storitev OpenStreetMap (potreben je internet); koordinate so izračunane tukaj.</div>
             </div>
             <div class="skupina">
                 <div class="skupina-naslov">Območje zveze in gasilski domovi</div>
@@ -147,6 +165,30 @@
     </div>
 
     <!-- OBMOČJE ZVEZE IN GASILSKI DOMOVI -->
+    <div id="splet-okno" class="okno-ozadje" style="display:none;">
+        <div class="okno" style="width:620px;">
+            <div class="okno-glava">
+                <b>☁️ Načrti na spletu</b>
+                <button type="button" id="btn-splet-zapri">✕</button>
+            </div>
+            <div class="okno-vsebina">
+                <div class="namig" style="margin-top:0;">Načrti se shranijo v Googlovo tabelo EPV (list Nacrti) in so dosegljivi z vsakega računalnika z geslom EPV. Shranjevanje v datoteko (💾) ostane na voljo.</div>
+                <div id="splet-prijava" class="vrstica" style="margin:10px 0; display:none;">
+                    <input type="password" id="splet-geslo" placeholder="Geslo EPV" autocomplete="off" style="flex:1; min-width:0;">
+                    <button type="button" id="btn-splet-prijava" class="poudarjen">Prijava</button>
+                </div>
+                <div id="splet-vsebina" style="display:none;">
+                    <div class="vrstica" style="margin:10px 0;">
+                        <button type="button" id="btn-splet-shrani" class="poudarjen" style="flex:1;">☁️ Shrani trenutni načrt na splet</button>
+                        <button type="button" id="btn-splet-osvezi">⟳</button>
+                    </div>
+                    <div id="splet-seznam"></div>
+                </div>
+                <div id="splet-stanje" class="namig" style="font-weight:bold;"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="osnova-okno" class="okno-ozadje" style="display:none;">
         <div class="okno">
             <div class="okno-glava">
@@ -170,6 +212,6 @@
     <div id="tisk-priprava" class="tisk-priprava" style="display:none;">Pripravljam izpis … (nalagam zemljevide)</div>
     <div id="tisk"></div>
 
-    <script src="js/nacrt.js?v=9"></script>
+    <script src="js/nacrt.js?v=10"></script>
 </body>
 </html>

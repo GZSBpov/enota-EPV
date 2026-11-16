@@ -41,8 +41,11 @@ var GLAVE = {
   DogodekGesla: ["Dogodek", "GesloHash", "Cas"],
   Zetoni: ["Dogodek", "Zeton", "Cas"],
   LokacijeArhiv: ["Čas", "Enota", "Latitude", "Longitude", "Natančnost", "Dogodek", "ID"],
-  ArhivDogodki: ["Dogodek", "Zadnja dejavnost", "Vrstic", "Arhivirano"]
+  ArhivDogodki: ["Dogodek", "Zadnja dejavnost", "Vrstic", "Arhivirano"],
+  Nacrti: ["Naziv", "Spremenjeno", "Del", "Delov", "Vsebina"]
 };
+var NACRT_KOS_ZNAKOV = 40000;     // celica sprejme največ 50.000 znakov - načrt se zapiše v več vrstic
+var NACRT_NAJVEC_ZNAKOV = 3000000;
 var ARHIV_PRIVZETO_DNI = 30;
 
 // Akcije, ki jih terenska aplikacija kliče z žetonom dogodka (iz QR kode) namesto z geslom
@@ -289,6 +292,9 @@ function doGet(e) {
       return napakaGesla ? napaka(napakaGesla) : vrniJson({ status: "success" });
     }
     case "zetonDogodka": return zetonDogodka(p);
+    case "seznamNacrtov": return seznamNacrtov();
+    case "pridobiNacrt": return pridobiNacrt(p);
+    case "izbrisiNacrt": return izbrisiNacrt(p);
     case "preveriGesloDogodka": {
       var r = preveriZascitoDogodka(p.dogodek || "", p.gesloHash || "");
       return vrniJson({ status: "success", zascitena: r.zascitena, ok: r.ok });
@@ -314,6 +320,7 @@ function doPost(e) {
     var gesloNapaka = preveriGeslo(vnos.geslo);
     if (gesloNapaka) return napaka(gesloNapaka);
     if (vnos.akcija === "shraniSektorje") return shraniSektorje(vnos);
+    if (vnos.akcija === "shraniNacrt") return shraniNacrt(vnos);
     return napaka("Neznana akcija (POST).");
   } catch (err) {
     return napaka(err.toString());
@@ -699,12 +706,83 @@ function pripraviListe() {
   Object.keys(GLAVE).forEach(function (ime) {
     var sheet = pridobiSheet(ime);
     sheet.getRange(1, 1, 1, GLAVE[ime].length).setValues([GLAVE[ime]]); // dopolni glavo (npr. stolpec ID)
-    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3], Zetoni: [3], LokacijeArhiv: [1], ArhivDogodki: [2, 4] }[ime] || [];
+    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3], Zetoni: [3], LokacijeArhiv: [1], ArhivDogodki: [2, 4], Nacrti: [2] }[ime] || [];
     casStolpci.forEach(function (c) {
       sheet.getRange(2, c, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
     });
   });
   Logger.log("Liste pripravljene. Časovni pas tabele: " + ss.getSpreadsheetTimeZone());
+}
+
+// ---------- načrti taktične table, shranjeni na spletu (list Nacrti) ----------
+// Načrt (JSON iz taktične table) se shrani v to tabelo, da je dosegljiv z vsakega računalnika. En načrt = ena ali
+// več vrstic z istim nazivom (kosi po NACRT_KOS_ZNAKOV). Vsak kos se začne z znakom "#", da ga Sheet nikoli ne
+// razume kot formulo; ob branju se znak odstrani.
+
+function odstraniNacrt(sheet, naziv) {
+  var zadnja = sheet.getLastRow();
+  if (zadnja < 2) return 0;
+  var imena = sheet.getRange(2, 1, zadnja - 1, 1).getValues();
+  var odstranjenih = 0;
+  for (var i = imena.length - 1; i >= 0; i--) {
+    if (String(imena[i][0]) === naziv) { sheet.deleteRow(i + 2); odstranjenih++; }
+  }
+  return odstranjenih;
+}
+
+/** POST akcija=shraniNacrt {naziv, vsebina}: shrani ali zamenja načrt z istim nazivom. */
+function shraniNacrt(vnos) {
+  var naziv = String(vnos.naziv || "").trim().slice(0, 120);
+  var vsebina = String(vnos.vsebina || "");
+  if (!naziv) return napaka("Manjka naziv načrta.");
+  if (!vsebina) return napaka("Načrt je prazen.");
+  if (vsebina.length > NACRT_NAJVEC_ZNAKOV) return napaka("Načrt je prevelik za shranjevanje na splet.");
+  try { JSON.parse(vsebina); } catch (err) { return napaka("Vsebina ni veljaven načrt."); }
+  return podZaklepom(function () {
+    var sheet = pridobiSheet("Nacrti");
+    var zdaj = new Date();
+    var kosi = [];
+    for (var i = 0; i < vsebina.length; i += NACRT_KOS_ZNAKOV) kosi.push(vsebina.slice(i, i + NACRT_KOS_ZNAKOV));
+    var vrsticeNove = kosi.map(function (k, j) { return [varno(naziv), zdaj, j + 1, kosi.length, "#" + k]; });
+    var zamenjan = odstraniNacrt(sheet, naziv) > 0;
+    var prva = sheet.getLastRow() + 1;
+    var potrebnih = prva + vrsticeNove.length - 1;
+    if (potrebnih > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), potrebnih - sheet.getMaxRows());
+    sheet.getRange(prva, 1, vrsticeNove.length, 5).setValues(vrsticeNove);
+    return vrniJson({ status: "success", naziv: naziv, spremenjeno: zdaj, zamenjan: zamenjan });
+  });
+}
+
+function seznamNacrtov() {
+  var poNazivu = {};
+  vrstice("Nacrti").forEach(function (v) {
+    var naziv = String(v[0] || "");
+    if (!naziv) return;
+    if (!poNazivu[naziv]) poNazivu[naziv] = { naziv: naziv, spremenjeno: v[1], znakov: 0 };
+    poNazivu[naziv].znakov += Math.max(0, String(v[4] || "").length - 1);
+  });
+  var seznam = Object.keys(poNazivu).map(function (k) { return poNazivu[k]; });
+  seznam.sort(function (a, b) { return vMs(b.spremenjeno) - vMs(a.spremenjeno); });
+  return vrniJson({ status: "success", data: seznam });
+}
+
+function pridobiNacrt(p) {
+  var naziv = String(p.naziv || "").trim();
+  var kosi = vrstice("Nacrti").filter(function (v) { return String(v[0]) === naziv; });
+  if (!kosi.length) return napaka("Načrt ni najden.");
+  kosi.sort(function (a, b) { return (stevilo(a[2]) || 0) - (stevilo(b[2]) || 0); });
+  if (kosi.length !== (stevilo(kosi[0][3]) || kosi.length)) return napaka("Načrt je na strežniku nepopoln.");
+  var vsebina = kosi.map(function (v) { return String(v[4] || "").slice(1); }).join("");
+  return vrniJson({ status: "success", naziv: naziv, spremenjeno: kosi[0][1], vsebina: vsebina });
+}
+
+function izbrisiNacrt(p) {
+  var naziv = String(p.naziv || "").trim();
+  if (!naziv) return napaka("Manjka naziv načrta.");
+  return podZaklepom(function () {
+    var n = odstraniNacrt(pridobiSheet("Nacrti"), naziv);
+    return n ? vrniJson({ status: "success" }) : napaka("Načrt ni najden.");
+  });
 }
 
 // ---------- arhiv pozicij starih dogodkov ----------

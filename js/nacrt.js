@@ -233,6 +233,207 @@
 
     function osveziZemljevid() { narisi(skica(), sloj, map, true); narisiRocice(); osveziLegendo(); }
 
+    // ---------- načrti na spletu (list Nacrti v tabeli EPV) ----------
+    function spletStanje(besedilo, napaka) {
+        const el = $('splet-stanje');
+        el.textContent = besedilo || '';
+        el.classList.toggle('napaka', !!napaka);
+    }
+    function spletNapaka(o) {
+        if (o.omrezje) return 'Ni povezave s strežnikom EPV.';
+        if (/Neznana akcija/i.test(o.message || '')) return 'Strežniška skripta še ne podpira načrtov na spletu (posodobi skripto, glej README).';
+        return o.message || 'Napaka na strežniku.';
+    }
+    function spletOdgovor(o) {
+        // geslo ni (več) veljavno: nazaj na prijavo
+        if (o.status !== 'success' && !o.omrezje && /gesl/i.test(o.message || '')) { if (window.EPVPrijava) window.EPVPrijava.pobrisi(); spletPokaziPrijavo(true); }
+        return o;
+    }
+    function spletPosljiNacrt(naziv, vsebina) {
+        // text/plain: Apps Script POST brez predhodne (preflight) zahteve
+        const zacetek = Date.now();
+        return fetch(window.GOOGLE_APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ akcija: 'shraniNacrt', geslo: window.EPVPrijava.geslo(), naziv: naziv, vsebina: vsebina }) })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+            .then(function (o) {
+                if (o) return spletOdgovor(o);
+                // Odgovora ni bilo mogoče prebrati (brskalnik ali preusmeritev): preverimo na seznamu, ali je načrt res zapisan.
+                return ziveKlic({ akcija: 'seznamNacrtov' }).then(spletOdgovor).then(function (s) {
+                    if (s.status !== 'success') return s;
+                    const zapis = (s.data || []).find(function (d) { return d.naziv === naziv; });
+                    return zapis && Date.parse(zapis.spremenjeno) >= zacetek - 120000 ? { status: 'success' } : { status: 'error', message: 'Shranjevanje ni potrjeno – poskusi znova.' };
+                });
+            });
+    }
+    function spletPokaziPrijavo(da) {
+        $('splet-prijava').style.display = da ? 'flex' : 'none';
+        $('splet-vsebina').style.display = da ? 'none' : '';
+    }
+    let spletNazivi = [];
+    function spletOsvezi() {
+        spletPokaziPrijavo(false);
+        spletStanje('Berem seznam …');
+        return ziveKlic({ akcija: 'seznamNacrtov' }).then(spletOdgovor).then(function (o) {
+            if (o.status !== 'success') { spletStanje(spletNapaka(o), true); return; }
+            const seznam = o.data || [];
+            spletNazivi = seznam.map(function (d) { return d.naziv; });
+            $('splet-seznam').innerHTML = seznam.map(function (d, i) {
+                const cas = d.spremenjeno ? new Date(d.spremenjeno).toLocaleString('sl-SI', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Ljubljana' }) : '';
+                return '<div class="splet-vrstica"><div class="splet-ime">' + esc(d.naziv) + '<small>' + esc(cas) + ' · ' + Math.max(1, Math.round((d.znakov || 0) / 1024)) + ' kB</small></div>' +
+                    '<button type="button" class="splet-odpri" data-i="' + i + '">📂 Odpri</button><button type="button" class="splet-brisi nevaren" data-i="' + i + '" title="Izbriši s spleta">🗑</button></div>';
+            }).join('');
+            spletStanje(seznam.length ? '' : 'Na spletu še ni shranjenih načrtov.');
+        });
+    }
+    function spletShrani() {
+        const naziv = String(nacrt.naziv || '').trim();
+        if (!naziv || naziv === 'Načrt' || naziv === 'Nov načrt') { spletStanje('Najprej vpiši naziv vaje ali intervencije (zgoraj levo) – pod tem imenom se načrt shrani.', true); return; }
+        if (spletNazivi.indexOf(naziv) >= 0 && !window.confirm('Načrt »' + naziv + '« je na spletu že shranjen. Ga zamenjam s trenutnim?')) return;
+        spletStanje('Shranjujem …');
+        spletPosljiNacrt(naziv, JSON.stringify(nacrtZaShranjevanje())).then(function (o) {
+            if (o.status !== 'success') { spletStanje(spletNapaka(o), true); return; }
+            spletOsvezi().then(function () { spletStanje('Shranjeno na splet: ' + naziv + ' (' + new Date().toLocaleTimeString('sl-SI') + ').'); });
+        });
+    }
+    function spletPripravi() {
+        $('btn-splet').addEventListener('click', function () {
+            $('splet-okno').style.display = 'flex';
+            spletStanje('');
+            if (!window.GOOGLE_APPS_SCRIPT_URL || !window.EPVPrijava) { spletPokaziPrijavo(false); spletStanje('Povezava z EPV tukaj ni na voljo.', true); return; }
+            if (window.EPVPrijava.geslo()) spletOsvezi();
+            else { spletPokaziPrijavo(true); spletStanje('Vpiši geslo EPV (enako kot v štabu).'); }
+        });
+        $('btn-splet-zapri').addEventListener('click', function () { $('splet-okno').style.display = 'none'; });
+        const prijava = function () {
+            const g = $('splet-geslo').value.trim();
+            if (!g) return;
+            spletStanje('Preverjam geslo …');
+            window.EPVPrijava.preveri(g).then(function (r) {
+                if (r.ok) { window.EPVPrijava.nastavi(g); $('splet-geslo').value = ''; spletOsvezi(); }
+                else spletStanje(r.omrezje ? 'Ni povezave s strežnikom EPV.' : 'Napačno geslo.', true);
+            });
+        };
+        $('btn-splet-prijava').addEventListener('click', prijava);
+        $('splet-geslo').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') prijava(); });
+        $('btn-splet-osvezi').addEventListener('click', spletOsvezi);
+        $('btn-splet-shrani').addEventListener('click', spletShrani);
+        $('splet-seznam').addEventListener('click', function (ev) {
+            const gumb = ev.target.closest('button');
+            if (!gumb) return;
+            const naziv = spletNazivi[parseInt(gumb.dataset.i, 10)];
+            if (naziv === undefined) return;
+            if (gumb.classList.contains('splet-odpri')) {
+                if (!window.confirm('Odprem načrt »' + naziv + '«? Trenutni načrt na zaslonu bo zamenjan (vrneš ga z ↩️ Razveljavi).')) return;
+                spletStanje('Odpiram …');
+                ziveKlic({ akcija: 'pridobiNacrt', naziv: naziv }).then(spletOdgovor).then(function (o) {
+                    if (o.status !== 'success') { spletStanje(spletNapaka(o), true); return; }
+                    if (nalozi(o.vsebina)) $('splet-okno').style.display = 'none';
+                });
+            } else if (gumb.classList.contains('splet-brisi')) {
+                if (!window.confirm('Izbrišem načrt »' + naziv + '« s spleta? Tega ni mogoče razveljaviti.')) return;
+                ziveKlic({ akcija: 'izbrisiNacrt', naziv: naziv }).then(spletOdgovor).then(function (o) {
+                    if (o.status !== 'success') { spletStanje(spletNapaka(o), true); return; }
+                    spletOsvezi();
+                });
+            }
+        });
+    }
+
+    // ---------- smeri neba ----------
+    // Zemljevid je vedno obrnjen proti severu, zato je vetrovnica stalna slika v kotu skice (zaslon in izpis).
+    function htmlSevera() {
+        return '<svg class="nacrt-sever" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smeri neba: sever je zgoraj">' +
+            '<circle cx="32" cy="34" r="22" fill="rgba(255,255,255,.92)" stroke="#111" stroke-width="1.5"/>' +
+            '<path d="M32 13 L38 34 L32 31 L26 34 Z" fill="#dc2626" stroke="#111" stroke-width="1"/>' +
+            '<path d="M32 55 L38 34 L32 37 L26 34 Z" fill="#fff" stroke="#111" stroke-width="1"/>' +
+            '<g font-family="Arial, sans-serif" font-weight="bold" fill="#111" text-anchor="middle" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" paint-order="stroke">' +
+            '<text x="32" y="10" font-size="12">S</text>' +
+            '<text x="50" y="37" font-size="8">V</text><text x="14" y="37" font-size="8">Z</text><text x="32" y="63.5" font-size="8">J</text></g></svg>';
+    }
+    function osveziSever() {
+        const el = $('sever');
+        const viden = !!(nacrt && nacrt.sever);
+        el.style.display = viden ? '' : 'none';
+        el.innerHTML = viden ? htmlSevera() : '';
+        $('sever-viden').checked = viden;
+    }
+
+    // ---------- naslov in koordinate kliknjene točke ----------
+    const pin = { oznaka: null, lat: null, lon: null, besedilo: '', naslov: '', zahteva: 0 };
+
+    function pinKoordinate(lat, lon) {
+        const K = window.EPVKoordinate;
+        let vrstice = 'WGS84: ' + lat.toFixed(6) + ', ' + lon.toFixed(6);
+        if (K) {
+            const d = K.d96Naprej(lat, lon);
+            if (d && isFinite(d.E) && isFinite(d.N)) vrstice += '\nD96/TM: E ' + Math.round(d.E) + ' N ' + Math.round(d.N);
+        }
+        return vrstice;
+    }
+    /** Iz odgovora storitve sestavi kratek naslov: "Ulica 12, 2310 Slovenska Bistrica" (+ ime objekta). */
+    function pinNaslovIzOdgovora(o) {
+        const a = (o && o.address) || {};
+        const cesta = a.road || a.pedestrian || a.footway || a.path || '';
+        const kraj = a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || '';
+        const prvi = cesta ? (cesta + (a.house_number ? ' ' + a.house_number : '')) : (a.house_number ? ((a.hamlet || a.village || kraj) + ' ' + a.house_number) : '');
+        const drugi = [a.postcode, kraj].filter(Boolean).join(' ');
+        const naslov = [prvi, drugi].filter(Boolean).join(', ');
+        const ime = o && o.name && o.name !== cesta ? String(o.name) : '';
+        return { naslov: naslov, ime: ime, hisna: !!a.house_number };
+    }
+    function pinPokazi(lat, lon) {
+        const K = window.EPVKoordinate;
+        pin.lat = lat; pin.lon = lon; pin.naslov = '';
+        const zahteva = ++pin.zahteva;
+        if (pin.oznaka) map.removeLayer(pin.oznaka);
+        pin.oznaka = L.marker([lat, lon], { interactive: false, zIndexOffset: 95000000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="pin-tocka"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
+        const koord = pinKoordinate(lat, lon);
+        $('pin-koordinate').textContent = koord;
+        $('pin-naslov').textContent = 'Iščem naslov …';
+        pin.besedilo = koord;
+        $('pin-okno').style.display = '';
+        const naslovUrl = (window.EPV_NASLOV_URL || 'https://nominatim.openstreetmap.org/reverse') + '?format=jsonv2&zoom=18&addressdetails=1&accept-language=sl&lat=' + lat.toFixed(6) + '&lon=' + lon.toFixed(6);
+        fetch(naslovUrl, { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+            .then(function (o) {
+                if (zahteva !== pin.zahteva) return; // medtem je bila kliknjena druga točka
+                const el = $('pin-naslov');
+                if (!o || o.error || !o.address) { el.textContent = 'Naslova ni bilo mogoče dobiti (ni interneta ali tu ni podatka).'; return; }
+                const n = pinNaslovIzOdgovora(o);
+                if (!n.naslov && !n.ime) { el.textContent = 'Za to mesto ni naslova.'; return; }
+                const oLat = parseFloat(o.lat), oLon = parseFloat(o.lon);
+                const razdalja = K && isFinite(oLat) && isFinite(oLon) ? K.razdaljaM(lat, lon, oLat, oLon) : null;
+                pin.naslov = [n.ime, n.naslov].filter(Boolean).join(', ');
+                el.innerHTML = esc(pin.naslov) + '<small>' + (n.hisna ? 'najbližji naslov' : 'brez hišne številke – najbližja cesta ali kraj') + (razdalja !== null ? ', ' + esc(K.oblikujRazdaljo(razdalja)) + ' od točke' : '') + ' · vir: OpenStreetMap</small>';
+                pin.besedilo = pin.naslov + '\n' + koord;
+            });
+    }
+    function pinZapri() {
+        pin.zahteva++;
+        if (pin.oznaka) { map.removeLayer(pin.oznaka); pin.oznaka = null; }
+        $('pin-okno').style.display = 'none';
+    }
+    function pinPripravi() {
+        $('btn-pin').addEventListener('click', function () { nastaviOrodje(orodje && orodje.vrsta === 'pin' ? null : { kljuc: 'pin', vrsta: 'pin' }); });
+        $('btn-pin-zapri').addEventListener('click', pinZapri);
+        $('btn-pin-kopiraj').addEventListener('click', function () {
+            const b = $('btn-pin-kopiraj');
+            const uspeh = function () { b.textContent = '✔ Kopirano'; setTimeout(function () { b.textContent = '📋 Kopiraj'; }, 1500); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(pin.besedilo).then(uspeh, function () { window.prompt('Kopiraj besedilo:', pin.besedilo); });
+            else window.prompt('Kopiraj besedilo:', pin.besedilo);
+        });
+        $('btn-pin-napis').addEventListener('click', function () {
+            if (pin.lat === null) return;
+            zapomni();
+            const e = { id: M.novId('e'), vrsta: 'besedilo', lat: pin.lat, lon: pin.lon, opis: pin.naslov || ('' + pin.lat.toFixed(6) + ', ' + pin.lon.toFixed(6)) };
+            skica().elementi.push(e);
+            pinZapri();
+            izbranId = e.id;
+            samodejnoShrani(); osveziVse(false);
+        });
+    }
+
     // ---------- žive enote s terena (EPV) ----------
     // Tabla po potrebi prebere pozicije enot izbranega dogodka iz iste skripte kot štab in jih pokaže čez načrt.
     // Niso del načrta: ne shranijo se v datoteko in jih ni v izpisu.
@@ -514,7 +715,7 @@
         const pasica = $('orodje-pasica');
         if (!novo) { pasica.style.display = 'none'; return; }
         const vecTock = novo.vrsta === 'crta' || novo.vrsta === 'obmocje';
-        $('orodje-besedilo').textContent = vecTock ? 'Tapkaj točke na zemljevidu, nato »Končaj«' : 'Tapni na zemljevid, kamor naj se postavi';
+        $('orodje-besedilo').textContent = novo.vrsta === 'pin' ? 'Tapni objekt ali mesto na zemljevidu za naslov in koordinate' : vecTock ? 'Tapkaj točke na zemljevidu, nato »Končaj«' : 'Tapni na zemljevid, kamor naj se postavi';
         $('btn-koncaj').style.display = vecTock ? '' : 'none';
         pasica.style.display = 'flex';
         if (vecTock) risanje = { tocke: [], predogled: null };
@@ -528,6 +729,7 @@
     function postavi(lat, lon) {
         if (!orodje) return;
         const o = orodje;
+        if (o.vrsta === 'pin') { nastaviOrodje(null); pinPokazi(lat, lon); return; }
         if (o.vrsta === 'osnovaDom') {
             const zeIma = osnova.tocke.map(function (t) { return t.naziv; });
             const predlog = (M.DRUSTVA.filter(function (d) { return zeIma.indexOf(d[1]) < 0; })[0] || ['', ''])[1];
@@ -770,6 +972,7 @@
     function osveziVse(tudiPogled) {
         $('naziv-nacrta').value = nacrt.naziv;
         $('napisi-vidni').checked = nacrt.napisi !== false;
+        osveziSever();
         document.title = 'EPV Načrt - ' + nacrt.naziv;
         if (tudiPogled) {
             const p = skica().pogled;
@@ -779,10 +982,14 @@
     }
 
     // ---------- datoteke ----------
-    function shraniVDatoteko() {
+    /** Načrt, kot se zapiše v datoteko ali na splet (z območjem zveze in domovi). */
+    function nacrtZaShranjevanje() {
         skica().pogled = trenutniPogled();
         samodejnoShrani();
-        const zaDatoteko = Object.assign({}, nacrt, { osnova: (osnova.tocke.length || osnova.obrisi.length) ? osnova : undefined });
+        return Object.assign({}, nacrt, { osnova: (osnova.tocke.length || osnova.obrisi.length) ? osnova : undefined });
+    }
+    function shraniVDatoteko() {
+        const zaDatoteko = nacrtZaShranjevanje();
         const blob = new Blob([JSON.stringify(zaDatoteko, null, 1)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -983,7 +1190,7 @@
         const cilj = $('tisk');
         let h = zElaboratom ? htmlElaborata() : '<h1>' + esc(nacrt.naziv) + '</h1>';
         nacrt.skice.forEach(function (s, i) {
-            h += '<div class="tisk-skica' + (!zElaboratom && i === 0 ? ' prva' : '') + '"><h2>Skica ' + (i + 1) + ': ' + esc(s.naziv) + '</h2><div class="tisk-zemljevid-okvir"><div class="tisk-zemljevid" id="tisk-z-' + i + '"></div></div>' + htmlLegende(s, true) + legendaSkice(s) + '</div>';
+            h += '<div class="tisk-skica' + (!zElaboratom && i === 0 ? ' prva' : '') + '"><h2>Skica ' + (i + 1) + ': ' + esc(s.naziv) + '</h2><div class="tisk-zemljevid-okvir"><div class="tisk-zemljevid" id="tisk-z-' + i + '"></div>' + (nacrt.sever ? htmlSevera() : '') + '</div>' + htmlLegende(s, true) + legendaSkice(s) + '</div>';
         });
         h += '<p class="tisk-noga">EPV Načrt · izpis ' + esc(new Date().toLocaleString('sl-SI')) + '</p>';
         cilj.innerHTML = h;
@@ -1129,6 +1336,9 @@
         $('btn-tisk-skice').addEventListener('click', function () { natisni(false); });
         $('napisi-vidni').addEventListener('change', function () { zapomni(); nacrt.napisi = $('napisi-vidni').checked; samodejnoShrani(); osveziZemljevid(); });
         zivePripravi();
+        pinPripravi();
+        spletPripravi();
+        $('sever-viden').addEventListener('change', function () { zapomni(); nacrt.sever = $('sever-viden').checked; samodejnoShrani(); osveziSever(); });
         $('osnova-vidna').addEventListener('change', function () { osnovaVidna = $('osnova-vidna').checked; shraniOsnovo(); osveziOsnovo(); osveziLegendo(); });
         $('btn-osnova').addEventListener('click', function () { $('osnova-uvoz-stanje').textContent = ''; osveziOsnovo(); $('osnova-okno').style.display = 'flex'; });
         $('btn-osnova-zapri').addEventListener('click', function () { $('osnova-okno').style.display = 'none'; });

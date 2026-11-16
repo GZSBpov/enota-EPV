@@ -34,6 +34,9 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 - **Točke črt**: napad, cevovod, pot, dovoz in reševanje se urejajo po točkah enako kot sektor (izberi črto - zadeneš jo tudi s klikom tik ob njej).
 - **Izpis**: skica v izpisu pokaže isti izrez kot na zaslonu, v enakem razmerju ikon do zemljevida; legenda je v treh stolpcih.
 - **Žive enote s terena**: v desnem stolpcu »Žive enote s terena (EPV)« vklopiš prikaz pozicij enot izbranega dogodka (geslo EPV, osveževanje na 15 s). Niso del načrta: ne shranijo se in jih ni v izpisu.
+- **Smeri neba**: kljukica »prikaži smeri neba na skici« doda vetrovnico v kot skice (zaslon in izpis); shrani se z načrtom.
+- **Naslov in koordinate**: gumb »📍 Pokaži naslov in koordinate točke«, nato klik na objekt. Pokaže najbližji naslov (javna storitev OpenStreetMap Nominatim, potreben je internet) ter koordinate WGS84 in D96/TM; rezultat se lahko kopira ali doda kot napis na skico.
+- **Načrti na spletu**: gumb »☁️ Splet« shrani načrt v tabelo EPV (list `Nacrti`) in ga odpre na drugem računalniku (geslo EPV). Zahteva posodobljeno skripto `apps-script/Code.gs`.
 - **Posadka in poročilo**: pri vozilu vpišeš posadko kot 1 + število gasilcev. Pod vsako skico v izpisu je poročilo o sodelujočih: enote, vozila in člani po enotah ter skupno število sodelujočih (enako v elaboratu za ves načrt). Vozila brez vpisane posadke so označena in niso všteta med člane.
 - **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.
 - **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.
