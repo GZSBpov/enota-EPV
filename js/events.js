@@ -1,6 +1,6 @@
 import { narisaniSektorjiSloj, nastaviPopupZaSektor, posodobiIzgledSektorja, posodobiOznakoSektorja, pridobiGeoJsonSektorjev, map } from './map.js';
 import { GOOGLE_APPS_SCRIPT_URL, ZACETNE_KOORDINATE, STORAGE_STARI_DOGODKI, DOGODKI_PRIKAZ_DNI } from './config.js';
-import { apiGet, novId } from './api.js';
+import { apiGet, novId, trenutnoGeslo } from './api.js';
 import { casVMs } from './cas-pomoc.js';
 import { ponastaviTocke, osveziTocke } from './tocke.js';
 import { osveziStabLog } from './stab-sporocila.js';
@@ -94,7 +94,7 @@ async function naloziSektorjeDogodka(imeDogodka) {
 
     try {
         let gesloHash = pridobiSejnoGeslo(imeDogodka);
-        let res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+        let res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
         let odgovor = res.ok ? await res.json() : null;
 
         if (odgovor && odgovor.status === 'locked') {
@@ -103,7 +103,7 @@ async function naloziSektorjeDogodka(imeDogodka) {
                 dostopUspel = false;
                 alert(`Dostop do dogodka "${imeDogodka}" je zavrnjen - geslo ni bilo vneseno.`);
             } else {
-                res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+                res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
                 odgovor = res.ok ? await res.json() : null;
 
                 if (odgovor && odgovor.status === 'locked') {
@@ -114,7 +114,7 @@ async function naloziSektorjeDogodka(imeDogodka) {
                     if (zeliPonastaviti) {
                         gesloHash = await ponastaviGesloDogodka(imeDogodka);
                         if (gesloHash) {
-                            res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+                            res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiDogodke&dogodek=${encodeURIComponent(imeDogodka)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
                             odgovor = res.ok ? await res.json() : null;
                         }
                     }
@@ -299,7 +299,7 @@ export async function shraniDogodek(tiho = false) {
  */
 async function posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, gesloHash) {
     try {
-        const preveriUrl = `${GOOGLE_APPS_SCRIPT_URL}?akcija=preveriGesloDogodka&dogodek=${encodeURIComponent(imeDogodka)}&gesloHash=${encodeURIComponent(gesloHash || '')}&geslo=EPV2026`;
+        const preveriUrl = `${GOOGLE_APPS_SCRIPT_URL}?akcija=preveriGesloDogodka&dogodek=${encodeURIComponent(imeDogodka)}&gesloHash=${encodeURIComponent(gesloHash || '')}&geslo=${encodeURIComponent(trenutnoGeslo())}`;
         const res = await fetch(preveriUrl, { cache: 'no-store' });
         const odgovor = res.ok ? await res.json() : null;
         if (odgovor && odgovor.status === 'success' && odgovor.zascitena === true && odgovor.ok !== true) {
@@ -315,7 +315,7 @@ async function posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, ges
             mode: 'no-cors',
             // text/plain namesto application/json, da Apps Script POST ne sproži CORS predhodne (preflight) zahteve
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ akcija: "shraniSektorje", geslo: "EPV2026", dogodek: imeDogodka, sektorji: sektorjiZaPosiljanje, gesloHashDogodka: gesloHash || '' })
+            body: JSON.stringify({ akcija: "shraniSektorje", geslo: trenutnoGeslo(), dogodek: imeDogodka, sektorji: sektorjiZaPosiljanje, gesloHashDogodka: gesloHash || '' })
         });
         if (gesloHash) shraniSejnoGeslo(imeDogodka, gesloHash);
         return true;
@@ -334,7 +334,7 @@ async function posljiShranjevanjeSektorjev(imeDogodka, sektorjiZaPosiljanje, ges
 async function posljiZaznamekDogodka(dogodekId, besedilo) {
     const center = map ? map.getCenter() : { lat: ZACETNE_KOORDINATE[0], lng: ZACETNE_KOORDINATE[1] };
     const id = novId('z');
-    const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:' + besedilo + ':0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent(besedilo.toUpperCase())}&id=${encodeURIComponent(id)}`;
+    const url = `${GOOGLE_APPS_SCRIPT_URL}?enota=${encodeURIComponent('SISTEM:' + besedilo + ':0')}&lat=${center.lat}&lon=${center.lng}&acc=0&dogodek=${encodeURIComponent(dogodekId)}&sporocilo=${encodeURIComponent(besedilo.toUpperCase())}&id=${encodeURIComponent(id)}&geslo=${encodeURIComponent(trenutnoGeslo())}`;
     for (let poskus = 0; poskus < 3; poskus++) {
         try {
             const res = await fetch(url, { cache: 'no-store' });
@@ -354,7 +354,7 @@ async function posljiZaznamekDogodka(dogodekId, besedilo) {
 async function jeDogodekZakljucen(dogodekId) {
     try {
         const gesloHash = pridobiSejnoGeslo(dogodekId);
-        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+        const res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
         if (!res.ok) return false;
         const odgovor = await res.json();
         // Če je dogodek zaščiten in geslo (še) ni bilo potrjeno za to sejo, sektorji zgoraj

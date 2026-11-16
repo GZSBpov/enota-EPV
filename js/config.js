@@ -2,7 +2,7 @@
 // EPV V2 - KONFIGURACIJA IN POVEZAVE
 // ==========================================
 
-export const NAVADNO_GESLO = "EPV2026";
+// Geslo aplikacije ni v kodi: vpiše ga uporabnik, preveri strežnik (glej js/prijava.js).
 
 // Povezava do Google Apps Script V2 (definirana v js/shared-config.js, ker jo potrebuje tudi terenEPV.html)
 export const GOOGLE_APPS_SCRIPT_URL = window.GOOGLE_APPS_SCRIPT_URL;

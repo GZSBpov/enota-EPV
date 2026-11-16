@@ -5,6 +5,7 @@
 // na strežniku zahteva to geslo - ne samo splošno geslo aplikacije (EPV2026).
 // ==========================================
 
+import { trenutnoGeslo } from './api.js';
 import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
 
 const STORAGE_SEJA_GESLA = 'epv2_seja_gesla_dogodkov';
@@ -74,7 +75,7 @@ export async function vprasajZaGesloDogodka(imeDogodka) {
  */
 export async function shraniGesloDogodkaNaStreznik(imeDogodka, gesloHash) {
     try {
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?akcija=shraniGesloDogodka&dogodek=${encodeURIComponent(imeDogodka)}&gesloHash=${encodeURIComponent(gesloHash)}&geslo=EPV2026`;
+        const url = `${GOOGLE_APPS_SCRIPT_URL}?akcija=shraniGesloDogodka&dogodek=${encodeURIComponent(imeDogodka)}&gesloHash=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`;
         const res = await fetch(url, { cache: 'no-store' });
         const odgovor = await res.json();
         return odgovor.status === 'success';

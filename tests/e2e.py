@@ -42,7 +42,11 @@ def vpis(ime, lat, lon, dogodek, acc=10, t=None, sporocilo=None, id_=None):
     p = dict(enota=ime, lat=lat, lon=lon, acc=acc, dogodek=dogodek, id=id_ or f'e2e{time.time_ns()}')
     if t is not None: p['t'] = int(t)
     if sporocilo: p['sporocilo'] = sporocilo
-    return exec_(**{k: v for k, v in p.items() if k != 'geslo'}) if False else json.loads(urllib.request.urlopen(f'{BASE}/exec?' + urllib.parse.urlencode(p), timeout=10).read())
+    return exec_(**p)
+
+def teren_url(dogodek, pot='terenEPV.html'):
+    zeton = exec_(akcija='zetonDogodka', dogodek=dogodek)['zeton']
+    return f'{BASE}/{pot}?dogodek={urllib.parse.quote(dogodek)}&zeton={zeton}'
 
 srv = subprocess.Popen(['node', os.path.join(ROOT, 'tests', 'apps-script-mock.js'), str(PORT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 try:
@@ -72,7 +76,7 @@ try:
         def pot_konfig(route):
             route.fulfill(status=200, content_type='application/javascript', body=konfig)
         ctx.route(re.compile(r'^https?://(?!127\.0\.0\.1)'), pot_zunanje)
-        ctx.route('**/js/shared-config.js', pot_konfig)
+        ctx.route(re.compile(r'/js/shared-config\.js(\?.*)?$'), pot_konfig)
         return ctx
 
     napake_strani = []
@@ -86,7 +90,7 @@ try:
         # ================= TEREN =================
         ctxF = pripravi_kontekst(browser, geolocation={'latitude': 46.3934, 'longitude': 15.5746, 'accuracy': 20}, permissions=['geolocation'])
         F = ctxF.new_page(); spremljaj(F, 'teren')
-        F.goto(f'{BASE}/terenEPV.html?dogodek=Rogla')
+        F.goto(teren_url('Rogla'))
         pri('teren: ni opozorila o konfiguraciji', not F.is_visible('#konfiguracijaNapaka'))
 
         F.fill('#imeEnote', 'pgd kebelj')
@@ -248,7 +252,7 @@ try:
         # ----- SOS brez GPS (nov kontekst brez dovoljenja za lokacijo) -----
         ctxN = pripravi_kontekst(browser)
         N = ctxN.new_page(); spremljaj(N, 'teren-brez-gps')
-        N.goto(f'{BASE}/terenEPV.html?dogodek=Rogla')
+        N.goto(teren_url('Rogla'))
         N.fill('#imeEnote', 'Brez GPS')
         N.dispatch_event('#imeEnote', 'change')
         N.click('button[data-sporocilo="SOS"]')
@@ -339,7 +343,7 @@ try:
         ctxR = pripravi_kontekst(browser, geolocation={'latitude': 46.35, 'longitude': 15.55, 'accuracy': 20}, permissions=['geolocation'])
         ctxR.add_init_script("window.EPV_OPOMNIK_NEODDAJANJE_MS = 4000; window.EPV_TEZAVA_POVEZAVA_MS = 3000; window.EPV_PONOVITEV_ZVOKA_MS = 3000; window.EPV_TEZAVA_GPS_MS = 3000;")
         R = ctxR.new_page(); spremljaj(R, 'teren-opomniki')
-        R.goto(f'{BASE}/terenEPV.html?dogodek=Opomniki')
+        R.goto(teren_url('Opomniki'))
         stevilo_opomnikov = lambda: R.evaluate("EPVZvok.dnevnik.filter(x => x.tip === 'opomnik').length")
         pri('opomniki: kljukica je privzeto vklopljena', R.is_checked('#chkOpomniki'))
         R.fill('#imeEnote', 'Opomnik Enota')
@@ -396,7 +400,69 @@ try:
         VH.select_option('#select-dogodek', 'StaraStran')
         pri('V1 štab: enota se pokaže', cakaj(lambda: 'Stara Enota' in VH.inner_text('#seznamEnotGumbi'), 15), VH.inner_text('#seznamEnotGumbi'))
 
-        for c in (ctxF, ctxH, ctxN, ctxV, ctxVH):
+        # ================= ZAŠČITA: žeton v QR kodi, tabla z živimi enotami, zamenjava gesla =================
+        H.select_option('#select-dogodek', 'Rogla')
+        H.click('#btn-qr-teren')
+        zeton_rogla = [v[1] for v in sheet('Zetoni')[1:] if v[0] == 'Rogla'][-1]
+        pri('QR: povezava vsebuje žeton dogodka', cakaj(lambda: ('zeton=' + zeton_rogla) in (H.get_attribute('#qr-direktna-povezava', 'href') or ''), 10), H.get_attribute('#qr-direktna-povezava', 'href'))
+        pri('QR: stanje zaščite prikazano', 'Zaščitena povezava' in H.inner_text('#qr-zeton-stanje'))
+        H.click('#btn-zapri-qr')
+        pri('koda strani ne vsebuje gesla', all('EPV2026' not in open(os.path.join(ROOT, f), encoding='utf-8').read() for f in ['terenEPV.html', 'mapeEPV.html', 'nacrtEPV.html', 'js/config.js', 'js/api.js', 'js/app.js', 'js/prijava.js', 'js/qr.js', 'js/nacrt.js']))
+
+        # stara povezava brez žetona: strežnik vpis zavrne, telefon pokaže navodilo, vpis ostane v vrsti
+        ctxS = pripravi_kontekst(browser, geolocation={'latitude': 46.45, 'longitude': 15.45, 'accuracy': 8}, permissions=['geolocation'])
+        S = ctxS.new_page(); spremljaj(S, 'teren-brez-zetona')
+        S.on('dialog', lambda d: d.accept())
+        S.goto(f'{BASE}/terenEPV.html?dogodek=Rogla')
+        S.fill('#imeEnote', 'Brez Zetona')
+        S.click('#gumbOddaja')
+        pri('teren brez žetona: opozorilo o neveljavni povezavi', cakaj(lambda: S.is_visible('#pasicaZeton'), 20))
+        pri('teren brez žetona: nič vpisano v tabelo', not any('Brez Zetona' in str(v[1]) for v in sheet('Lokacije')[1:]))
+        S.goto(teren_url('Rogla'))
+        pri('teren: žeton se umakne iz naslovne vrstice', cakaj(lambda: 'zeton=' not in S.url, 5), S.url)
+        pri('teren: po novi QR kodi se čakajoči vpisi pošljejo', cakaj(lambda: any('Brez Zetona' in str(v[1]) for v in sheet('Lokacije')[1:]), 30))
+        pri('teren: opozorilo izgine', cakaj(lambda: not S.is_visible('#pasicaZeton'), 10))
+
+        # taktična tabla: žive enote
+        T = ctxH.new_page(); spremljaj(T, 'tabla')
+        T.on('dialog', lambda d: d.accept())
+        T.goto(f'{BASE}/nacrtEPV.html?naziv=Rogla')
+        T.check('#zive-vklop')
+        pri('tabla: brez prijave zahteva geslo', T.is_visible('#zive-geslo'))
+        T.fill('#zive-geslo', 'napacno'); T.click('#btn-zive-prijava')
+        pri('tabla: napačno geslo zavrnjeno', cakaj(lambda: 'Napačno geslo' in T.inner_text('#zive-stanje'), 10), T.inner_text('#zive-stanje'))
+        T.fill('#zive-geslo', 'EPV2026'); T.click('#btn-zive-prijava')
+        pri('tabla: dogodek iz EPV izbran sam', cakaj(lambda: T.input_value('#zive-dogodek') == 'Rogla', 15), T.input_value('#zive-dogodek'))
+        pri('tabla: enote s terena so na zemljevidu', cakaj(lambda: 'brez zetona' in T.evaluate("Object.keys(EPVNacrt.zive().enote)"), 15), T.evaluate("Object.keys(EPVNacrt.zive().enote)"))
+        pri('tabla: sistemski zaznamki niso enote', not any('konec' in k for k in T.evaluate("Object.keys(EPVNacrt.zive().enote)")))
+        pri('tabla: žive enote niso del načrta', all(len(sk['elementi']) == 0 for sk in T.evaluate("EPVNacrt.stanje().nacrt.skice")))
+        exec_(enota='GASILEC:Nova Enota:3:1', lat=46.46, lon=15.46, dogodek='Rogla', id='zive1')
+        T.click('#btn-zive-osvezi')
+        pri('tabla: nova pozicija pride ob osvežitvi', cakaj(lambda: 'nova enota' in T.evaluate("Object.keys(EPVNacrt.zive().enote)"), 10))
+        T.uncheck('#zive-vklop')
+        pri('tabla: izklop odstrani enote', T.evaluate("Object.keys(EPVNacrt.zive().enote).length") == 0)
+
+        # zamenjava gesla (na koncu: staro geslo po tem ne velja več)
+        ctxG = pripravi_kontekst(browser)
+        G = ctxG.new_page(); spremljaj(G, 'geslo')
+        odgovori = []
+        G.on('dialog', lambda d: d.accept(odgovori.pop(0)) if d.type == 'prompt' and odgovori else d.accept())
+        G.goto(f'{BASE}/mapeEPV.html')
+        G.fill('#input-geslo', 'napacno'); G.click('#btn-potrdi-geslo')
+        pri('štab: napačno geslo zavrne strežnik', cakaj(lambda: 'Napačno geslo' in G.inner_text('#geslo-napaka'), 10) and G.is_visible('#vstopno-geslo-modal'))
+        G.fill('#input-geslo', 'EPV2026'); G.click('#btn-potrdi-geslo')
+        pri('štab: opozorilo o starem geslu', cakaj(lambda: G.is_visible('#geslo-opozorilo'), 10))
+        odgovori[:] = ['NovoGeslo#2026', 'NovoGeslo#2026']
+        G.click('#geslo-opozorilo')
+        pri('štab: geslo zamenjano, opozorilo izgine', cakaj(lambda: not G.is_visible('#geslo-opozorilo'), 10))
+        pri('strežnik: staro geslo ne velja več', exec_(akcija='pridobiSeznamDogodkov')['status'] == 'error' and exec_(akcija='pridobiSeznamDogodkov', geslo='NovoGeslo#2026')['status'] == 'success')
+        G.reload()
+        pri('štab: po osvežitvi ostane prijavljen z novim geslom', cakaj(lambda: G.evaluate("Array.from(document.querySelectorAll('#select-dogodek option')).some(o => o.value === 'Rogla')"), 15) and not G.is_visible('#geslo-opozorilo'))
+        S.fill('#porocilo', 'Po zamenjavi') if S.query_selector('#porocilo') else None
+        exec_(enota='GASILEC:Brez Zetona:3:1', lat=46.47, lon=15.47, dogodek='Rogla', id='pozamenjavi', zeton=zeton_rogla, geslo='')
+        pri('teren z žetonom deluje tudi po zamenjavi gesla', any(v[6] == 'pozamenjavi' for v in sheet('Lokacije')[1:]))
+
+        for c in (ctxF, ctxH, ctxN, ctxV, ctxVH, ctxS, ctxG):
             c.close()
         browser.close()
 

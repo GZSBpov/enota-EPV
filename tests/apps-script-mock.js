@@ -11,6 +11,7 @@ function ustvari(opcije) {
     const sheeti = {};
     let casovniPas = 'UTC';
     const predpomnilnik = new Map();
+    const lastnosti = {};
     let zaklenjen = false;
     const stanje = { zahtevkov: 0, formuleVSheetu: 0, zakleni: opcije.zakleni || false };
 
@@ -30,6 +31,8 @@ function ustvari(opcije) {
     SheetObj.prototype.getLastRow = function () { return this.vrstice.length; };
     SheetObj.prototype.getMaxRows = function () { return Math.max(1000, this.vrstice.length); };
     SheetObj.prototype.deleteRow = function (n) { this.vrstice.splice(n - 1, 1); };
+    SheetObj.prototype.insertRowsAfter = function () {};
+    SheetObj.prototype.deleteRows = function (n, koliko) { this.vrstice.splice(n - 1, koliko); };
     SheetObj.prototype.getDataRange = function () {
         const self = this;
         return { getValues: function () { return self.vrstice.map(function (r) { return r.slice(); }); } };
@@ -82,6 +85,21 @@ function ustvari(opcije) {
                 };
             }
         },
+        Utilities: {
+            DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' },
+            computeDigest: function (alg, besedilo) { return Array.from(require('crypto').createHash('sha256').update(String(besedilo), 'utf8').digest()).map(function (b) { return b > 127 ? b - 256 : b; }); },
+            sleep: function () {},
+            getUuid: function () { return require('crypto').randomUUID(); }
+        },
+        PropertiesService: {
+            getScriptProperties: function () {
+                return {
+                    getProperty: function (k) { return Object.prototype.hasOwnProperty.call(lastnosti, k) ? lastnosti[k] : null; },
+                    setProperty: function (k, v) { lastnosti[k] = String(v); },
+                    deleteProperty: function (k) { delete lastnosti[k]; }
+                };
+            }
+        },
         CacheService: {
             getScriptCache: function () {
                 return { get: function (k) { return predpomnilnik.get(k) || null; }, put: function (k, v) { predpomnilnik.set(k, v); } };
@@ -96,7 +114,7 @@ function ustvari(opcije) {
     function vJson(izhod) { return JSON.parse(izhod.getContent()); }
 
     return {
-        sheeti: sheeti, stanje: stanje, ss: ss,
+        sheeti: sheeti, stanje: stanje, ss: ss, lastnosti: lastnosti,
         get: function (parametri) { stanje.zahtevkov++; return vJson(sandbox.doGet({ parameter: parametri })); },
         post: function (telo) { stanje.zahtevkov++; return vJson(sandbox.doPost({ postData: { contents: typeof telo === 'string' ? telo : JSON.stringify(telo) } })); },
         pripravi: function () { sandbox.pripraviListe(); },

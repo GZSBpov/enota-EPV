@@ -33,6 +33,7 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 - **Vrstni red**: izbrani element pošlješ »V ospredje« ali »V ozadje«. Ikona v ozadju je pod narisanimi črtami in območji; pri črtah in območjih gumba določata, katero je narisano čez drugo.
 - **Točke črt**: napad, cevovod, pot, dovoz in reševanje se urejajo po točkah enako kot sektor (izberi črto - zadeneš jo tudi s klikom tik ob njej).
 - **Izpis**: skica v izpisu pokaže isti izrez kot na zaslonu, v enakem razmerju ikon do zemljevida; legenda je v treh stolpcih.
+- **Žive enote s terena**: v desnem stolpcu »Žive enote s terena (EPV)« vklopiš prikaz pozicij enot izbranega dogodka (geslo EPV, osveževanje na 15 s). Niso del načrta: ne shranijo se in jih ni v izpisu.
 - **Posadka in poročilo**: pri vozilu vpišeš posadko kot 1 + število gasilcev. Pod vsako skico v izpisu je poročilo o sodelujočih: enote, vozila in člani po enotah ter skupno število sodelujočih (enako v elaboratu za ves načrt). Vozila brez vpisane posadke so označena in niso všteta med člane.
 - **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.
 - **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.
@@ -127,8 +128,8 @@ python3 tests/nacrt.e2e.py      # taktična tabla v Chromiumu
 python3 tests/e2e.py            # Chromium: teren + štab + stara stran V1/ prek simulatorja (potrebuje Playwright)
 ```
 
-## Varnost (namenoma odloženo na konec)
+## Varnost
 
-Zaenkrat enako kot prej: geslo `EPV2026` je v kodi, vpis lokacij in sporočil s terena ne zahteva gesla, repozitorij je javen.
-Ob vpisu se vsa besedila, ki bi jih Sheet razumel kot formulo, zapišejo kot besedilo (to je že vgrajeno). Predlog za zaključek: žeton dogodka v QR kodi,
-ki ga strežnik preveri pri vpisu, in zaseben repozitorij.
+Prva dva koraka zaščite sta narejena: geslo ni več v kodi (preverja ga strežnik, zamenja se v štabu z gumbom 🔑 Geslo), teren pa vpisuje z žetonom dogodka iz QR kode. Uvedba, pozabljeno geslo in preostali koraki: [docs/VARNOST.md](docs/VARNOST.md).
+
+**Vrstni red uvedbe:** najprej nova skripta (`apps-script/Code.gs`, `pripraviListe()`, nova različica uvedbe), šele nato Merge. Po uvedbi takoj zamenjaj staro geslo.

@@ -44,6 +44,7 @@ with sync_playwright() as pw:
     el = lambda: st()['nacrt']['skice'][st()['idxSkice']]['elementi']
     pri('naziv iz povezave EPV', p.input_value('#naziv-nacrta') == 'Vaja Impol')
     pri('pogled iz povezave EPV', st()['nacrt']['skice'][0]['pogled'] == {'lat': 46.4, 'lon': 15.6, 'z': 17}, st()['nacrt']['skice'][0]['pogled'])
+    pri('povezava nazaj na štab EPV', p.get_attribute('#btn-epv', 'href') == 'mapeEPV.html' and p.is_visible('#btn-epv'))
     pri('tri privzete skice', [s['naziv'] for s in st()['nacrt']['skice']] == ['Lokacija', 'Evakuacija', 'Posredovanje'])
     pri('paleta: vsa gasilska vozila + ročno', p.locator('#pal-vozila .pal').count() == 18, p.locator('#pal-vozila .pal').count())
     pri('paleta: druge službe', p.locator('#pal-sluzbe .pal').count() == 5)

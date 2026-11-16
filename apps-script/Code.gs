@@ -23,8 +23,12 @@
 // zaženi pripraviListe() -> Uvedi -> Upravljanje uvedb -> Uredi -> Nova različica; URL ostane enak).
 // ==========================================================================
 
-var PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
-var NAVADNO_GESLO = "EPV2026";
+// GESLO APLIKACIJE ni več zapisano v kodi. Njegova zgoščena vrednost (SHA-256) je v nastavitvah skripte
+// (Script Properties, ključ GESLO_HASH) in se nastavi iz štaba (gumb "Geslo") ali iz menija tabele EPV -> Nastavi geslo.
+// Dokler novo geslo ni nastavljeno, velja staro (spodnja vrednost je zgoščena vrednost starega, javno znanega gesla),
+// zato ga po uvedbi čim prej zamenjaj.
+var STARI_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
+var NAJMANJ_ZNAKOV_GESLA = 8;
 var CASOVNI_PAS = "Europe/Ljubljana";
 
 var GLAVE = {
@@ -34,8 +38,15 @@ var GLAVE = {
   Tocke: ["Cas", "Dogodek", "ID", "Cilj", "Naziv", "Lat", "Lon", "Polmer", "Opomba", "Status", "Ver", "Umaknjeno"],
   Potrditve: ["Cas", "Dogodek", "Enota", "Tip", "Ref"],
   Dogodki: ["dogodek", "tip", "podatki", "dodeljenaEnota"],
-  DogodekGesla: ["Dogodek", "GesloHash", "Cas"]
+  DogodekGesla: ["Dogodek", "GesloHash", "Cas"],
+  Zetoni: ["Dogodek", "Zeton", "Cas"],
+  LokacijeArhiv: ["Čas", "Enota", "Latitude", "Longitude", "Natančnost", "Dogodek", "ID"],
+  ArhivDogodki: ["Dogodek", "Zadnja dejavnost", "Vrstic", "Arhivirano"]
 };
+var ARHIV_PRIVZETO_DNI = 30;
+
+// Akcije, ki jih terenska aplikacija kliče z žetonom dogodka (iz QR kode) namesto z geslom
+var TERENSKE_AKCIJE = { pridobiDodeljeneSektorje: 1, pridobiSporocilaStab: 1, pridobiTocke: 1, potrdiPrejem: 1, pridobiImenaEnot: 1, pridobiSporocila: 1 };
 
 // ---------- pomožne funkcije ----------
 
@@ -82,10 +93,99 @@ function stevilo(v) {
   return isNaN(n) ? null : n;
 }
 
+function sha256Hex(besedilo) {
+  var bajti = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(besedilo), Utilities.Charset.UTF_8);
+  var hex = "";
+  for (var i = 0; i < bajti.length; i++) {
+    var b = bajti[i] < 0 ? bajti[i] + 256 : bajti[i];
+    hex += (b < 16 ? "0" : "") + b.toString(16);
+  }
+  return hex;
+}
+
+function veljavniGesloHash() {
+  return PropertiesService.getScriptProperties().getProperty("GESLO_HASH") || STARI_GESLO_HASH;
+}
+
+function jeGesloPravilno(g) {
+  return !!g && sha256Hex(g) === veljavniGesloHash();
+}
+
 function preveriGeslo(g) {
   if (!g) return "Ni prejetega gesla!";
-  var ok = (String(g).toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase()) || g === NAVADNO_GESLO;
-  return ok ? null : "Napačno geslo!";
+  if (jeGesloPravilno(g)) return null;
+  Utilities.sleep(400); // upočasni ugibanje gesla
+  return "Napačno geslo!";
+}
+
+function shraniNovoGeslo(novo) {
+  novo = String(novo || "");
+  if (novo.length < NAJMANJ_ZNAKOV_GESLA) return "Novo geslo mora imeti vsaj " + NAJMANJ_ZNAKOV_GESLA + " znakov.";
+  if (sha256Hex(novo) === STARI_GESLO_HASH) return "To je staro, javno znano geslo. Izberi drugo.";
+  PropertiesService.getScriptProperties().setProperty("GESLO_HASH", sha256Hex(novo));
+  return null;
+}
+
+// ---------- žetoni dogodkov (QR koda za teren) ----------
+
+/** Veljavni žeton dogodka ali "" (če za dogodek še ni bil izdan). */
+function zetonZaDogodek(dogodek) {
+  dogodek = String(dogodek || "");
+  if (!dogodek) return "";
+  var cache = CacheService.getScriptCache();
+  var k = "zt:" + dogodek;
+  var izCache = cache.get(k);
+  if (izCache !== null && izCache !== undefined) return izCache === "-" ? "" : izCache;
+  var v = vrstice("Zetoni");
+  var zeton = "";
+  for (var i = 0; i < v.length; i++) if (String(v[i][0]) === dogodek) zeton = String(v[i][1] || "");
+  cache.put(k, zeton || "-", 300);
+  return zeton;
+}
+
+function jeZetonVeljaven(dogodek, zeton) {
+  var pravi = zetonZaDogodek(dogodek);
+  return !!pravi && !!zeton && String(zeton) === pravi;
+}
+
+/** akcija=zetonDogodka (z geslom): vrne žeton dogodka; ustvari ga, če ga še ni, ali zamenja z nov=1 (stara QR koda preneha veljati). */
+function zetonDogodka(p) {
+  var dogodek = String(p.dogodek || "").trim();
+  if (!dogodek || dogodek === "novy") return napaka("Manjka dogodek.");
+  return podZaklepom(function () {
+    var sheet = pridobiSheet("Zetoni");
+    var podatki = sheet.getDataRange().getValues();
+    var vrsta = -1;
+    for (var i = 1; i < podatki.length; i++) if (String(podatki[i][0]) === dogodek) vrsta = i + 1;
+    if (vrsta > 0 && p.nov !== "1" && podatki[vrsta - 1][1]) return vrniJson({ status: "success", zeton: String(podatki[vrsta - 1][1]), nov: false });
+    var zeton = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "").slice(0, 24);
+    if (vrsta > 0) sheet.getRange(vrsta, 2, 1, 2).setValues([[zeton, new Date()]]);
+    else sheet.appendRow([varno(dogodek), zeton, new Date()]);
+    CacheService.getScriptCache().put("zt:" + dogodek, zeton, 300);
+    return vrniJson({ status: "success", zeton: zeton, nov: true });
+  });
+}
+
+function strogaZascita() {
+  return PropertiesService.getScriptProperties().getProperty("STROGA_ZASCITA") === "1";
+}
+
+/**
+ * Ali sme ta zahteva vpisati pozicijo/sporočilo za dogodek?
+ *  - dogodek z izdanim žetonom: samo s pravim žetonom (ali z geslom - štab)
+ *  - dogodek brez žetona: dovoljeno (stare QR kode), razen če je vklopljena stroga zaščita
+ * Vrne null ali odgovor z napako (koda "zeton" - terenska aplikacija pokaže navodilo za novo QR kodo).
+ */
+function preveriVpis(p) {
+  var dogodek = String(p.dogodek || "");
+  if (p.geslo && jeGesloPravilno(p.geslo)) return null;
+  var pravi = zetonZaDogodek(dogodek);
+  if (pravi) {
+    if (p.zeton && String(p.zeton) === pravi) return null;
+    return vrniJson({ status: "error", koda: "zeton", message: "Vpis zavrnjen: povezava ni veljavna. Skeniraj novo QR kodo štaba." });
+  }
+  if (strogaZascita()) return vrniJson({ status: "error", koda: "zeton", message: "Vpis zavrnjen: dogodek nima veljavne QR kode štaba." });
+  return null;
 }
 
 /** Izvede funkcijo pod zaklepom; če zaklepa ni mogoče dobiti, vrne napako (naprava ponovi poskus). */
@@ -153,14 +253,20 @@ function preveriZascitoDogodka(imeDogodka, podanGesloHash) {
 function doGet(e) {
   var p = (e && e.parameter) ? e.parameter : {};
 
-  // 1) Vpis lokacije (in neobvezno sporočila) s terena - brez gesla (kot V1)
-  if (p.enota && p.lat && p.lon) return vpisLokacije(p);
-  // 1b) Sporočilo BREZ lokacije (npr. SOS, ko telefon nima GPS signala) - sporočilo mora priti do štaba vseeno
-  if (p.enota && p.sporocilo) return vpisSporocilaBrezLokacije(p);
+  // 1) Vpis lokacije (in neobvezno sporočila) s terena: z žetonom dogodka iz QR kode (glej preveriVpis)
+  if (p.enota && ((p.lat && p.lon) || p.sporocilo)) {
+    var zavrnitev = preveriVpis(p);
+    if (zavrnitev) return zavrnitev;
+    // 1b) Sporočilo BREZ lokacije (npr. SOS, ko telefon nima GPS signala) mora priti do štaba vseeno
+    return (p.lat && p.lon) ? vpisLokacije(p) : vpisSporocilaBrezLokacije(p);
+  }
 
-  // 2) Vse ostalo zahteva geslo aplikacije
-  var gesloNapaka = preveriGeslo(p.geslo);
-  if (gesloNapaka) return napaka(gesloNapaka);
+  // 2) Terenske akcije: zadošča veljaven žeton dogodka; vse ostalo zahteva geslo aplikacije
+  var zZetonom = TERENSKE_AKCIJE[p.akcija] === 1 && jeZetonVeljaven(p.dogodek, p.zeton);
+  if (!zZetonom) {
+    var gesloNapaka = preveriGeslo(p.geslo);
+    if (gesloNapaka) return napaka(gesloNapaka);
+  }
 
   switch (p.akcija) {
     case "pridobiSeznamDogodkov": return pridobiSeznamDogodkov(p);
@@ -177,6 +283,12 @@ function doGet(e) {
     case "potrdiPrejem": return potrdiPrejem(p);
     case "pridobiPotrditve": return pridobiPotrditve(p);
     case "shraniGesloDogodka": return shraniGesloDogodka(p);
+    case "preveriGeslo": return vrniJson({ status: "success", privzetoGeslo: veljavniGesloHash() === STARI_GESLO_HASH });
+    case "zamenjajGeslo": {
+      var napakaGesla = shraniNovoGeslo(p.novoGeslo);
+      return napakaGesla ? napaka(napakaGesla) : vrniJson({ status: "success" });
+    }
+    case "zetonDogodka": return zetonDogodka(p);
     case "preveriGesloDogodka": {
       var r = preveriZascitoDogodka(p.dogodek || "", p.gesloHash || "");
       return vrniJson({ status: "success", zascitena: r.zascitena, ok: r.ok });
@@ -257,6 +369,7 @@ function pridobiSeznamDogodkov(p) {
   vrstice("Dogodki").forEach(function (v) { zabelezi(v[0], 0); });
   vrstice("Lokacije").forEach(function (v) { zabelezi(v[5], vMs(v[0])); });
   vrstice("Sporocila").forEach(function (v) { zabelezi(v[2], vMs(v[0])); });
+  vrstice("ArhivDogodki").forEach(function (v) { zabelezi(v[0], vMs(v[1])); }); // arhivirani dogodki ostanejo na seznamu
   // stari odjemalec (V1/) pričakuje samo imena; nov doda oblika=objekt in dobi tudi čas zadnje dejavnosti
   if (!p || p.oblika !== "objekt") return vrniJson({ status: "success", data: Object.keys(zadnji) });
   var seznam = Object.keys(zadnji).map(function (ime) {
@@ -274,7 +387,7 @@ function pridobiSeznamDogodkov(p) {
 function pridobiLokacije(p) {
   var dogodek = String(p.dogodek || "");
   if (!dogodek || dogodek === "novy") return vrniJson({ status: "success", data: [], kazalec: 0 });
-  var v = vrstice("Lokacije");
+  var v = lokacijeDogodka(dogodek);
   var kazalec = parseInt(p.kazalec, 10) || 0;
   if (kazalec > v.length || kazalec < 0) kazalec = 0; // list je bil medtem skrajšan - začni znova
   var rezultat = [];
@@ -289,7 +402,7 @@ function pridobiImenaEnot(p) {
   var dogodek = String(p.dogodek || "");
   var videna = {};
   var seznam = [];
-  var v = vrstice("Lokacije");
+  var v = dogodek ? lokacijeDogodka(dogodek) : vrstice("Lokacije");
   for (var i = v.length - 1; i >= 0; i--) { // od najnovejše
     if (dogodek && String(v[i][5]) !== dogodek) continue;
     var deli = String(v[i][1] || "").split(":");
@@ -586,10 +699,122 @@ function pripraviListe() {
   Object.keys(GLAVE).forEach(function (ime) {
     var sheet = pridobiSheet(ime);
     sheet.getRange(1, 1, 1, GLAVE[ime].length).setValues([GLAVE[ime]]); // dopolni glavo (npr. stolpec ID)
-    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3] }[ime] || [];
+    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3], Zetoni: [3], LokacijeArhiv: [1], ArhivDogodki: [2, 4] }[ime] || [];
     casStolpci.forEach(function (c) {
       sheet.getRange(2, c, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
     });
   });
   Logger.log("Liste pripravljene. Časovni pas tabele: " + ss.getSpreadsheetTimeZone());
+}
+
+// ---------- arhiv pozicij starih dogodkov ----------
+// List Lokacije raste z vsako oddano pozicijo in ga strežnik bere ob vsakem osveževanju. Arhiviranje prestavi
+// pozicije starih dogodkov v list LokacijeArhiv; tekoči dogodki zato berejo krajši list. Arhiviran dogodek ostane
+// na seznamu in se odpre kot prej (pot, poročilo) - strežnik ga prebere iz arhiva. Sporočila, točke, sektorji in
+// potrditve se ne selijo (teh je malo).
+
+/** Pozicije za branje enega dogodka: živi list; pri arhiviranem dogodku pred njim še njegove vrstice iz arhiva. */
+function lokacijeDogodka(dogodek) {
+  var zive = vrstice("Lokacije");
+  var arhivirano = vrstice("ArhivDogodki").some(function (v) { return String(v[0]) === dogodek; });
+  if (!arhivirano) return zive;
+  var izArhiva = vrstice("LokacijeArhiv").filter(function (v) { return String(v[5]) === dogodek; });
+  return izArhiva.concat(zive);
+}
+
+/**
+ * Prestavi v arhiv pozicije dogodkov, ki nimajo nobene dejavnosti zadnjih "dni" dni.
+ * Vrstni red je varen: najprej zapis v arhiv, šele nato brisanje iz lista Lokacije - če se izvajanje vmes
+ * prekine, so vrstice kvečjemu na obeh listih, nikoli izgubljene.
+ */
+function arhivirajStareDogodke(dni) {
+  dni = stevilo(dni);
+  if (dni === null || dni < 1) dni = ARHIV_PRIVZETO_DNI;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return { ok: false, sporocilo: "Strežnik je zaseden, poskusi znova." };
+  try {
+    var sheet = pridobiSheet("Lokacije");
+    var vse = sheet.getDataRange().getValues();
+    if (vse.length < 2) return { ok: true, dogodkov: 0, vrstic: 0, imena: [] };
+    var meja = new Date().getTime() - dni * 86400000;
+    var zadnji = {};
+    for (var i = 1; i < vse.length; i++) {
+      var ime = String(vse[i][5] || "");
+      var ms = vMs(vse[i][0]);
+      if (zadnji[ime] === undefined || ms > zadnji[ime]) zadnji[ime] = ms;
+    }
+    vrstice("Sporocila").forEach(function (v) { var d = String(v[2] || ""); if (zadnji[d] !== undefined && vMs(v[0]) > zadnji[d]) zadnji[d] = vMs(v[0]); });
+    var stari = {};
+    Object.keys(zadnji).forEach(function (d) { if (d && zadnji[d] > 0 && zadnji[d] < meja) stari[d] = 0; });
+    if (!Object.keys(stari).length) return { ok: true, dogodkov: 0, vrstic: 0, imena: [] };
+
+    function zaZapis(vrsta) { // besedila spet zavarujemo, da jih Sheet ne razume kot formule
+      var o = [];
+      for (var j = 0; j < 7; j++) o.push(typeof vrsta[j] === "string" ? varno(vrsta[j]) : (vrsta[j] === undefined ? "" : vrsta[j]));
+      return o;
+    }
+    var vArhiv = [], ostane = [];
+    for (var k = 1; k < vse.length; k++) {
+      var dog = String(vse[k][5] || "");
+      if (stari[dog] !== undefined) { vArhiv.push(zaZapis(vse[k])); stari[dog]++; } else ostane.push(zaZapis(vse[k]));
+    }
+    // 1) zapis v arhiv
+    var arhiv = pridobiSheet("LokacijeArhiv");
+    var potrebnih = arhiv.getLastRow() + vArhiv.length;
+    if (potrebnih > arhiv.getMaxRows()) arhiv.insertRowsAfter(arhiv.getMaxRows(), potrebnih - arhiv.getMaxRows());
+    arhiv.getRange(arhiv.getLastRow() + 1, 1, vArhiv.length, 7).setValues(vArhiv);
+    arhiv.getRange(2, 1, Math.max(1, arhiv.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    // 2) seznam arhiviranih dogodkov
+    var indeks = pridobiSheet("ArhivDogodki");
+    var zdaj = new Date();
+    Object.keys(stari).forEach(function (d) { indeks.appendRow([varno(d), new Date(zadnji[d]), stari[d], zdaj]); });
+    // 3) živi list: preostale vrstice na vrh, odvečne vrstice na dnu izbrisane
+    if (ostane.length) sheet.getRange(2, 1, ostane.length, 7).setValues(ostane);
+    sheet.deleteRows(ostane.length + 2, vArhiv.length);
+    return { ok: true, dogodkov: Object.keys(stari).length, vrstic: vArhiv.length, imena: Object.keys(stari) };
+  } catch (err) {
+    return { ok: false, sporocilo: String(err) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------- meni v tabeli (Razširitve -> Apps Script je vezan na tabelo): EPV ----------
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu("EPV")
+    .addItem("Nastavi geslo aplikacije", "meniNastaviGeslo")
+    .addItem("Arhiviraj pozicije starih dogodkov", "meniArhiviraj")
+    .addItem("Stroga zaščita vpisov: vklopi", "meniVklopiStrogo")
+    .addItem("Stroga zaščita vpisov: izklopi", "meniIzklopiStrogo")
+    .addToUi();
+}
+
+/** Nastavi novo geslo aplikacije (tudi če je staro pozabljeno) - dostopno samo urednikom tabele. */
+function meniNastaviGeslo() {
+  var ui = SpreadsheetApp.getUi();
+  var odgovor = ui.prompt("Geslo aplikacije EPV", "Vpiši novo geslo (vsaj " + NAJMANJ_ZNAKOV_GESLA + " znakov):", ui.ButtonSet.OK_CANCEL);
+  if (odgovor.getSelectedButton() !== ui.Button.OK) return;
+  var napakaGesla = shraniNovoGeslo(odgovor.getResponseText());
+  ui.alert(napakaGesla || "Geslo je nastavljeno. Staro geslo ne velja več.");
+}
+
+/** Stroga zaščita: vpis pozicij in sporočil samo z QR kodo štaba (žetonom) - tudi za dogodke brez izdanega žetona. */
+function meniVklopiStrogo() {
+  PropertiesService.getScriptProperties().setProperty("STROGA_ZASCITA", "1");
+  SpreadsheetApp.getUi().alert("Stroga zaščita je vklopljena: teren lahko vpisuje samo prek QR kode štaba.");
+}
+function meniIzklopiStrogo() {
+  PropertiesService.getScriptProperties().deleteProperty("STROGA_ZASCITA");
+  SpreadsheetApp.getUi().alert("Stroga zaščita je izklopljena.");
+}
+
+/** Arhiviranje pozicij starih dogodkov (najprej naredi kopijo tabele: Datoteka -> Ustvari kopijo). */
+function meniArhiviraj() {
+  var ui = SpreadsheetApp.getUi();
+  var odgovor = ui.prompt("Arhiviranje pozicij", "V list LokacijeArhiv prestavim pozicije dogodkov brez dejavnosti zadnjih toliko dni:", ui.ButtonSet.OK_CANCEL);
+  if (odgovor.getSelectedButton() !== ui.Button.OK) return;
+  var r = arhivirajStareDogodke(odgovor.getResponseText() || ARHIV_PRIVZETO_DNI);
+  if (!r.ok) { ui.alert("Arhiviranje ni uspelo: " + r.sporocilo); return; }
+  ui.alert(r.dogodkov ? "Arhivirano: " + r.dogodkov + " dogodkov, " + r.vrstic + " pozicij.\n\n" + r.imena.join(", ") : "Ni dogodkov, starejših od izbrane meje.");
 }
