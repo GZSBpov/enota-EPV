@@ -112,15 +112,20 @@
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [60, 76], iconAnchor: [30, 28] });
     }
+    /** Vsebina znaka: lastna risba (svg) ali črka/simbol. */
+    function vsebinaZnaka(z) {
+        return z.svg ? '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + z.svg + '</svg>' : esc(z.znak);
+    }
     function ikonaZnaka(e, izbran, brezNapisa) {
         const z = M.ZNAKI[e.znak];
+        const vel = M.omejiVelikostZnaka(e.vel === undefined ? 1 : e.vel);
         const napis = brezNapisa ? '' : (e.opis || z.napis || '');
-        const html = '<div class="nz' + (izbran ? ' izbran' : '') + '"><div class="nz-telo' + (z.krog ? ' krog' : '') + (z.prazen ? ' prazen' : '') + '" style="background:' + z.barva + ';' + (z.vrti ? 'transform:rotate(' + ((e.kot || 0) - 90) + 'deg);' : '') + '">' + esc(z.znak) + '</div>' +
+        const html = '<div class="nz' + (izbran ? ' izbran' : '') + '"><div class="nz-telo' + (z.krog ? ' krog' : '') + (z.kvadrat ? ' kvadrat' : '') + (z.prazen ? ' prazen' : '') + (z.prosto ? ' prosto' : '') + '" style="background:' + z.barva + ';' + ((z.vrti || vel !== 1) ? 'transform:' + (z.vrti ? 'rotate(' + ((e.kot || 0) - 90) + 'deg) ' : '') + 'scale(' + vel + ');' : '') + (vel > 1 ? 'margin-bottom:' + Math.round((vel - 1) * 17) + 'px;' : '') + '">' + vsebinaZnaka(z) + '</div>' +
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [40, 56], iconAnchor: [20, 19] });
     }
     function ikonaBesedila(e, izbran) {
-        return L.divIcon({ className: 'nacrt-ikona', html: '<span class="nb' + (izbran ? ' izbran' : '') + '">' + esc(e.opis || 'Besedilo') + '</span>', iconSize: [0, 0], iconAnchor: [0, 0] });
+        return L.divIcon({ className: 'nacrt-ikona', html: '<span class="nb' + (izbran ? ' izbran' : '') + (e.sirina ? ' zalomljen' : '') + '" style="' + (e.velikost ? 'font-size:' + e.velikost + 'px;' : '') + (e.sirina ? 'width:' + e.sirina + 'px;' : '') + '">' + esc(e.opis || 'Besedilo') + '</span>', iconSize: [0, 0], iconAnchor: [0, 0] });
     }
     function sredina(tocke) {
         let a = 0, b = 0;
@@ -350,6 +355,14 @@
             '<text x="32" y="10" font-size="12">S</text>' +
             '<text x="50" y="37" font-size="8">V</text><text x="14" y="37" font-size="8">Z</text><text x="32" y="63.5" font-size="8">J</text></g></svg>';
     }
+    // ---------- velikost ikon in napisov na skici ----------
+    function osveziMerilo() {
+        const m = M.omejiMerilo(skica().merilo === undefined ? 1 : skica().merilo);
+        $('zemljevid').style.setProperty('--nm', m);
+        $('merilo-skice').value = Math.round(m * 100);
+        $('merilo-vrednost').textContent = Math.round(m * 100) + ' %';
+    }
+
     function osveziSever() {
         const el = $('sever');
         const viden = !!(nacrt && nacrt.sever);
@@ -454,6 +467,37 @@
             .then(function (r) { return r.ok ? r.json() : { status: 'error', omrezje: true }; })
             .catch(function () { return { status: 'error', omrezje: true }; });
     }
+    /** Polje v lastnostih vozila: povezava z enoto, ki oddaja iz terenske aplikacije (število članov pride od tam). */
+    function zivePoljeVozila(e) {
+        const imena = Object.keys(zive.enote).map(function (k) { return zive.enote[k]; });
+        if (!e.epvEnota && !(zive.vklop && imena.length)) return '';
+        const kljuc = String(e.epvEnota || '').toLowerCase();
+        const znana = zive.enote[kljuc];
+        let moznosti = '<option value="">- ni povezano -</option>' + imena.map(function (en) {
+            return '<option value="' + esc(en.ime) + '"' + (en.ime.toLowerCase() === kljuc ? ' selected' : '') + '>' + esc(en.ime) + (en.clanov ? ' (' + en.clanov + ' čl.)' : '') + '</option>';
+        }).join('');
+        if (e.epvEnota && !znana) moznosti += '<option value="' + esc(e.epvEnota) + '" selected>' + esc(e.epvEnota) + ' (ne oddaja)</option>';
+        return '<label>Enota s terena (EPV)</label><select data-epv="1">' + moznosti + '</select>' +
+            '<div class="namig" style="margin-top:4px;">' + (e.epvEnota ? (znana && znana.clanov ? 'Posadka se vpisuje iz terenske aplikacije: ' + znana.clanov + ' članov (1 + ' + (znana.clanov - 1) + ').' : 'Enota števila članov (še) ni sporočila – posadko vpiši ročno.') : 'Povezano vozilo dobi število članov, ki ga enota vpiše na telefonu.') + '</div>';
+    }
+    /** Povezanim vozilom vpiše posadko iz terenskih podatkov. Če je na eno enoto vezanih več vozil iste skice, dobi člane prvo (po št. prihoda). Vrne true ob spremembi. */
+    function zivePoveziPosadke() {
+        let spremenjeno = false;
+        nacrt.skice.forEach(function (sk) {
+            const obdelane = {};
+            sk.elementi.filter(function (e) { return e.vrsta === 'vozilo' && e.epvEnota; })
+                .sort(function (a, b) { return (parseInt(a.st, 10) || 999) - (parseInt(b.st, 10) || 999); })
+                .forEach(function (e) {
+                    const k = String(e.epvEnota).toLowerCase();
+                    const en = zive.enote[k];
+                    if (!en || !en.clanov || obdelane[k]) return;
+                    obdelane[k] = true;
+                    const posadka = Math.min(60, en.clanov - 1);
+                    if (M.steviloPosadke(e) !== posadka) { e.posadka = posadka; spremenjeno = true; }
+                });
+        });
+        return spremenjeno;
+    }
     function ziveNarisi() {
         if (!zive.sloj) return;
         zive.sloj.clearLayers();
@@ -462,7 +506,7 @@
             const e = zive.enote[k];
             const stara = zdaj - e.ms > ZIVE_STARO_MS;
             const ura = new Date(e.ms).toLocaleTimeString('sl-SI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Ljubljana' });
-            const m = L.marker([e.lat, e.lon], { interactive: false, zIndexOffset: 50000000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nze' + (stara ? ' stara' : '') + '"><span class="nze-pika"></span><span class="nze-napis">' + esc(e.ime) + ' · ' + ura + '</span></div>', iconSize: [26, 26], iconAnchor: [13, 13] }) });
+            const m = L.marker([e.lat, e.lon], { interactive: false, zIndexOffset: 50000000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nze' + (stara ? ' stara' : '') + '"><span class="nze-pika"></span><span class="nze-napis">' + esc(e.ime) + (e.clanov ? ' · ' + e.clanov + ' čl.' : '') + ' · ' + ura + '</span></div>', iconSize: [26, 26], iconAnchor: [13, 13] }) });
             m.zivaEnota = e.ime;
             zive.sloj.addLayer(m);
         });
@@ -487,10 +531,14 @@
                 const lat = parseFloat(r.lat), lon = parseFloat(r.lon), ms = Date.parse(r.cas);
                 if (!ime || !isFinite(lat) || !isFinite(lon)) return;
                 const k = ime.toLowerCase();
-                if (!zive.enote[k] || !(ms < zive.enote[k].ms)) zive.enote[k] = { ime: ime, lat: lat, lon: lon, ms: isFinite(ms) ? ms : Date.now() };
+                const clanov = parseInt(deli[2], 10), vozil = parseInt(deli[3], 10);
+                if (!zive.enote[k] || !(ms < zive.enote[k].ms)) zive.enote[k] = { ime: ime, lat: lat, lon: lon, ms: isFinite(ms) ? ms : Date.now(), clanov: clanov > 0 ? clanov : 0, vozil: vozil > 0 ? vozil : 0 };
             });
             if (typeof o.kazalec === 'number') zive.kazalec = o.kazalec;
             ziveNarisi();
+            if (zivePoveziPosadke()) { samodejnoShrani(); osveziZemljevid(); osveziSeznamVozil(); }
+            // lastnosti izbranega vozila osvežimo samo, če uporabnik vanje ravno ne piše
+            if (izbranId && !$('lastnosti').contains(document.activeElement)) osveziLastnosti();
             const n = Object.keys(zive.enote).length;
             const aktivnih = Object.keys(zive.enote).filter(function (k) { return Date.now() - zive.enote[k].ms <= ZIVE_STARO_MS; }).length;
             ziveStanje(n ? 'Enot: ' + n + ' (oddaja: ' + aktivnih + ') · osveženo ' + new Date().toLocaleTimeString('sl-SI') : 'Za ta dogodek še ni pozicij.', false);
@@ -697,7 +745,7 @@
         });
         Object.keys(M.ZNAKI).forEach(function (k) {
             const z = M.ZNAKI[k];
-            $('pal-znaki').appendChild(gumbPalete('<span class="pal-znak" style="background:' + z.barva + ';' + (z.krog ? 'border-radius:50%;' : '') + (z.prazen ? 'border:2px dashed #fff;' : '') + '">' + esc(z.znak) + '</span><small>' + esc(z.naziv) + '</small>', { kljuc: 'z:' + k, vrsta: 'znak', znak: k }, z.naziv));
+            $('pal-znaki').appendChild(gumbPalete('<span class="pal-znak" style="background:' + z.barva + ';' + (z.krog ? 'border-radius:50%;' : '') + (z.kvadrat ? 'border-radius:2px;' : '') + (z.prazen ? 'border:2px dashed #fff;' : '') + '">' + vsebinaZnaka(z) + '</span><small>' + esc(z.naziv) + '</small>', { kljuc: 'z:' + k, vrsta: 'znak', znak: k }, z.naziv));
         });
         Object.keys(M.CRTE).forEach(function (k) {
             const c = M.CRTE[k];
@@ -820,12 +868,15 @@
             h += '<datalist id="dl-tipi">' + M.TIPI_VOZIL.map(function (v) { return '<option value="' + esc(v.tip) + '">'; }).join('') + '</datalist>';
             h += '<label>Služba (barva)</label><select data-k="sluzba">' + Object.keys(M.SLUZBE).map(function (k) { return '<option value="' + k + '"' + (k === e.sluzba ? ' selected' : '') + '>' + esc(M.SLUZBE[k].naziv) + '</option>'; }).join('') + '</select>';
             h += '<label>Posadka (voznik + število gasilcev)</label><div class="vrstica"><b style="white-space:nowrap;font-size:17px;">1 +</b><input type="number" data-k="posadka" min="0" max="60" step="1" inputmode="numeric" placeholder="npr. 5" value="' + esc(e.posadka === undefined || e.posadka === null ? '' : e.posadka) + '"></div>';
+            h += zivePoljeVozila(e);
             h += polje('Naloga / opomba', 'opis', e.opis);
             h += kot;
             if (M.imaRoko(e.oblika || oblikaZaTip(e.tip, e.sluzba))) h += '<label>' + ((e.oblika || oblikaZaTip(e.tip, e.sluzba)) === 'lestev' ? 'Smer lestvenika' : 'Smer roke / dvigala') + '</label><div class="gumbi-kot"><button type="button" data-roka="-45">⟲ 45°</button><button type="button" data-roka="-15">⟲ 15°</button><button type="button" data-roka="15">15° ⟳</button><button type="button" data-roka="45">45° ⟳</button></div>';
         } else if (e.vrsta === 'znak') {
             h += '<div><b>' + esc(M.ZNAKI[e.znak].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis);
             if (M.ZNAKI[e.znak].vrti) h += kot;
+            h += '<label>Velikost znaka: <b>' + Math.round(M.omejiVelikostZnaka(e.vel === undefined ? 1 : e.vel) * 100) + ' %</b></label><div class="gumbi-bes"><button type="button" data-vel="-0.2">− manjši</button><button type="button" data-vel="0.2">večji +</button><button type="button" data-vel="0">običajna</button></div>' +
+                (e.znak === 'pozar' ? '<div class="namig">Večji znak za večji obseg požara.</div>' : e.znak === 'veter' ? '<div class="namig">Puščica kaže, kam veter piha. Večji znak za močnejši veter.</div>' : '');
         } else if (e.vrsta === 'crta') {
             const trenutnaBarva = e.barva || M.CRTE[e.slog].barva;
             h += '<div><b>' + esc(M.CRTE[e.slog].naziv) + '</b></div>' + polje('Napis', 'opis', e.opis) +
@@ -835,7 +886,10 @@
         } else if (e.vrsta === 'krog') {
             h += polje('Napis', 'opis', e.opis) + polje('Polmer (m)', 'r', e.r, { tip: 'number', atributi: ' min="5" step="5"' }) + '<div class="namig">Središče premakneš z vlečenjem ročice ✥ na zemljevidu.</div>';
         } else if (e.vrsta === 'besedilo') {
-            h += polje('Besedilo', 'opis', e.opis);
+            h += '<label>Besedilo</label><textarea data-k="opis" rows="3" autocomplete="off" style="width:100%; box-sizing:border-box; resize:vertical;">' + esc(e.opis) + '</textarea>' +
+                '<label>Pisava: <b>' + (e.velikost || 13) + ' px</b></label><div class="gumbi-bes"><button type="button" data-bes="vel-">A −</button><button type="button" data-bes="vel+">A +</button><button type="button" data-bes="vel0">običajna</button></div>' +
+                '<label>Širina okvirja: <b>' + (e.sirina ? e.sirina + ' px' : 'po besedilu') + '</b></label><div class="gumbi-bes"><button type="button" data-bes="sir-">◀ ožje</button><button type="button" data-bes="sir+">širše ▶</button><button type="button" data-bes="sir0">po besedilu</button></div>' +
+                '<div class="namig">Pri nastavljeni širini se besedilo samo zalomi v več vrstic. Novo vrstico narediš tudi z Enter.</div>';
         }
         h += '<label>Vrstni red</label><div class="vrstica"><button type="button" id="btn-el-ospredje" style="flex:1;">⬆ V ospredje</button><button type="button" id="btn-el-ozadje" style="flex:1;">⬇ V ozadje</button></div>' +
             '<div class="namig" style="margin-top:4px;">' + (e.plast === 'ozadje' ? 'Ikona je v ozadju: pod črtami in območji.' : (e.vrsta === 'vozilo' || e.vrsta === 'znak' || e.vrsta === 'besedilo') ? 'V ozadju je ikona pod narisanimi črtami in območji.' : 'Določa, katera črta ali območje je narisano čez drugo.') + '</div>';
@@ -869,6 +923,33 @@
                 e.kot = (((e.kot || 0) + d) % 360 + 360) % 360;
                 samodejnoShrani(); osveziZemljevid();
             });
+        });
+        Array.prototype.forEach.call(el.querySelectorAll('[data-vel]'), function (b) {
+            b.addEventListener('click', function () {
+                zapomni();
+                const d = parseFloat(b.dataset.vel);
+                const nova = d === 0 ? 1 : M.omejiVelikostZnaka((e.vel === undefined ? 1 : e.vel) + d);
+                if (nova === 1) delete e.vel; else e.vel = nova;
+                samodejnoShrani(); osveziZemljevid(); osveziLastnosti();
+            });
+        });
+        Array.prototype.forEach.call(el.querySelectorAll('[data-bes]'), function (b) {
+            b.addEventListener('click', function () {
+                zapomni();
+                const k = b.dataset.bes;
+                if (k === 'vel0') delete e.velikost;
+                else if (k === 'vel-' || k === 'vel+') e.velikost = Math.max(9, Math.min(41, (e.velikost || 13) + (k === 'vel+' ? 2 : -2)));
+                else if (k === 'sir0') delete e.sirina;
+                else e.sirina = Math.max(60, Math.min(600, (e.sirina || 180) + (k === 'sir+' ? 20 : -20)));
+                samodejnoShrani(); osveziZemljevid(); osveziLastnosti();
+            });
+        });
+        const izbiraEpv = el.querySelector('[data-epv]');
+        if (izbiraEpv) izbiraEpv.addEventListener('change', function () {
+            zapomni();
+            if (izbiraEpv.value) e.epvEnota = izbiraEpv.value; else delete e.epvEnota;
+            zivePoveziPosadke();
+            samodejnoShrani(); osveziZemljevid(); osveziSeznamVozil(); osveziLastnosti();
         });
         Array.prototype.forEach.call(el.querySelectorAll('[data-roka]'), function (b) {
             b.addEventListener('click', function () {
@@ -973,6 +1054,7 @@
         $('naziv-nacrta').value = nacrt.naziv;
         $('napisi-vidni').checked = nacrt.napisi !== false;
         osveziSever();
+        osveziMerilo();
         document.title = 'EPV Načrt - ' + nacrt.naziv;
         if (tudiPogled) {
             const p = skica().pogled;
@@ -1077,7 +1159,7 @@
             const kljuc = z.prazen ? 'prazen:' + (e.opis || '') : e.znak;
             if (znaki[kljuc]) return;
             znaki[kljuc] = true;
-            dodaj('<span style="display:inline-block;width:17px;height:17px;line-height:17px;border-radius:' + (z.krog ? '50%' : '3px') + ';background:' + z.barva + ';color:#fff;font-size:10px;font-weight:bold;text-align:center;">' + esc(z.znak) + '</span>', z.prazen ? (e.opis || 'Znak') : z.naziv);
+            dodaj('<span style="display:inline-block;width:17px;height:17px;line-height:17px;border-radius:' + (z.krog ? '50%' : z.kvadrat ? '1px' : '3px') + ';background:' + z.barva + ';color:#fff;font-size:10px;font-weight:bold;text-align:center;vertical-align:middle;">' + (z.svg ? '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:15px;height:15px;margin:1px;display:block;">' + z.svg + '</svg>' : esc(z.znak)) + '</span>', z.prazen ? (e.opis || 'Znak') : z.naziv);
         });
         const crte = {};
         sk.elementi.forEach(function (e) {
@@ -1201,23 +1283,7 @@
         const visinaIzrisa = Math.round(sirinaZaslona * 125 / 180);
         const merilo = 680.3 / sirinaZaslona;
         const zemljevidi = [];
-        const cakanja = nacrt.skice.map(function (s, i) {
-            const okvir = $('tisk-z-' + i);
-            okvir.style.width = sirinaZaslona + 'px'; okvir.style.height = visinaIzrisa + 'px'; okvir.style.transform = 'scale(' + merilo + ')';
-            const m = L.map('tisk-z-' + i, { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, zoomSnap: 0.25, fadeAnimation: false, zoomAnimation: false });
-            zemljevidi.push(m);
-            m.createPane('epvOzadje').style.zIndex = 350;
-            const plast = ustvariPodlago(trenutnaPodlaga).addTo(m);
-            const meje = mejeSkice(s);
-            if (s.pogled && s.pogled.meje) m.fitBounds(s.pogled.meje, { padding: [0, 0] });
-            else if (s.pogled) m.setView([s.pogled.lat, s.pogled.lon], s.pogled.z);
-            else if (meje) m.fitBounds(meje, { padding: [30, 30], maxZoom: 18 });
-            else { const p = trenutniPogled(); m.setView([p.lat, p.lon], p.z); }
-            narisiOsnovo(L.layerGroup().addTo(m), false);
-            const g = L.layerGroup().addTo(m);
-            narisi(s, g, m, false);
-            return new Promise(function (resolve) { plast.once('load', resolve); });
-        });
+        const cakanja = nacrt.skice.map(function (s, i) { return tiskZemljevid(s, 'tisk-z-' + i, zemljevidi, false); });
         const najvec = new Promise(function (resolve) { setTimeout(resolve, window.EPV_TISK_CAKAJ_MS || 6000); });
         Promise.race([Promise.all(cakanja), najvec]).then(function () {
             setTimeout(function () {
@@ -1233,10 +1299,134 @@
         });
     }
 
+    /**
+     * Zemljevid skice za izpis ali sliko v elementu z danim id. Velikost izrisa = širina zemljevida na zaslonu
+     * (razmerje stranic lista), nato pomanjšano na 180 mm (680,3 px). Vrne obljubo, ki se izpolni, ko so podlage naložene.
+     * cors = true: podlage se naložijo tako, da jih je mogoče prerisati v sliko.
+     */
+    function tiskZemljevid(s, id, zemljevidi, cors) {
+        const sirinaZaslona = Math.max(700, Math.min(1600, $('zemljevid').clientWidth || 1000));
+        const visinaIzrisa = Math.round(sirinaZaslona * 125 / 180);
+        const merilo = 680.3 / sirinaZaslona;
+        {
+            const okvir = $(id);
+            okvir.style.width = sirinaZaslona + 'px'; okvir.style.height = visinaIzrisa + 'px'; okvir.style.transform = 'scale(' + merilo + ')';
+            okvir.style.setProperty('--nm', M.omejiMerilo(s.merilo === undefined ? 1 : s.merilo));
+            const m = L.map(id, { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, zoomSnap: 0.25, fadeAnimation: false, zoomAnimation: false });
+            zemljevidi.push(m);
+            m.createPane('epvOzadje').style.zIndex = 350;
+            const plast = ustvariPodlago(trenutnaPodlaga, cors).addTo(m);
+            const meje = mejeSkice(s);
+            if (s.pogled && s.pogled.meje) m.fitBounds(s.pogled.meje, { padding: [0, 0] });
+            else if (s.pogled) m.setView([s.pogled.lat, s.pogled.lon], s.pogled.z);
+            else if (meje) m.fitBounds(meje, { padding: [30, 30], maxZoom: 18 });
+            else { const p = trenutniPogled(); m.setView([p.lat, p.lon], p.z); }
+            narisiOsnovo(L.layerGroup().addTo(m), false);
+            const g = L.layerGroup().addTo(m);
+            narisi(s, g, m, false);
+            return new Promise(function (resolve) { plast.once('load', resolve); });
+        }
+    }
+
+    // ---------- slika skice (JPG) ----------
+    // Skica se izriše kot za izpis, nato se njen del strani prenese v sliko: vsakemu elementu se vpišejo izračunani
+    // slogi, podlage zemljevida se vgradijo kot podatki, vse skupaj se kot SVG nariše na platno (canvas).
+    function elementVSliko(el, faktor) {
+        const mera = el.getBoundingClientRect();
+        const sirina = Math.ceil(mera.width), visina = Math.ceil(mera.height);
+        const klon = el.cloneNode(true);
+        const izvirni = [el].concat(Array.prototype.slice.call(el.querySelectorAll('*')));
+        const kloni = [klon].concat(Array.prototype.slice.call(klon.querySelectorAll('*')));
+        let brezPodlage = 0;
+        izvirni.forEach(function (o, i) {
+            const k = kloni[i];
+            if (!k || !k.style) return;
+            const cs = window.getComputedStyle(o);
+            let besedilo = '';
+            for (let j = 0; j < cs.length; j++) {
+                const ime = cs[j];
+                const v = cs.getPropertyValue(ime);
+                if (v) besedilo += ime + ':' + v + ';';
+            }
+            k.setAttribute('style', besedilo);
+            if (o.tagName === 'IMG') {
+                // podlaga zemljevida: sliko vgradimo kot podatke (zunanjih slik SVG ne naloži)
+                try {
+                    const p = document.createElement('canvas');
+                    p.width = o.naturalWidth || 256; p.height = o.naturalHeight || 256;
+                    p.getContext('2d').drawImage(o, 0, 0);
+                    k.setAttribute('src', p.toDataURL('image/jpeg', 0.9));
+                } catch (e) { k.removeAttribute('src'); brezPodlage++; }
+                k.removeAttribute('crossorigin');
+            }
+        });
+        klon.style.margin = '0';
+        const xhtml = new XMLSerializer().serializeToString(klon);
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + sirina + '" height="' + visina + '"><foreignObject x="0" y="0" width="100%" height="100%">' + xhtml + '</foreignObject></svg>';
+        return new Promise(function (resolve, reject) {
+            const slika = new Image();
+            slika.onload = function () {
+                try {
+                    const platno = document.createElement('canvas');
+                    platno.width = Math.round(sirina * faktor); platno.height = Math.round(visina * faktor);
+                    const c = platno.getContext('2d');
+                    c.fillStyle = '#fff'; c.fillRect(0, 0, platno.width, platno.height);
+                    c.drawImage(slika, 0, 0, platno.width, platno.height);
+                    platno.toBlob(function (blob) { if (blob) resolve({ blob: blob, brezPodlage: brezPodlage, sirina: platno.width, visina: platno.height }); else reject(new Error('Slike ni bilo mogoče ustvariti.')); }, 'image/jpeg', 0.92);
+                } catch (e) { reject(e); }
+            };
+            slika.onerror = function () { reject(new Error('Brskalnik skice ni mogel prerisati v sliko.')); };
+            slika.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        });
+    }
+    function slikaSkice() {
+        skica().pogled = trenutniPogled();
+        samodejnoShrani();
+        const s = skica();
+        const cilj = $('tisk');
+        cilj.innerHTML = '<div class="tisk-slika" id="tisk-slika"><div class="tisk-zemljevid-okvir"><div class="tisk-zemljevid" id="tisk-z-slika"></div>' + (nacrt.sever ? htmlSevera() : '') + '</div>' + htmlLegende(s, true) + '</div>';
+        const priprava = $('tisk-priprava');
+        const napisPriprave = priprava.textContent;
+        priprava.textContent = 'Pripravljam sliko skice …';
+        priprava.style.display = 'flex';
+        const zemljevidi = [];
+        const pocisti = function () {
+            zemljevidi.forEach(function (m) { try { m.remove(); } catch (e) { /* že odstranjen */ } });
+            if (!window.EPV_TISK_OHRANI) cilj.innerHTML = '';
+            priprava.style.display = 'none';
+            priprava.textContent = napisPriprave;
+        };
+        const najvec = new Promise(function (resolve) { setTimeout(resolve, window.EPV_TISK_CAKAJ_MS || 6000); });
+        return Promise.race([tiskZemljevid(s, 'tisk-z-slika', zemljevidi, true), najvec])
+            .then(function () { return new Promise(function (resolve) { setTimeout(resolve, 400); }); })
+            .then(function () {
+                const el = $('tisk-slika');
+                return elementVSliko(el, Math.min(3, 2200 / Math.max(1, el.getBoundingClientRect().width)));
+            })
+            .then(function (r) {
+                pocisti();
+                const ime = M.imeDatoteke(nacrt).replace(/\.epvnacrt\.json$/, '') + '_skica' + (idxSkice + 1) + '.jpg';
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(r.blob);
+                a.download = ime;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+                zadnjaSlika = { ime: ime, sirina: r.sirina, visina: r.visina, velikost: r.blob.size, brezPodlage: r.brezPodlage, blob: r.blob };
+                if (r.brezPodlage) alert('Slika je shranjena, vendar brez podlage zemljevida (' + r.brezPodlage + ' delov ni bilo mogoče vključiti). Poskusi znova ali uporabi 🖨️ Skice → Shrani kot PDF.');
+            })
+            .catch(function (e) {
+                pocisti();
+                alert('Slike skice ni bilo mogoče ustvariti: ' + (e && e.message ? e.message : e) + '\nNamesto tega uporabi 🖨️ Skice → Shrani kot PDF.');
+            });
+    }
+    let zadnjaSlika = null;
+
     // ---------- zemljevid ----------
-    function ustvariPodlago(katera) {
-        if (katera === 'cesta') return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
-        return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 19, attribution: 'Tiles © Esri' });
+    function ustvariPodlago(katera, cors) {
+        // cors: podlaga se naloži z dovoljenjem za prerisovanje v sliko (potrebno samo za izvoz slike)
+        const dodatno = cors ? { crossOrigin: 'anonymous' } : {};
+        if (katera === 'cesta') return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', Object.assign({ maxZoom: 19, maxNativeZoom: 19, attribution: '© OpenStreetMap' }, dodatno));
+        return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', Object.assign({ maxZoom: 21, maxNativeZoom: 19, attribution: 'Tiles © Esri' }, dodatno));
     }
 
     function zacni() {
@@ -1338,6 +1528,15 @@
         zivePripravi();
         pinPripravi();
         spletPripravi();
+        $('btn-slika').addEventListener('click', function () { slikaSkice(); });
+        let meriloZapomnjeno = false;
+        $('merilo-skice').addEventListener('input', function () {
+            if (!meriloZapomnjeno) { zapomni(); meriloZapomnjeno = true; }
+            const m = M.omejiMerilo(parseInt($('merilo-skice').value, 10) / 100);
+            if (m === 1) delete skica().merilo; else skica().merilo = m;
+            samodejnoShrani(); osveziMerilo();
+        });
+        $('merilo-skice').addEventListener('change', function () { meriloZapomnjeno = false; });
         $('sever-viden').addEventListener('change', function () { zapomni(); nacrt.sever = $('sever-viden').checked; samodejnoShrani(); osveziSever(); });
         $('osnova-vidna').addEventListener('change', function () { osnovaVidna = $('osnova-vidna').checked; shraniOsnovo(); osveziOsnovo(); osveziLegendo(); });
         $('btn-osnova').addEventListener('click', function () { $('osnova-uvoz-stanje').textContent = ''; osveziOsnovo(); $('osnova-okno').style.display = 'flex'; });
@@ -1365,7 +1564,7 @@
         window.addEventListener('beforeunload', samodejnoShrani);
 
         // za teste in diagnostiko
-        window.EPVNacrt = { zive: function () { return zive; }, stanje: function () { return { nacrt: nacrt, idxSkice: idxSkice, izbranId: izbranId, orodje: orodje, osnova: osnova, osnovaVidna: osnovaVidna }; }, postavi: postavi, nalozi: nalozi };
+        window.EPVNacrt = { zive: function () { return zive; }, zadnjaSlika: function () { return zadnjaSlika; }, stanje: function () { return { nacrt: nacrt, idxSkice: idxSkice, izbranId: izbranId, orodje: orodje, osnova: osnova, osnovaVidna: osnovaVidna }; }, postavi: postavi, nalozi: nalozi };
         osveziVse(false);
     }
 

@@ -351,6 +351,33 @@ with sync_playwright() as pw:
 
     # elaborat se shrani z načrtom
     pri('elaborat je del načrta', st()['nacrt']['elaborat']['krajDatum'] == 'Slovenska Bistrica, 26. 9. 2026')
+    # novi znaki, velikost znaka, napis v okvirčku, velikost ikon na skici
+    p.evaluate("document.querySelectorAll('.okno-ozadje').forEach(o => o.style.display = 'none')")
+    zadnja_ikona = lambda: p.evaluate("String(window.__L.markers.filter(m => m.options.icon && m.options.draggable).slice(-1)[0].options.icon.html)")
+    pri('novi znaki v paleti', all(p.query_selector(f'.pal[data-kljuc="z:{k}"] svg') is not None for k in ['lestev', 'crpalka', 'elektrika', 'skupina', 'pozar', 'veter']))
+    p.click('.pal[data-kljuc="z:pozar"]'); p.evaluate("EPVNacrt.postavi(46.4051, 15.6051)")
+    p.evaluate("window.__L.markers.filter(m => m.options.icon && m.options.draggable).slice(-1)[0].handlers.click[0]({})")
+    pri('požar: izbran, ponujena velikost znaka', el()[-1]['znak'] == 'pozar' and st()['izbranId'] == el()[-1]['id'] and p.query_selector('[data-vel="0.2"]') is not None)
+    p.click('[data-vel="0.2"]'); p.click('[data-vel="0.2"]')
+    izbran = lambda: [x for x in el() if x['id'] == st()['izbranId']][0]
+    pri('požar: večji znak', izbran()['vel'] == 1.4 and '140 %' in p.inner_text('#lastnosti') and 'scale(1.4)' in p.evaluate("String(window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('prosto')).slice(-1)[0].options.icon.html)"))
+    p.click('[data-vel="0"]')
+    pri('požar: običajna velikost pobriše nastavitev', 'vel' not in izbran())
+    p.click('.pal[data-kljuc="b:besedilo"]'); p.evaluate("EPVNacrt.postavi(46.4052, 15.6052)")
+    if p.query_selector('textarea[data-k="opis"]') is None:
+        p.evaluate("window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('class=\"nb')).slice(-1)[0].handlers.click[0]({})")
+    p.fill('textarea[data-k="opis"]', 'Napad po lestvi v drugo nadstropje')
+    p.click('[data-bes="vel+"]'); p.click('[data-bes="sir+"]')
+    html_b = p.evaluate("String(window.__L.markers.filter(m => m.options.icon && String(m.options.icon.html).includes('class=\"nb')).slice(-1)[0].options.icon.html)")
+    pri('napis: večja pisava in širina okvirja z zalomom', izbran()['velikost'] == 15 and izbran()['sirina'] == 200 and 'font-size:15px' in html_b and 'width:200px' in html_b and 'zalomljen' in html_b and 'Napad po lestvi' in html_b, html_b)
+    p.click('[data-bes="sir0"]'); p.click('[data-bes="vel0"]')
+    pri('napis: nazaj na običajno', 'sirina' not in izbran() and 'velikost' not in izbran())
+    p.fill('#merilo-skice', '70'); p.dispatch_event('#merilo-skice', 'input'); p.dispatch_event('#merilo-skice', 'change')
+    pri('velikost ikon na skici: 70 %', st()['nacrt']['skice'][st()['idxSkice']]['merilo'] == 0.7 and p.evaluate("document.getElementById('zemljevid').style.getPropertyValue('--nm')") == '0.7' and p.inner_text('#merilo-vrednost') == '70 %')
+    drugi = 0 if st()['idxSkice'] != 0 else 1
+    p.click(f'.skica-vrstica[data-i="{drugi}"]')
+    pri('velikost ikon velja samo za svojo skico', p.input_value('#merilo-skice') == '100' and p.evaluate("document.getElementById('zemljevid').style.getPropertyValue('--nm')") == '1')
+    pri('gumb za sliko skice', p.is_visible('#btn-slika'))
     b.close()
 
 pri('brez JS napak', len(napake) == 0, napake[:5])
