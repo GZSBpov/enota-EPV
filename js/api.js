@@ -3,10 +3,15 @@
 // Vsi klici gredo skozi to datoteko: geslo aplikacije, časovna omejitev in ID za vpise so na enem mestu.
 // ==========================================
 
-import { GOOGLE_APPS_SCRIPT_URL, NAVADNO_GESLO } from './config.js';
+import { GOOGLE_APPS_SCRIPT_URL } from './config.js';
+
+/** Geslo, ki ga je uporabnik vpisal ob prijavi (js/prijava.js); prazno, če ni prijavljen. */
+export function trenutnoGeslo() {
+    return window.EPVPrijava ? window.EPVPrijava.geslo() : '';
+}
 
 function sestaviUrl(parametri) {
-    const vsi = Object.assign({ geslo: NAVADNO_GESLO }, parametri);
+    const vsi = Object.assign({ geslo: trenutnoGeslo() }, parametri);
     const niz = Object.keys(vsi)
         .filter(k => vsi[k] !== undefined && vsi[k] !== null)
         .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(String(vsi[k]))}`)

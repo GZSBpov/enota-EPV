@@ -93,7 +93,7 @@
 
     function vibriraj(vzorec) {
         try {
-            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(vzorec);
+            if (typeof navigator !== 'undefined' && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(vzorec);
         } catch (e) { /* ni podprto */ }
     }
 

@@ -233,6 +233,133 @@
 
     function osveziZemljevid() { narisi(skica(), sloj, map, true); narisiRocice(); osveziLegendo(); }
 
+    // ---------- žive enote s terena (EPV) ----------
+    // Tabla po potrebi prebere pozicije enot izbranega dogodka iz iste skripte kot štab in jih pokaže čez načrt.
+    // Niso del načrta: ne shranijo se v datoteko in jih ni v izpisu.
+    const ZIVE_INTERVAL_MS = 15000, ZIVE_STARO_MS = 3 * 60000;
+    const zive = { vklop: false, dogodek: '', kazalec: 0, enote: {}, casovnik: null, sloj: null, poteka: false };
+
+    function ziveStanje(besedilo, napaka) {
+        const el = $('zive-stanje');
+        if (!el) return;
+        el.textContent = besedilo;
+        el.classList.toggle('napaka', !!napaka);
+    }
+    function ziveKlic(parametri) {
+        const P = window.EPVPrijava;
+        const vsi = Object.assign({ geslo: P ? P.geslo() : '' }, parametri);
+        const niz = Object.keys(vsi).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(String(vsi[k])); }).join('&');
+        return fetch(window.GOOGLE_APPS_SCRIPT_URL + '?' + niz, { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : { status: 'error', omrezje: true }; })
+            .catch(function () { return { status: 'error', omrezje: true }; });
+    }
+    function ziveNarisi() {
+        if (!zive.sloj) return;
+        zive.sloj.clearLayers();
+        const zdaj = Date.now();
+        Object.keys(zive.enote).forEach(function (k) {
+            const e = zive.enote[k];
+            const stara = zdaj - e.ms > ZIVE_STARO_MS;
+            const ura = new Date(e.ms).toLocaleTimeString('sl-SI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Ljubljana' });
+            const m = L.marker([e.lat, e.lon], { interactive: false, zIndexOffset: 50000000, icon: L.divIcon({ className: 'nacrt-ikona', html: '<div class="nze' + (stara ? ' stara' : '') + '"><span class="nze-pika"></span><span class="nze-napis">' + esc(e.ime) + ' · ' + ura + '</span></div>', iconSize: [26, 26], iconAnchor: [13, 13] }) });
+            m.zivaEnota = e.ime;
+            zive.sloj.addLayer(m);
+        });
+    }
+    function ziveOsvezi() {
+        if (!zive.vklop || !zive.dogodek || zive.poteka) return Promise.resolve();
+        zive.poteka = true;
+        const dogodek = zive.dogodek;
+        return ziveKlic({ akcija: 'pridobiLokacije', dogodek: dogodek, kazalec: zive.kazalec }).then(function (o) {
+            zive.poteka = false;
+            if (dogodek !== zive.dogodek || !zive.vklop) return;
+            if (o.omrezje) { ziveStanje('Ni povezave z EPV - poskusim znova.', true); return; }
+            if (o.status !== 'success') {
+                if (/gesl/i.test(o.message || '')) { if (window.EPVPrijava) window.EPVPrijava.pobrisi(); zivePrikaziPrijavo(true); ziveStanje('Geslo EPV ni več veljavno - prijavi se znova.', true); zivePocakaj(false); }
+                else ziveStanje('EPV: ' + (o.message || 'napaka'), true);
+                return;
+            }
+            (o.data || []).forEach(function (r) {
+                const deli = String(r.enota || '').split(':');
+                if ((deli[0] || '').toUpperCase() === 'SISTEM') return;
+                const ime = (deli[1] || r.enota || '').trim();
+                const lat = parseFloat(r.lat), lon = parseFloat(r.lon), ms = Date.parse(r.cas);
+                if (!ime || !isFinite(lat) || !isFinite(lon)) return;
+                const k = ime.toLowerCase();
+                if (!zive.enote[k] || !(ms < zive.enote[k].ms)) zive.enote[k] = { ime: ime, lat: lat, lon: lon, ms: isFinite(ms) ? ms : Date.now() };
+            });
+            if (typeof o.kazalec === 'number') zive.kazalec = o.kazalec;
+            ziveNarisi();
+            const n = Object.keys(zive.enote).length;
+            const aktivnih = Object.keys(zive.enote).filter(function (k) { return Date.now() - zive.enote[k].ms <= ZIVE_STARO_MS; }).length;
+            ziveStanje(n ? 'Enot: ' + n + ' (oddaja: ' + aktivnih + ') · osveženo ' + new Date().toLocaleTimeString('sl-SI') : 'Za ta dogodek še ni pozicij.', false);
+        });
+    }
+    function zivePocakaj(tece) {
+        if (zive.casovnik) { clearInterval(zive.casovnik); zive.casovnik = null; }
+        if (tece) zive.casovnik = setInterval(ziveOsvezi, ZIVE_INTERVAL_MS);
+    }
+    function zivePrikaziPrijavo(da) {
+        $('zive-prijava').style.display = da ? 'flex' : 'none';
+        $('zive-dogodek').style.display = da ? 'none' : '';
+    }
+    function ziveIzberiDogodek(ime) {
+        zive.dogodek = ime || '';
+        zive.kazalec = 0; zive.enote = {};
+        ziveNarisi();
+        if (!zive.dogodek) { ziveStanje('Izberi dogodek.', false); zivePocakaj(false); return; }
+        ziveStanje('Berem pozicije …', false);
+        zivePocakaj(true);
+        ziveOsvezi();
+    }
+    function ziveNaloziDogodke() {
+        zivePrikaziPrijavo(false);
+        ziveStanje('Berem seznam dogodkov …', false);
+        return ziveKlic({ akcija: 'pridobiSeznamDogodkov', oblika: 'objekt' }).then(function (o) {
+            if (!zive.vklop) return;
+            if (o.omrezje) { ziveStanje('Ni povezave z EPV.', true); return; }
+            if (o.status !== 'success') { if (window.EPVPrijava) window.EPVPrijava.pobrisi(); zivePrikaziPrijavo(true); ziveStanje(/gesl/i.test(o.message || '') ? 'Napačno geslo.' : 'EPV: ' + (o.message || 'napaka'), true); return; }
+            const seznam = (o.data || []).map(function (d) { return typeof d === 'string' ? { ime: d, zadnji: null } : d; })
+                .sort(function (a, b) { return (Date.parse(b.zadnji) || 0) - (Date.parse(a.zadnji) || 0); });
+            const izbira = $('zive-dogodek');
+            const zeljen = zive.dogodek || new URLSearchParams(window.location.search).get('naziv') || '';
+            izbira.innerHTML = '<option value="">- izberi dogodek -</option>' + seznam.map(function (d) { return '<option value="' + esc(d.ime) + '">' + esc(d.ime) + '</option>'; }).join('');
+            const ujemanje = seznam.find(function (d) { return d.ime === zeljen; });
+            izbira.value = ujemanje ? ujemanje.ime : '';
+            ziveIzberiDogodek(izbira.value);
+        });
+    }
+    function ziveVklopi(da) {
+        zive.vklop = da;
+        $('zive-nastavitve').style.display = da ? '' : 'none';
+        if (!da) { zivePocakaj(false); zive.enote = {}; zive.kazalec = 0; ziveNarisi(); ziveStanje('Pozicije se berejo iz EPV po potrebi; niso del načrta in se ne shranijo ali natisnejo.', false); return; }
+        if (!window.GOOGLE_APPS_SCRIPT_URL || !window.EPVPrijava) { ziveStanje('Povezava z EPV tukaj ni na voljo.', true); return; }
+        if (window.EPVPrijava.geslo()) ziveNaloziDogodke();
+        else { zivePrikaziPrijavo(true); ziveStanje('Vpiši geslo EPV (enako kot v štabu).', false); }
+    }
+    function zivePripravi() {
+        zive.sloj = L.layerGroup().addTo(map);
+        $('zive-vklop').addEventListener('change', function () { ziveVklopi($('zive-vklop').checked); });
+        const prijava = function () {
+            const g = $('zive-geslo').value.trim();
+            if (!g) return;
+            ziveStanje('Preverjam geslo …', false);
+            window.EPVPrijava.preveri(g).then(function (r) {
+                if (r.ok) { window.EPVPrijava.nastavi(g); $('zive-geslo').value = ''; ziveNaloziDogodke(); }
+                else ziveStanje(r.omrezje ? 'Ni povezave z EPV.' : 'Napačno geslo.', true);
+            });
+        };
+        $('btn-zive-prijava').addEventListener('click', prijava);
+        $('zive-geslo').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') prijava(); });
+        $('zive-dogodek').addEventListener('change', function () { ziveIzberiDogodek($('zive-dogodek').value); });
+        $('btn-zive-osvezi').addEventListener('click', function () { ziveOsvezi(); });
+        $('btn-zive-pokazi').addEventListener('click', function () {
+            const t = Object.keys(zive.enote).map(function (k) { return [zive.enote[k].lat, zive.enote[k].lon]; });
+            if (t.length === 1) map.setView(t[0], Math.max(map.getZoom(), 16));
+            else if (t.length > 1) map.fitBounds(t, { padding: [60, 60], maxZoom: 18 });
+        });
+    }
+
     // ---------- stalna osnova: območje zveze in gasilski domovi ----------
     function shraniOsnovo() {
         try { localStorage.setItem(KLJUC_OSNOVA, JSON.stringify(osnova)); localStorage.setItem(KLJUC_OSNOVA_VIDNA, osnovaVidna ? '1' : '0'); } catch (e) { /* nedostopen pomnilnik */ }
@@ -1001,6 +1128,7 @@
         $('btn-elaborat-tisk').addEventListener('click', function () { $('elaborat-okno').style.display = 'none'; natisni(true); });
         $('btn-tisk-skice').addEventListener('click', function () { natisni(false); });
         $('napisi-vidni').addEventListener('change', function () { zapomni(); nacrt.napisi = $('napisi-vidni').checked; samodejnoShrani(); osveziZemljevid(); });
+        zivePripravi();
         $('osnova-vidna').addEventListener('change', function () { osnovaVidna = $('osnova-vidna').checked; shraniOsnovo(); osveziOsnovo(); osveziLegendo(); });
         $('btn-osnova').addEventListener('click', function () { $('osnova-uvoz-stanje').textContent = ''; osveziOsnovo(); $('osnova-okno').style.display = 'flex'; });
         $('btn-osnova-zapri').addEventListener('click', function () { $('osnova-okno').style.display = 'none'; });
@@ -1027,7 +1155,7 @@
         window.addEventListener('beforeunload', samodejnoShrani);
 
         // za teste in diagnostiko
-        window.EPVNacrt = { stanje: function () { return { nacrt: nacrt, idxSkice: idxSkice, izbranId: izbranId, orodje: orodje, osnova: osnova, osnovaVidna: osnovaVidna }; }, postavi: postavi, nalozi: nalozi };
+        window.EPVNacrt = { zive: function () { return zive; }, stanje: function () { return { nacrt: nacrt, idxSkice: idxSkice, izbranId: izbranId, orodje: orodje, osnova: osnova, osnovaVidna: osnovaVidna }; }, postavi: postavi, nalozi: nalozi };
         osveziVse(false);
     }
 

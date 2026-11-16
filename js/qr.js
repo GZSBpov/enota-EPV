@@ -3,11 +3,12 @@
 // ==========================================
 
 import { TEREN_EPV_URL } from './config.js';
+import { apiGet } from './api.js';
 
 /**
  * Ustvari QR kodo z aktivnim dogodkom in jo prikaže v modalnem oknu
  */
-export function prikaziQRModal() {
+export async function prikaziQRModal(novZeton = false) {
     const modal = document.getElementById('qr-modal');
     const qrContainer = document.getElementById('qr-code-container');
     const selectDogodek = document.getElementById('select-dogodek');
@@ -26,7 +27,17 @@ export function prikaziQRModal() {
 
     // Sestavimo celoten URL do terenEPV.html
     const bazniUrl = TEREN_EPV_URL || "https://gzsbpov.github.io/enota-EPV/terenEPV.html";
-    const terenskiUrl = `${bazniUrl}?dogodek=${encodeURIComponent(dogodekIme)}`;
+    // Žeton dogodka: z njim strežnik sprejme pozicije in sporočila samo od telefonov, ki so odprli to povezavo.
+    // novZeton = true izda novega (stara QR koda in povezave prenehajo veljati).
+    const stanjeZetona = document.getElementById('qr-zeton-stanje');
+    const odgovor = await apiGet({ akcija: 'zetonDogodka', dogodek: dogodekIme, nov: novZeton ? '1' : '' });
+    const zeton = odgovor.status === 'success' ? odgovor.zeton : '';
+    if (stanjeZetona) {
+        stanjeZetona.textContent = zeton
+            ? (novZeton ? '🔒 Izdana je nova zaščitena povezava. Stare QR kode za ta dogodek ne veljajo več.' : '🔒 Zaščitena povezava: vpisuje lahko samo, kdor jo odpre.')
+            : (odgovor.omrezje ? '⚠️ Ni povezave s strežnikom - povezava je brez zaščite.' : '⚠️ Povezava je brez zaščite (strežniška skripta še ni posodobljena).');
+    }
+    const terenskiUrl = `${bazniUrl}?dogodek=${encodeURIComponent(dogodekIme)}${zeton ? '&zeton=' + encodeURIComponent(zeton) : ''}`;
 
     posodobiPovezaveZaDeljenje(terenskiUrl, dogodekIme);
 
@@ -44,8 +55,8 @@ export function prikaziQRModal() {
             correctLevel: QRCode.CorrectLevel.H
         });
     } else {
-        // Če knjižnica ni naložena, uporabi rezervni API
-        qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(terenskiUrl)}" alt="QR Koda" style="border: 1px solid #ccc; padding: 5px; background: white; border-radius: 4px;" />`;
+        // Knjižnica za QR ni naložena: povezave NE pošiljamo zunanji storitvi (vsebuje žeton) - uporabi povezavo ali gumbe spodaj.
+        qrContainer.textContent = 'QR kode ni mogoče izrisati (ni interneta za knjižnico). Uporabi povezavo spodaj.';
     }
 
     // Prikažemo modalno okno
@@ -109,6 +120,9 @@ export function iniciirajQRGenerator() {
     const btnQrTeren = document.getElementById('btn-qr-teren');
     const btnZapriQr = document.getElementById('btn-zapri-qr');
 
-    btnQrTeren?.addEventListener('click', prikaziQRModal);
+    btnQrTeren?.addEventListener('click', () => prikaziQRModal(false));
+    document.getElementById('btn-qr-nov-zeton')?.addEventListener('click', () => {
+        if (window.confirm('Izdam novo QR kodo? Stare QR kode in povezave za ta dogodek prenehajo veljati - enote na terenu morajo skenirati novo.')) prikaziQRModal(true);
+    });
     btnZapriQr?.addEventListener('click', zapriQRModal);
 }

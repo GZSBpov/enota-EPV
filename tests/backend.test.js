@@ -10,7 +10,7 @@ const g = (p) => m.get(Object.assign({}, G, p));
 pri('brez gesla', m.get({ akcija: 'pridobiSeznamDogodkov' }).status === 'error');
 pri('napačno geslo ne razkrije gesla', (() => { const r = m.get({ geslo: 'xyz', akcija: 'pridobiSeznamDogodkov' }); return r.status === 'error' && !/xyz/.test(r.message); })());
 pri('neznana akcija', g({ akcija: 'nekaj' }).status === 'error');
-pri('hash gesla velja', m.get({ geslo: '8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756', akcija: 'pridobiSeznamDogodkov' }).status === 'success');
+pri('zgoščena vrednost ni več veljavno geslo', m.get({ geslo: '8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756', akcija: 'pridobiSeznamDogodkov' }).status === 'error');
 
 // Vpis lokacije
 const t0 = Date.now();
@@ -170,6 +170,61 @@ pri('zasedeno ob zaklepu', m2.get({ enota: 'A:B:1:0', lat: '46', lon: '15', id: 
   const st = ustvari(); st.ss.insertSheet('Lokacije').appendRow(['ČAS', 'ENOTA', 'Latitude', 'Longitude', 'Natančnost', 'Dogodek']);
   st.sheeti.Lokacije.appendRow(['x']); st.pripravi();
   if (st.sheeti.Lokacije.vrstice[0].length !== 7 || st.sheeti.Lokacije.vrstice[0][6] !== 'ID') { console.log('NAPAKA: glava ni dopolnjena', st.sheeti.Lokacije.vrstice[0]); process.exit(1); }
+}
+
+// ---------------- geslo aplikacije: ni v kodi, zamenjava ----------------
+{
+  const z = ustvari(); z.pripravi();
+  const koda = require('fs').readFileSync(require('path').join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+  pri('geslo ni zapisano v kodi skripte', !/EPV2026/.test(koda.replace(/\/\/.*$/gm, '')));
+  pri('pred zamenjavo velja staro geslo, strežnik opozori', z.get({ geslo: 'EPV2026', akcija: 'preveriGeslo' }).privzetoGeslo === true);
+  pri('prekratko novo geslo zavrnjeno', z.get({ geslo: 'EPV2026', akcija: 'zamenjajGeslo', novoGeslo: 'kratko' }).status === 'error');
+  pri('staro geslo kot novo zavrnjeno', z.get({ geslo: 'EPV2026', akcija: 'zamenjajGeslo', novoGeslo: 'EPV2026' }).status === 'error');
+  pri('zamenjava brez veljavnega gesla zavrnjena', z.get({ geslo: 'napacno', akcija: 'zamenjajGeslo', novoGeslo: 'NovoGeslo#2026' }).status === 'error' && !z.lastnosti.GESLO_HASH);
+  pri('zamenjava gesla', z.get({ geslo: 'EPV2026', akcija: 'zamenjajGeslo', novoGeslo: 'NovoGeslo#2026' }).status === 'success');
+  pri('v nastavitvah je samo zgoščena vrednost', /^[0-9a-f]{64}$/.test(z.lastnosti.GESLO_HASH) && !JSON.stringify(z.lastnosti).includes('NovoGeslo'));
+  pri('staro geslo ne velja več', z.get({ geslo: 'EPV2026', akcija: 'pridobiSeznamDogodkov' }).status === 'error' && z.post({ akcija: 'shraniSektorje', geslo: 'EPV2026', dogodek: 'x', sektorji: [] }).status === 'error');
+  const r2 = z.get({ geslo: 'NovoGeslo#2026', akcija: 'preveriGeslo' });
+  pri('novo geslo velja', r2.status === 'success' && r2.privzetoGeslo === false && z.post({ akcija: 'shraniSektorje', geslo: 'NovoGeslo#2026', dogodek: 'x', sektorji: [] }).status === 'success');
+  pri('napačno geslo ne razkrije ničesar', z.get({ geslo: 'NovoGeslo#2025', akcija: 'preveriGeslo' }).message === 'Napačno geslo!');
+}
+
+// ---------------- žetoni dogodkov (QR koda) ----------------
+{
+  const z = ustvari(); z.pripravi();
+  const G = 'EPV2026';
+  const vpis = (dod) => Object.assign({ enota: 'GASILEC:Oplotnica:5:1', lat: '46.4', lon: '15.6', dogodek: 'Vaja A', id: 'i' + Math.random() }, dod);
+  pri('dogodek brez žetona: vpis brez žetona deluje (stare QR kode)', z.get(vpis()).status === 'success');
+  pri('žeton zahteva geslo', z.get({ akcija: 'zetonDogodka', dogodek: 'Vaja A' }).status === 'error');
+  const zt = z.get({ geslo: G, akcija: 'zetonDogodka', dogodek: 'Vaja A' });
+  pri('žeton izdan', zt.status === 'success' && zt.nov === true && /^[0-9a-f]{24}$/.test(zt.zeton), zt);
+  pri('ponovna zahteva vrne isti žeton', z.get({ geslo: G, akcija: 'zetonDogodka', dogodek: 'Vaja A' }).zeton === zt.zeton);
+  pri('žeton brez dogodka', z.get({ geslo: G, akcija: 'zetonDogodka', dogodek: '' }).status === 'error');
+  const brez = z.get(vpis());
+  pri('po izdaji žetona: vpis brez žetona zavrnjen', brez.status === 'error' && brez.koda === 'zeton', brez);
+  pri('napačen žeton zavrnjen', z.get(vpis({ zeton: 'abcdef' })).koda === 'zeton');
+  pri('pravi žeton: vpis pozicije', z.get(vpis({ zeton: zt.zeton })).status === 'success');
+  pri('pravi žeton: SOS brez lokacije', z.get({ enota: 'GASILEC:Oplotnica:5:1', dogodek: 'Vaja A', sporocilo: 'SOS', id: 'sos1', zeton: zt.zeton }).status === 'success');
+  pri('lažni SOS brez žetona zavrnjen', z.get({ enota: 'GASILEC:Lazna:1:0', dogodek: 'Vaja A', sporocilo: 'SOS', id: 'sos2' }).koda === 'zeton' && z.sheeti.Sporocila.vrstice.every(v => !String(v[1]).includes('Lazna')));
+  pri('žeton drugega dogodka ne velja', (() => { const d = z.get({ geslo: G, akcija: 'zetonDogodka', dogodek: 'Vaja B' }).zeton; return z.get(vpis({ zeton: d })).koda === 'zeton' && z.get(vpis({ dogodek: 'Vaja B', zeton: d })).status === 'success'; })());
+  pri('štab vpisuje z geslom (zaznamek konca intervencije)', z.get({ enota: 'SISTEM:Konec intervencije:0', lat: '46.4', lon: '15.6', dogodek: 'Vaja A', sporocilo: 'KONEC INTERVENCIJE', id: 'k1', geslo: G }).status === 'success');
+  // terenske akcije z žetonom
+  z.get({ geslo: G, akcija: 'posljiSporociloStab', dogodek: 'Vaja A', cilj: 'VSI', sporocilo: 'Zbor', id: 'st1' });
+  z.get({ geslo: G, akcija: 'posljiTocko', dogodek: 'Vaja A', id: 't1', lat: '46.4', lon: '15.6', cilj: 'VSI', naziv: 'T' });
+  const sZ = { dogodek: 'Vaja A', zeton: zt.zeton };
+  pri('teren z žetonom bere sporočila štaba', z.get(Object.assign({ akcija: 'pridobiSporocilaStab', cilj: 'Oplotnica' }, sZ)).data.length === 1);
+  pri('teren z žetonom bere točke in sektorje', z.get(Object.assign({ akcija: 'pridobiTocke', enotaIme: 'Oplotnica' }, sZ)).data.length === 1 && z.get(Object.assign({ akcija: 'pridobiDodeljeneSektorje', enotaIme: 'Oplotnica' }, sZ)).status === 'success');
+  pri('teren z žetonom potrdi prejem', z.get(Object.assign({ akcija: 'potrdiPrejem', enotaIme: 'Oplotnica', tip: 'sporocilo', ref: 'st1' }, sZ)).status === 'success');
+  pri('teren brez žetona in gesla ne bere', z.get({ akcija: 'pridobiSporocilaStab', dogodek: 'Vaja A', cilj: 'Oplotnica' }).status === 'error' && z.get({ akcija: 'pridobiTocke', dogodek: 'Vaja A', zeton: 'napacen' }).status === 'error');
+  pri('žeton ne odpre štabnih akcij', ['pridobiLokacije', 'pridobiSeznamDogodkov', 'posljiSporociloStab', 'posljiTocko', 'zetonDogodka', 'zamenjajGeslo', 'pridobiDogodke', 'pridobiPotrditve', 'shraniGesloDogodka'].every(a => z.get(Object.assign({ akcija: a, cilj: 'VSI', sporocilo: 'x', novoGeslo: 'NovoGeslo#1' }, sZ)).status === 'error') && !z.lastnosti.GESLO_HASH);
+  pri('žeton enega dogodka ne bere drugega', z.get({ akcija: 'pridobiSporocilaStab', dogodek: 'Vaja B', zeton: zt.zeton }).status === 'error');
+  // nov žeton prekliče starega
+  const nov = z.get({ geslo: G, akcija: 'zetonDogodka', dogodek: 'Vaja A', nov: '1' });
+  pri('nov žeton prekliče starega', nov.nov === true && nov.zeton !== zt.zeton && z.get(vpis({ zeton: zt.zeton })).koda === 'zeton' && z.get(vpis({ zeton: nov.zeton })).status === 'success' && z.sheeti.Zetoni.vrstice.filter(v => v[0] === 'Vaja A').length === 1);
+  // stroga zaščita
+  pri('brez stroge zaščite: nov dogodek brez žetona je odprt', z.get(vpis({ dogodek: 'Neznan' })).status === 'success');
+  z.lastnosti.STROGA_ZASCITA = '1';
+  pri('stroga zaščita: dogodek brez žetona zavrnjen', z.get(vpis({ dogodek: 'Neznan2' })).koda === 'zeton' && z.get(vpis({ zeton: nov.zeton })).status === 'success' && z.get(vpis({ dogodek: 'Neznan2', geslo: G })).status === 'success');
 }
 
 console.log('Strežnik: ' + ok + ' uspešnih, ' + fail + ' napak.');

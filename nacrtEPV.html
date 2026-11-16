@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPV Načrt - taktična tabla</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="nacrt.css?v=8">
+    <link rel="stylesheet" href="nacrt.css?v=9">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/nacrt-model.js?v=8"></script>
+    <script src="js/shared-config.js?v=9"></script>
+    <script src="js/prijava.js?v=9"></script>
+    <script src="js/nacrt-model.js?v=9"></script>
 </head>
 <body>
     <header class="vrh">
-        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r8</span></div>
+        <div class="vrh-naslov">🚒 <b>EPV Načrt</b> <span class="oznaka">taktična tabla</span> <span class="razlicica" title="Različica modula">r9</span></div>
         <input type="text" id="naziv-nacrta" placeholder="Naziv vaje / intervencije" autocomplete="off">
         <div class="vrh-gumbi">
             <button type="button" id="btn-novo" title="Nov prazen načrt">📄 Nov</button>
@@ -88,6 +90,19 @@
                 <div class="vrstica" style="margin-top:6px;"><button type="button" id="btn-osnova" style="flex:1;">🏠 Uredi / uvozi…</button></div>
                 <div class="namig" id="osnova-stanje"></div>
             </div>
+            <div class="skupina">
+                <div class="skupina-naslov">Žive enote s terena (EPV)</div>
+                <label class="os-preklop"><input type="checkbox" id="zive-vklop"> prikaži pozicije enot</label>
+                <div id="zive-nastavitve" style="display:none;">
+                    <div id="zive-prijava" class="vrstica" style="margin-top:6px; display:none;">
+                        <input type="password" id="zive-geslo" placeholder="Geslo EPV" autocomplete="off" style="flex:1; min-width:0;">
+                        <button type="button" id="btn-zive-prijava">Prijava</button>
+                    </div>
+                    <select id="zive-dogodek" style="width:100%; margin-top:6px;"></select>
+                    <div class="vrstica" style="margin-top:6px;"><button type="button" id="btn-zive-osvezi" style="flex:1;">⟳ Osveži zdaj</button><button type="button" id="btn-zive-pokazi" style="flex:1;" title="Premakni zemljevid na enote">🎯 Pokaži enote</button></div>
+                </div>
+                <div class="namig" id="zive-stanje">Pozicije se berejo iz EPV po potrebi; niso del načrta in se ne shranijo ali natisnejo.</div>
+            </div>
             <div class="skupina" id="lastnosti-okvir">
                 <div class="skupina-naslov">Izbrani element</div>
                 <div id="lastnosti"><div class="namig">Tapni element na zemljevidu, da ga urediš ali izbrišeš. Vozila in oznake premikaš z vlečenjem.</div></div>
@@ -154,6 +169,6 @@
     <div id="tisk-priprava" class="tisk-priprava" style="display:none;">Pripravljam izpis … (nalagam zemljevide)</div>
     <div id="tisk"></div>
 
-    <script src="js/nacrt.js?v=8"></script>
+    <script src="js/nacrt.js?v=9"></script>
 </body>
 </html>

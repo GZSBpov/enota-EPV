@@ -23,8 +23,12 @@
 // zaženi pripraviListe() -> Uvedi -> Upravljanje uvedb -> Uredi -> Nova različica; URL ostane enak).
 // ==========================================================================
 
-var PRAVILNO_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
-var NAVADNO_GESLO = "EPV2026";
+// GESLO APLIKACIJE ni več zapisano v kodi. Njegova zgoščena vrednost (SHA-256) je v nastavitvah skripte
+// (Script Properties, ključ GESLO_HASH) in se nastavi iz štaba (gumb "Geslo") ali iz menija tabele EPV -> Nastavi geslo.
+// Dokler novo geslo ni nastavljeno, velja staro (spodnja vrednost je zgoščena vrednost starega, javno znanega gesla),
+// zato ga po uvedbi čim prej zamenjaj.
+var STARI_GESLO_HASH = "8603900fdfbc2a9cfccf9e8d0ff0501d5b59d559577a65be787860b73b9c9756";
+var NAJMANJ_ZNAKOV_GESLA = 8;
 var CASOVNI_PAS = "Europe/Ljubljana";
 
 var GLAVE = {
@@ -34,8 +38,12 @@ var GLAVE = {
   Tocke: ["Cas", "Dogodek", "ID", "Cilj", "Naziv", "Lat", "Lon", "Polmer", "Opomba", "Status", "Ver", "Umaknjeno"],
   Potrditve: ["Cas", "Dogodek", "Enota", "Tip", "Ref"],
   Dogodki: ["dogodek", "tip", "podatki", "dodeljenaEnota"],
-  DogodekGesla: ["Dogodek", "GesloHash", "Cas"]
+  DogodekGesla: ["Dogodek", "GesloHash", "Cas"],
+  Zetoni: ["Dogodek", "Zeton", "Cas"]
 };
+
+// Akcije, ki jih terenska aplikacija kliče z žetonom dogodka (iz QR kode) namesto z geslom
+var TERENSKE_AKCIJE = { pridobiDodeljeneSektorje: 1, pridobiSporocilaStab: 1, pridobiTocke: 1, potrdiPrejem: 1, pridobiImenaEnot: 1, pridobiSporocila: 1 };
 
 // ---------- pomožne funkcije ----------
 
@@ -82,10 +90,99 @@ function stevilo(v) {
   return isNaN(n) ? null : n;
 }
 
+function sha256Hex(besedilo) {
+  var bajti = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(besedilo), Utilities.Charset.UTF_8);
+  var hex = "";
+  for (var i = 0; i < bajti.length; i++) {
+    var b = bajti[i] < 0 ? bajti[i] + 256 : bajti[i];
+    hex += (b < 16 ? "0" : "") + b.toString(16);
+  }
+  return hex;
+}
+
+function veljavniGesloHash() {
+  return PropertiesService.getScriptProperties().getProperty("GESLO_HASH") || STARI_GESLO_HASH;
+}
+
+function jeGesloPravilno(g) {
+  return !!g && sha256Hex(g) === veljavniGesloHash();
+}
+
 function preveriGeslo(g) {
   if (!g) return "Ni prejetega gesla!";
-  var ok = (String(g).toLowerCase() === PRAVILNO_GESLO_HASH.toLowerCase()) || g === NAVADNO_GESLO;
-  return ok ? null : "Napačno geslo!";
+  if (jeGesloPravilno(g)) return null;
+  Utilities.sleep(400); // upočasni ugibanje gesla
+  return "Napačno geslo!";
+}
+
+function shraniNovoGeslo(novo) {
+  novo = String(novo || "");
+  if (novo.length < NAJMANJ_ZNAKOV_GESLA) return "Novo geslo mora imeti vsaj " + NAJMANJ_ZNAKOV_GESLA + " znakov.";
+  if (sha256Hex(novo) === STARI_GESLO_HASH) return "To je staro, javno znano geslo. Izberi drugo.";
+  PropertiesService.getScriptProperties().setProperty("GESLO_HASH", sha256Hex(novo));
+  return null;
+}
+
+// ---------- žetoni dogodkov (QR koda za teren) ----------
+
+/** Veljavni žeton dogodka ali "" (če za dogodek še ni bil izdan). */
+function zetonZaDogodek(dogodek) {
+  dogodek = String(dogodek || "");
+  if (!dogodek) return "";
+  var cache = CacheService.getScriptCache();
+  var k = "zt:" + dogodek;
+  var izCache = cache.get(k);
+  if (izCache !== null && izCache !== undefined) return izCache === "-" ? "" : izCache;
+  var v = vrstice("Zetoni");
+  var zeton = "";
+  for (var i = 0; i < v.length; i++) if (String(v[i][0]) === dogodek) zeton = String(v[i][1] || "");
+  cache.put(k, zeton || "-", 300);
+  return zeton;
+}
+
+function jeZetonVeljaven(dogodek, zeton) {
+  var pravi = zetonZaDogodek(dogodek);
+  return !!pravi && !!zeton && String(zeton) === pravi;
+}
+
+/** akcija=zetonDogodka (z geslom): vrne žeton dogodka; ustvari ga, če ga še ni, ali zamenja z nov=1 (stara QR koda preneha veljati). */
+function zetonDogodka(p) {
+  var dogodek = String(p.dogodek || "").trim();
+  if (!dogodek || dogodek === "novy") return napaka("Manjka dogodek.");
+  return podZaklepom(function () {
+    var sheet = pridobiSheet("Zetoni");
+    var podatki = sheet.getDataRange().getValues();
+    var vrsta = -1;
+    for (var i = 1; i < podatki.length; i++) if (String(podatki[i][0]) === dogodek) vrsta = i + 1;
+    if (vrsta > 0 && p.nov !== "1" && podatki[vrsta - 1][1]) return vrniJson({ status: "success", zeton: String(podatki[vrsta - 1][1]), nov: false });
+    var zeton = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "").slice(0, 24);
+    if (vrsta > 0) sheet.getRange(vrsta, 2, 1, 2).setValues([[zeton, new Date()]]);
+    else sheet.appendRow([varno(dogodek), zeton, new Date()]);
+    CacheService.getScriptCache().put("zt:" + dogodek, zeton, 300);
+    return vrniJson({ status: "success", zeton: zeton, nov: true });
+  });
+}
+
+function strogaZascita() {
+  return PropertiesService.getScriptProperties().getProperty("STROGA_ZASCITA") === "1";
+}
+
+/**
+ * Ali sme ta zahteva vpisati pozicijo/sporočilo za dogodek?
+ *  - dogodek z izdanim žetonom: samo s pravim žetonom (ali z geslom - štab)
+ *  - dogodek brez žetona: dovoljeno (stare QR kode), razen če je vklopljena stroga zaščita
+ * Vrne null ali odgovor z napako (koda "zeton" - terenska aplikacija pokaže navodilo za novo QR kodo).
+ */
+function preveriVpis(p) {
+  var dogodek = String(p.dogodek || "");
+  if (p.geslo && jeGesloPravilno(p.geslo)) return null;
+  var pravi = zetonZaDogodek(dogodek);
+  if (pravi) {
+    if (p.zeton && String(p.zeton) === pravi) return null;
+    return vrniJson({ status: "error", koda: "zeton", message: "Vpis zavrnjen: povezava ni veljavna. Skeniraj novo QR kodo štaba." });
+  }
+  if (strogaZascita()) return vrniJson({ status: "error", koda: "zeton", message: "Vpis zavrnjen: dogodek nima veljavne QR kode štaba." });
+  return null;
 }
 
 /** Izvede funkcijo pod zaklepom; če zaklepa ni mogoče dobiti, vrne napako (naprava ponovi poskus). */
@@ -153,14 +250,20 @@ function preveriZascitoDogodka(imeDogodka, podanGesloHash) {
 function doGet(e) {
   var p = (e && e.parameter) ? e.parameter : {};
 
-  // 1) Vpis lokacije (in neobvezno sporočila) s terena - brez gesla (kot V1)
-  if (p.enota && p.lat && p.lon) return vpisLokacije(p);
-  // 1b) Sporočilo BREZ lokacije (npr. SOS, ko telefon nima GPS signala) - sporočilo mora priti do štaba vseeno
-  if (p.enota && p.sporocilo) return vpisSporocilaBrezLokacije(p);
+  // 1) Vpis lokacije (in neobvezno sporočila) s terena: z žetonom dogodka iz QR kode (glej preveriVpis)
+  if (p.enota && ((p.lat && p.lon) || p.sporocilo)) {
+    var zavrnitev = preveriVpis(p);
+    if (zavrnitev) return zavrnitev;
+    // 1b) Sporočilo BREZ lokacije (npr. SOS, ko telefon nima GPS signala) mora priti do štaba vseeno
+    return (p.lat && p.lon) ? vpisLokacije(p) : vpisSporocilaBrezLokacije(p);
+  }
 
-  // 2) Vse ostalo zahteva geslo aplikacije
-  var gesloNapaka = preveriGeslo(p.geslo);
-  if (gesloNapaka) return napaka(gesloNapaka);
+  // 2) Terenske akcije: zadošča veljaven žeton dogodka; vse ostalo zahteva geslo aplikacije
+  var zZetonom = TERENSKE_AKCIJE[p.akcija] === 1 && jeZetonVeljaven(p.dogodek, p.zeton);
+  if (!zZetonom) {
+    var gesloNapaka = preveriGeslo(p.geslo);
+    if (gesloNapaka) return napaka(gesloNapaka);
+  }
 
   switch (p.akcija) {
     case "pridobiSeznamDogodkov": return pridobiSeznamDogodkov(p);
@@ -177,6 +280,12 @@ function doGet(e) {
     case "potrdiPrejem": return potrdiPrejem(p);
     case "pridobiPotrditve": return pridobiPotrditve(p);
     case "shraniGesloDogodka": return shraniGesloDogodka(p);
+    case "preveriGeslo": return vrniJson({ status: "success", privzetoGeslo: veljavniGesloHash() === STARI_GESLO_HASH });
+    case "zamenjajGeslo": {
+      var napakaGesla = shraniNovoGeslo(p.novoGeslo);
+      return napakaGesla ? napaka(napakaGesla) : vrniJson({ status: "success" });
+    }
+    case "zetonDogodka": return zetonDogodka(p);
     case "preveriGesloDogodka": {
       var r = preveriZascitoDogodka(p.dogodek || "", p.gesloHash || "");
       return vrniJson({ status: "success", zascitena: r.zascitena, ok: r.ok });
@@ -592,4 +701,33 @@ function pripraviListe() {
     });
   });
   Logger.log("Liste pripravljene. Časovni pas tabele: " + ss.getSpreadsheetTimeZone());
+}
+
+// ---------- meni v tabeli (Razširitve -> Apps Script je vezan na tabelo): EPV ----------
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu("EPV")
+    .addItem("Nastavi geslo aplikacije", "meniNastaviGeslo")
+    .addItem("Stroga zaščita vpisov: vklopi", "meniVklopiStrogo")
+    .addItem("Stroga zaščita vpisov: izklopi", "meniIzklopiStrogo")
+    .addToUi();
+}
+
+/** Nastavi novo geslo aplikacije (tudi če je staro pozabljeno) - dostopno samo urednikom tabele. */
+function meniNastaviGeslo() {
+  var ui = SpreadsheetApp.getUi();
+  var odgovor = ui.prompt("Geslo aplikacije EPV", "Vpiši novo geslo (vsaj " + NAJMANJ_ZNAKOV_GESLA + " znakov):", ui.ButtonSet.OK_CANCEL);
+  if (odgovor.getSelectedButton() !== ui.Button.OK) return;
+  var napakaGesla = shraniNovoGeslo(odgovor.getResponseText());
+  ui.alert(napakaGesla || "Geslo je nastavljeno. Staro geslo ne velja več.");
+}
+
+/** Stroga zaščita: vpis pozicij in sporočil samo z QR kodo štaba (žetonom) - tudi za dogodke brez izdanega žetona. */
+function meniVklopiStrogo() {
+  PropertiesService.getScriptProperties().setProperty("STROGA_ZASCITA", "1");
+  SpreadsheetApp.getUi().alert("Stroga zaščita je vklopljena: teren lahko vpisuje samo prek QR kode štaba.");
+}
+function meniIzklopiStrogo() {
+  PropertiesService.getScriptProperties().deleteProperty("STROGA_ZASCITA");
+  SpreadsheetApp.getUi().alert("Stroga zaščita je izklopljena.");
 }

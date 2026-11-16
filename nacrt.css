@@ -170,3 +170,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
    nastavi nacrt.js), da so ikone in napisi v enakem razmerju do zemljevida kot na zaslonu. */
 #tisk .tisk-zemljevid-okvir { position: relative; width: 180mm; height: 125mm; overflow: hidden; border: 1px solid #000; box-sizing: content-box; contain: paint; }
 #tisk .tisk-zemljevid { position: absolute; left: 0; top: 0; border: none; transform-origin: top left; }
+
+/* Žive enote s terena (EPV): pozicija enote čez načrt */
+.nze { position: relative; width: 26px; height: 26px; }
+.nze-pika { display: block; width: 22px; height: 22px; margin: 2px; border-radius: 50%; background: #22c55e; border: 3px solid #fff; box-shadow: 0 0 0 2px #14532d, 0 1px 5px rgba(0,0,0,.8); }
+.nze.stara .nze-pika { background: #94a3b8; box-shadow: 0 0 0 2px #334155, 0 1px 5px rgba(0,0,0,.8); }
+.nze-napis { position: absolute; left: 50%; top: 27px; transform: translateX(-50%); white-space: nowrap; font: bold 11px Arial, sans-serif; color: #fff; background: rgba(20,83,45,.95); border: 1px solid #fff; border-radius: 4px; padding: 1px 5px; }
+.nze.stara .nze-napis { background: rgba(51,65,85,.95); }
+#zive-stanje.napaka { color: #fca5a5; font-weight: bold; }

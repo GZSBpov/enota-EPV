@@ -101,6 +101,7 @@
 
     <div id="tezaveBanner" class="pasica napaka" role="alert"></div>
     <div id="obvestiloNadaljevanje" class="pasica opozorilo"></div>
+    <div id="pasicaZeton" class="pasica opozorilo" style="display:none;"><b>⚠️ Povezava ni več veljavna.</b> Štab vpisov ne sprejema. Skeniraj novo QR kodo štaba ali odpri novo povezavo – čakajoči vpisi se bodo nato poslali sami.</div>
     <div id="opozoriloOzadje" class="pasica opozorilo"></div>
 
     <div id="prikazDogodka" class="zacka-dogodek">Dogodek: Splošno</div>
@@ -171,7 +172,24 @@
     // točke iz štaba (razdalja, smer, navigacija), zvok + vibracija, potrditev prejema sporočil.
     // ==========================================================================
     const SCRIPT_URL = window.GOOGLE_APPS_SCRIPT_URL;
-    const GESLO_APP = "EPV2026";
+    // Teren ne uporablja gesla aplikacije: strežnik ga prepozna po žetonu dogodka iz QR kode (povezave) štaba.
+    const STORAGE_ZETONI = 'epv2_teren_zetoni';
+    let zetoni = {};
+    try { zetoni = JSON.parse(localStorage.getItem(STORAGE_ZETONI)) || {}; } catch (e) { zetoni = {}; }
+    function zetonZa(dogodek) { return (dogodek && zetoni[dogodek]) || ''; }
+    function shraniZeton(dogodek, zeton) {
+        if (!dogodek || !zeton) return;
+        zetoni[dogodek] = zeton;
+        try { localStorage.setItem(STORAGE_ZETONI, JSON.stringify(zetoni)); } catch (e) { /* velja do zaprtja strani */ }
+    }
+    let zetonZavrnjen = false;
+    function prikaziZavrnjenZeton(da) {
+        if (zetonZavrnjen === da) return;
+        zetonZavrnjen = da;
+        const p = document.getElementById('pasicaZeton');
+        if (p) p.style.display = da ? 'block' : 'none';
+        if (da && Zvok && navigator.userActivation && navigator.userActivation.hasBeenActive) { try { Zvok.opozorilo(); } catch (e) { /* brez zvoka */ } }
+    }
     const Zvok = window.EPVZvok;
 
     const STORAGE_TEREN_STANJE = 'epv2_teren_stanje';
@@ -265,7 +283,9 @@
 
     // ---------- strežnik: GET s časovno omejitvijo ----------
     function sestaviUrl(parametri, zGeslom) {
-        const vsi = zGeslom ? Object.assign({ geslo: GESLO_APP }, parametri) : parametri;
+        // žeton se doda ob pošiljanju (ne ob vpisu v čakalno vrsto), da po skeniranju nove QR kode velja tudi za čakajoče vpise
+        const zt = zetonZa(parametri.dogodek);
+        const vsi = zt ? Object.assign({ zeton: zt }, parametri) : parametri;
         const niz = Object.keys(vsi).filter(k => vsi[k] !== undefined && vsi[k] !== null)
             .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(String(vsi[k]))}`).join('&');
         return `${SCRIPT_URL}?${niz}`;
@@ -276,7 +296,10 @@
         try {
             const res = await fetch(sestaviUrl(parametri, zGeslom), { cache: 'no-store', signal: kontrola.signal });
             if (!res.ok) return { status: 'error', message: 'HTTP ' + res.status, omrezje: true };
-            return await res.json();
+            const odgovor = await res.json();
+            // branje brez veljavnega žetona strežnik zavrne kot manjkajoče/napačno geslo
+            if (odgovor.status === 'error' && /gesl/i.test(odgovor.message || '')) prikaziZavrnjenZeton(true);
+            return odgovor;
         } catch (err) {
             return { status: 'error', message: String(err && err.message || err), omrezje: true };
         } finally {
@@ -330,7 +353,12 @@
                     const idx = vrsta.indexOf(el);
                     if (odgovor.status === 'success') {
                         if (idx >= 0) vrsta.splice(idx, 1);
+                        prikaziZavrnjenZeton(false);
                         ob_uspesnem_vpisu(el);
+                    } else if (odgovor.koda === 'zeton') {
+                        // povezava (QR koda) ni več veljavna: vpisi ostanejo v vrsti, dokler enota ne skenira nove kode
+                        napaka = true;
+                        prikaziZavrnjenZeton(true);
                     } else if (odgovor.omrezje || /zaseden/i.test(odgovor.message || '')) {
                         napaka = true; // povezave ni ali je strežnik zaseden - poskusimo znova čez nekaj sekund
                     } else {
@@ -554,6 +582,7 @@
         const clanov = urlParams.get('clanov');
         const vozila = urlParams.get('vozila');
         const dogodek = urlParams.get('dogodek');
+        const zetonUrl = urlParams.get('zeton');
 
         const shranjeno = nalozizStanjeObrazca();
         if (shranjeno) {
@@ -570,8 +599,13 @@
         if (clanov) $('stClanov').value = clanov;
         if (vozila) $('stVozil').value = vozila;
         if (dogodek) {
-            izbranDogodek = decodeURIComponent(dogodek);
+            izbranDogodek = dogodek;
             $('prikazDogodka').innerText = "Dogodek: " + izbranDogodek;
+            if (zetonUrl) {
+                shraniZeton(izbranDogodek, zetonUrl);
+                // žeton umaknemo iz naslovne vrstice (da ne ostane v zgodovini ali na posnetku zaslona)
+                try { urlParams.delete('zeton'); history.replaceState(null, '', window.location.pathname + '?' + urlParams.toString()); } catch (e) { /* ni bistveno */ }
+            }
         }
 
         if (shranjeno?.oddaja && shranjeno?.ime) prikaziPozivZaNadaljevanje(shranjeno);

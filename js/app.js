@@ -10,9 +10,8 @@ import { naloziSporocila, iniciirajAlarmSOS } from './sporocila.js';
 import { iniciirajStabSporocila, osveziStabLog } from './stab-sporocila.js';
 import { iniciirajTocke, osveziTocke } from './tocke.js';
 import { pripraviInNatisni } from './tisk.js';
-import { OSVEZEVANJE_INTERVAL_MS, OSVEZEVANJE_STATUSOV_MS, OSVEZEVANJE_STAB_LOGA_MS, OBS_STREAM_URL, STORAGE_KEY_GESLO, NAVADNO_GESLO } from './config.js';
+import { OSVEZEVANJE_INTERVAL_MS, OSVEZEVANJE_STATUSOV_MS, OSVEZEVANJE_STAB_LOGA_MS, OBS_STREAM_URL } from './config.js';
 
-const PRAVO_GESLO = NAVADNO_GESLO;
 
 // Štabni računalnik: zaslon naj ne zaspi, dokler je aplikacija odprta, ob vrnitvi na zavihek pa se takoj osveži
 // (brskalnik zavihke v ozadju upočasni - opozorila bi sicer lahko zamujala do minute).
@@ -45,6 +44,17 @@ async function naloziVsebinoAplikacije() {
         if (opozorilo) opozorilo.style.display = 'block';
     }
     window.EPVZvok?.pripraviGumb(document.getElementById('btn-zvok'));
+    const zamenjajGeslo = async () => {
+        const novo = window.prompt('Novo geslo aplikacije (vsaj 8 znakov). Velja za štab in taktično tablo; teren uporablja QR kodo.');
+        if (novo === null) return;
+        const ponovi = window.prompt('Ponovi novo geslo:');
+        if (ponovi !== novo) { alert('Gesli se ne ujemata.'); return; }
+        const r = await window.EPVPrijava.zamenjaj(window.EPVPrijava.geslo(), novo);
+        if (r.ok) { alert('Geslo je zamenjano. Staro geslo ne velja več - novo sporoči ostalim v štabu.'); const o = document.getElementById('geslo-opozorilo'); if (o) o.style.display = 'none'; }
+        else alert('Gesla ni bilo mogoče zamenjati: ' + r.sporocilo);
+    };
+    document.getElementById('btn-geslo')?.addEventListener('click', zamenjajGeslo);
+    document.getElementById('geslo-opozorilo')?.addEventListener('click', zamenjajGeslo);
     iniciirajSkrbZaOzadje();
     iniciirajZemljevid();
     iniciirajSlojeEnot();
@@ -97,29 +107,43 @@ function preveriGeslo() {
 
     if (!modal) return;
 
-    if (sessionStorage.getItem(STORAGE_KEY_GESLO) === "true") {
+    const Prijava = window.EPVPrijava;
+    const vstopi = function (privzeto) {
         modal.style.display = 'none';
+        if (napaka) napaka.textContent = "";
+        const opozorilo = document.getElementById('geslo-opozorilo');
+        if (opozorilo) opozorilo.style.display = privzeto ? '' : 'none';
         naloziVsebinoAplikacije();
+    };
+
+    // že prijavljen v tem zavihku: geslo še enkrat preveri strežnik (lahko je bilo medtem zamenjano)
+    if (Prijava.geslo()) {
+        Prijava.preveri(Prijava.geslo()).then(function (r) {
+            if (r.ok || r.omrezje) { vstopi(r.privzeto); return; }
+            Prijava.pobrisi();
+            modal.style.display = 'flex';
+        });
         return;
     }
 
     modal.style.display = 'flex';
 
+    let preverjam = false;
     function potrdiPrijavo() {
         const vnos = input ? input.value.trim() : "";
-
-        if (vnos === PRAVO_GESLO) {
-            sessionStorage.setItem(STORAGE_KEY_GESLO, "true");
-            modal.style.display = 'none';
-            if (napaka) napaka.textContent = "";
-            naloziVsebinoAplikacije();
-        } else {
-            if (napaka) napaka.textContent = "Napačno geslo! Poskusite znova.";
-            if (input) {
-                input.value = "";
-                input.focus();
+        if (!vnos || preverjam) return;
+        preverjam = true;
+        if (napaka) napaka.textContent = "Preverjam ...";
+        Prijava.preveri(vnos).then(function (r) {
+            preverjam = false;
+            if (r.ok) {
+                Prijava.nastavi(vnos);
+                vstopi(r.privzeto);
+            } else {
+                if (napaka) napaka.textContent = r.omrezje ? "Ni povezave s strežnikom - gesla ni mogoče preveriti." : "Napačno geslo! Poskusite znova.";
+                if (input && !r.omrezje) { input.value = ""; input.focus(); }
             }
-        }
+        });
     }
 
     if (btn) btn.onclick = potrdiPrijavo;

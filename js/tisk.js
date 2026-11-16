@@ -6,7 +6,7 @@ import { GOOGLE_APPS_SCRIPT_URL, SLOVAR_BARV } from './config.js';
 import { narisaniSektorjiSloj } from './map.js';
 import { pridobiTrenutnoVidneEnote } from './units.js';
 import { formatirajCas as formatCas, casVMs } from './cas-pomoc.js';
-import { apiGet } from './api.js';
+import { apiGet, trenutnoGeslo } from './api.js';
 import { jeIzkljuceno } from './tisk-izbor.js';
 import { pridobiSejnoGeslo, vprasajZaGesloDogodka, ponastaviGesloDogodka } from './geslo-dogodka.js';
 
@@ -93,7 +93,7 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
     // zaščitena) - šele ko dostop uspe, nadaljujemo z ostalimi podatki za poročilo.
     try {
         let gesloHash = pridobiSejnoGeslo(dogodekId);
-        let res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+        let res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
         let odgovor = res.ok ? await res.json() : null;
 
         if (odgovor && odgovor.status === 'locked') {
@@ -102,7 +102,7 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
                 if (tabelaEl) tabelaEl.innerHTML = '<p>Dostop zavrnjen - dogodek je zaščiten z geslom, ki ni bilo vneseno.</p>';
                 return;
             }
-            res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+            res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
             odgovor = res.ok ? await res.json() : null;
 
             if (odgovor && odgovor.status === 'locked') {
@@ -110,7 +110,7 @@ async function pripraviPodatkeZaTisk(dogodekId, stevilkaTiska) {
                 if (zeliPonastaviti) {
                     gesloHash = await ponastaviGesloDogodka(dogodekId);
                     if (gesloHash) {
-                        res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=EPV2026`, { cache: 'no-store' });
+                        res = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?akcija=pridobiSporocila&dogodek=${encodeURIComponent(dogodekId)}&gesloHashDogodka=${encodeURIComponent(gesloHash)}&geslo=${encodeURIComponent(trenutnoGeslo())}`, { cache: 'no-store' });
                         odgovor = res.ok ? await res.json() : null;
                     }
                 }
