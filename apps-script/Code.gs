@@ -39,8 +39,11 @@ var GLAVE = {
   Potrditve: ["Cas", "Dogodek", "Enota", "Tip", "Ref"],
   Dogodki: ["dogodek", "tip", "podatki", "dodeljenaEnota"],
   DogodekGesla: ["Dogodek", "GesloHash", "Cas"],
-  Zetoni: ["Dogodek", "Zeton", "Cas"]
+  Zetoni: ["Dogodek", "Zeton", "Cas"],
+  LokacijeArhiv: ["Čas", "Enota", "Latitude", "Longitude", "Natančnost", "Dogodek", "ID"],
+  ArhivDogodki: ["Dogodek", "Zadnja dejavnost", "Vrstic", "Arhivirano"]
 };
+var ARHIV_PRIVZETO_DNI = 30;
 
 // Akcije, ki jih terenska aplikacija kliče z žetonom dogodka (iz QR kode) namesto z geslom
 var TERENSKE_AKCIJE = { pridobiDodeljeneSektorje: 1, pridobiSporocilaStab: 1, pridobiTocke: 1, potrdiPrejem: 1, pridobiImenaEnot: 1, pridobiSporocila: 1 };
@@ -366,6 +369,7 @@ function pridobiSeznamDogodkov(p) {
   vrstice("Dogodki").forEach(function (v) { zabelezi(v[0], 0); });
   vrstice("Lokacije").forEach(function (v) { zabelezi(v[5], vMs(v[0])); });
   vrstice("Sporocila").forEach(function (v) { zabelezi(v[2], vMs(v[0])); });
+  vrstice("ArhivDogodki").forEach(function (v) { zabelezi(v[0], vMs(v[1])); }); // arhivirani dogodki ostanejo na seznamu
   // stari odjemalec (V1/) pričakuje samo imena; nov doda oblika=objekt in dobi tudi čas zadnje dejavnosti
   if (!p || p.oblika !== "objekt") return vrniJson({ status: "success", data: Object.keys(zadnji) });
   var seznam = Object.keys(zadnji).map(function (ime) {
@@ -383,7 +387,7 @@ function pridobiSeznamDogodkov(p) {
 function pridobiLokacije(p) {
   var dogodek = String(p.dogodek || "");
   if (!dogodek || dogodek === "novy") return vrniJson({ status: "success", data: [], kazalec: 0 });
-  var v = vrstice("Lokacije");
+  var v = lokacijeDogodka(dogodek);
   var kazalec = parseInt(p.kazalec, 10) || 0;
   if (kazalec > v.length || kazalec < 0) kazalec = 0; // list je bil medtem skrajšan - začni znova
   var rezultat = [];
@@ -398,7 +402,7 @@ function pridobiImenaEnot(p) {
   var dogodek = String(p.dogodek || "");
   var videna = {};
   var seznam = [];
-  var v = vrstice("Lokacije");
+  var v = dogodek ? lokacijeDogodka(dogodek) : vrstice("Lokacije");
   for (var i = v.length - 1; i >= 0; i--) { // od najnovejše
     if (dogodek && String(v[i][5]) !== dogodek) continue;
     var deli = String(v[i][1] || "").split(":");
@@ -695,7 +699,7 @@ function pripraviListe() {
   Object.keys(GLAVE).forEach(function (ime) {
     var sheet = pridobiSheet(ime);
     sheet.getRange(1, 1, 1, GLAVE[ime].length).setValues([GLAVE[ime]]); // dopolni glavo (npr. stolpec ID)
-    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3] }[ime] || [];
+    var casStolpci = { Lokacije: [1], Sporocila: [1], SporocilaStab: [1], Tocke: [1, 11, 12], Potrditve: [1], DogodekGesla: [3], Zetoni: [3], LokacijeArhiv: [1], ArhivDogodki: [2, 4] }[ime] || [];
     casStolpci.forEach(function (c) {
       sheet.getRange(2, c, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
     });
@@ -703,11 +707,84 @@ function pripraviListe() {
   Logger.log("Liste pripravljene. Časovni pas tabele: " + ss.getSpreadsheetTimeZone());
 }
 
+// ---------- arhiv pozicij starih dogodkov ----------
+// List Lokacije raste z vsako oddano pozicijo in ga strežnik bere ob vsakem osveževanju. Arhiviranje prestavi
+// pozicije starih dogodkov v list LokacijeArhiv; tekoči dogodki zato berejo krajši list. Arhiviran dogodek ostane
+// na seznamu in se odpre kot prej (pot, poročilo) - strežnik ga prebere iz arhiva. Sporočila, točke, sektorji in
+// potrditve se ne selijo (teh je malo).
+
+/** Pozicije za branje enega dogodka: živi list; pri arhiviranem dogodku pred njim še njegove vrstice iz arhiva. */
+function lokacijeDogodka(dogodek) {
+  var zive = vrstice("Lokacije");
+  var arhivirano = vrstice("ArhivDogodki").some(function (v) { return String(v[0]) === dogodek; });
+  if (!arhivirano) return zive;
+  var izArhiva = vrstice("LokacijeArhiv").filter(function (v) { return String(v[5]) === dogodek; });
+  return izArhiva.concat(zive);
+}
+
+/**
+ * Prestavi v arhiv pozicije dogodkov, ki nimajo nobene dejavnosti zadnjih "dni" dni.
+ * Vrstni red je varen: najprej zapis v arhiv, šele nato brisanje iz lista Lokacije - če se izvajanje vmes
+ * prekine, so vrstice kvečjemu na obeh listih, nikoli izgubljene.
+ */
+function arhivirajStareDogodke(dni) {
+  dni = stevilo(dni);
+  if (dni === null || dni < 1) dni = ARHIV_PRIVZETO_DNI;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return { ok: false, sporocilo: "Strežnik je zaseden, poskusi znova." };
+  try {
+    var sheet = pridobiSheet("Lokacije");
+    var vse = sheet.getDataRange().getValues();
+    if (vse.length < 2) return { ok: true, dogodkov: 0, vrstic: 0, imena: [] };
+    var meja = new Date().getTime() - dni * 86400000;
+    var zadnji = {};
+    for (var i = 1; i < vse.length; i++) {
+      var ime = String(vse[i][5] || "");
+      var ms = vMs(vse[i][0]);
+      if (zadnji[ime] === undefined || ms > zadnji[ime]) zadnji[ime] = ms;
+    }
+    vrstice("Sporocila").forEach(function (v) { var d = String(v[2] || ""); if (zadnji[d] !== undefined && vMs(v[0]) > zadnji[d]) zadnji[d] = vMs(v[0]); });
+    var stari = {};
+    Object.keys(zadnji).forEach(function (d) { if (d && zadnji[d] > 0 && zadnji[d] < meja) stari[d] = 0; });
+    if (!Object.keys(stari).length) return { ok: true, dogodkov: 0, vrstic: 0, imena: [] };
+
+    function zaZapis(vrsta) { // besedila spet zavarujemo, da jih Sheet ne razume kot formule
+      var o = [];
+      for (var j = 0; j < 7; j++) o.push(typeof vrsta[j] === "string" ? varno(vrsta[j]) : (vrsta[j] === undefined ? "" : vrsta[j]));
+      return o;
+    }
+    var vArhiv = [], ostane = [];
+    for (var k = 1; k < vse.length; k++) {
+      var dog = String(vse[k][5] || "");
+      if (stari[dog] !== undefined) { vArhiv.push(zaZapis(vse[k])); stari[dog]++; } else ostane.push(zaZapis(vse[k]));
+    }
+    // 1) zapis v arhiv
+    var arhiv = pridobiSheet("LokacijeArhiv");
+    var potrebnih = arhiv.getLastRow() + vArhiv.length;
+    if (potrebnih > arhiv.getMaxRows()) arhiv.insertRowsAfter(arhiv.getMaxRows(), potrebnih - arhiv.getMaxRows());
+    arhiv.getRange(arhiv.getLastRow() + 1, 1, vArhiv.length, 7).setValues(vArhiv);
+    arhiv.getRange(2, 1, Math.max(1, arhiv.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    // 2) seznam arhiviranih dogodkov
+    var indeks = pridobiSheet("ArhivDogodki");
+    var zdaj = new Date();
+    Object.keys(stari).forEach(function (d) { indeks.appendRow([varno(d), new Date(zadnji[d]), stari[d], zdaj]); });
+    // 3) živi list: preostale vrstice na vrh, odvečne vrstice na dnu izbrisane
+    if (ostane.length) sheet.getRange(2, 1, ostane.length, 7).setValues(ostane);
+    sheet.deleteRows(ostane.length + 2, vArhiv.length);
+    return { ok: true, dogodkov: Object.keys(stari).length, vrstic: vArhiv.length, imena: Object.keys(stari) };
+  } catch (err) {
+    return { ok: false, sporocilo: String(err) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ---------- meni v tabeli (Razširitve -> Apps Script je vezan na tabelo): EPV ----------
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu("EPV")
     .addItem("Nastavi geslo aplikacije", "meniNastaviGeslo")
+    .addItem("Arhiviraj pozicije starih dogodkov", "meniArhiviraj")
     .addItem("Stroga zaščita vpisov: vklopi", "meniVklopiStrogo")
     .addItem("Stroga zaščita vpisov: izklopi", "meniIzklopiStrogo")
     .addToUi();
@@ -730,4 +807,14 @@ function meniVklopiStrogo() {
 function meniIzklopiStrogo() {
   PropertiesService.getScriptProperties().deleteProperty("STROGA_ZASCITA");
   SpreadsheetApp.getUi().alert("Stroga zaščita je izklopljena.");
+}
+
+/** Arhiviranje pozicij starih dogodkov (najprej naredi kopijo tabele: Datoteka -> Ustvari kopijo). */
+function meniArhiviraj() {
+  var ui = SpreadsheetApp.getUi();
+  var odgovor = ui.prompt("Arhiviranje pozicij", "V list LokacijeArhiv prestavim pozicije dogodkov brez dejavnosti zadnjih toliko dni:", ui.ButtonSet.OK_CANCEL);
+  if (odgovor.getSelectedButton() !== ui.Button.OK) return;
+  var r = arhivirajStareDogodke(odgovor.getResponseText() || ARHIV_PRIVZETO_DNI);
+  if (!r.ok) { ui.alert("Arhiviranje ni uspelo: " + r.sporocilo); return; }
+  ui.alert(r.dogodkov ? "Arhivirano: " + r.dogodkov + " dogodkov, " + r.vrstic + " pozicij.\n\n" + r.imena.join(", ") : "Ni dogodkov, starejših od izbrane meje.");
 }

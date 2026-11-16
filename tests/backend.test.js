@@ -227,5 +227,43 @@ pri('zasedeno ob zaklepu', m2.get({ enota: 'A:B:1:0', lat: '46', lon: '15', id: 
   pri('stroga zaščita: dogodek brez žetona zavrnjen', z.get(vpis({ dogodek: 'Neznan2' })).koda === 'zeton' && z.get(vpis({ zeton: nov.zeton })).status === 'success' && z.get(vpis({ dogodek: 'Neznan2', geslo: G })).status === 'success');
 }
 
+// ---------------- arhiv pozicij starih dogodkov ----------------
+{
+  const z = ustvari(); z.pripravi();
+  const G = 'EPV2026', dan = 86400000, zdaj = Date.now();
+  const L = z.sheeti.Lokacije;
+  const vrsta = (ms, enota, dog, id) => L.vrstice.push([new Date(ms), enota, 46.4, 15.6, 10, dog, id]);
+  // prepleteni vrstici starega in tekočega dogodka + dogodek z nevarnim imenom enote
+  vrsta(zdaj - 60 * dan, 'GASILEC:Stara A:3:1', 'Stara vaja', 's1');
+  vrsta(zdaj - 2 * dan, 'GASILEC:Nova A:3:1', 'Tekoca', 'n1');
+  vrsta(zdaj - 59 * dan, 'GASILEC:=Stara B:3:1', 'Stara vaja', 's2');
+  vrsta(zdaj - 1 * dan, 'GASILEC:Nova B:3:1', 'Tekoca', 'n2');
+  vrsta(zdaj - 40 * dan, 'GASILEC:Sredina:2:1', 'Srednja', 'm1');
+  z.sheeti.Sporocila.vrstice.push([new Date(zdaj - 5 * dan), 'GASILEC:Sredina:2:1', 'Srednja', 'pozno sporočilo', '', '', 'ms1']);
+  const pred = z.get({ geslo: G, akcija: 'pridobiLokacije', dogodek: 'Stara vaja' }).data;
+  const r = z.sandbox.arhivirajStareDogodke(30);
+  pri('arhiv: prestavljen samo stari dogodek', r.ok && r.dogodkov === 1 && r.vrstic === 2 && r.imena[0] === 'Stara vaja', r);
+  pri('arhiv: dogodek s svežim sporočilom ostane', L.vrstice.some(v => v[5] === 'Srednja'));
+  pri('arhiv: živi list brez starih vrstic in brez praznih', L.vrstice.length === 4 && L.vrstice.slice(1).map(v => v[6]).join() === 'n1,n2,m1', L.vrstice.map(v => v[6]));
+  pri('arhiv: vrstice v arhivu s časom in ID', z.sheeti.LokacijeArhiv.vrstice.length === 3 && z.sheeti.LokacijeArhiv.vrstice[1][0] instanceof Date && z.sheeti.LokacijeArhiv.vrstice[2][6] === 's2');
+  pri('arhiv: besedilo ni postalo formula', z.stanje.formuleVSheetu === 0);
+  const po = z.get({ geslo: G, akcija: 'pridobiLokacije', dogodek: 'Stara vaja' });
+  pri('arhiv: arhiviran dogodek se bere enako kot prej', JSON.stringify(po.data.map(v => [v.id, v.enota, v.cas])) === JSON.stringify(pred.map(v => [v.id, v.enota, v.cas])), po.data);
+  pri('arhiv: dogodek ostane na seznamu s časom', z.get({ geslo: G, akcija: 'pridobiSeznamDogodkov', oblika: 'objekt' }).data.some(d => d.ime === 'Stara vaja' && d.zadnji) && z.get({ geslo: G, akcija: 'pridobiSeznamDogodkov' }).data.includes('Stara vaja'));
+  pri('arhiv: imena enot arhiviranega dogodka', z.get({ geslo: G, akcija: 'pridobiImenaEnot', dogodek: 'Stara vaja' }).data.length === 2);
+  pri('arhiv: tekoči dogodek nespremenjen', z.get({ geslo: G, akcija: 'pridobiLokacije', dogodek: 'Tekoca' }).data.map(v => v.id).join() === 'n1,n2');
+  // kazalec pri arhiviranem dogodku + nova pozicija za isto ime
+  z.get({ enota: 'GASILEC:Stara A:3:1', lat: '46.4', lon: '15.6', dogodek: 'Stara vaja', id: 's3' });
+  const dodatno = z.get({ geslo: G, akcija: 'pridobiLokacije', dogodek: 'Stara vaja', kazalec: po.kazalec });
+  pri('arhiv: nova pozicija arhiviranega dogodka pride po kazalcu', dodatno.data.length === 1 && dodatno.data[0].id === 's3', dodatno);
+  pri('arhiv: ponovni zagon ne naredi ničesar', z.sandbox.arhivirajStareDogodke(30).vrstic === 0 && z.sheeti.LokacijeArhiv.vrstice.length === 3);
+  pri('arhiv: neveljavna meja uporabi privzeto', z.sandbox.arhivirajStareDogodke('abc').ok === true);
+  const p2 = ustvari(); p2.pripravi();
+  pri('arhiv: prazna tabela', p2.sandbox.arhivirajStareDogodke(30).vrstic === 0);
+  const vse = ustvari(); vse.pripravi();
+  vse.sheeti.Lokacije.vrstice.push([new Date(zdaj - 90 * dan), 'GASILEC:X:1:1', 46, 15, 5, 'Edini', 'e1']);
+  pri('arhiv: ko se arhivira vse, ostane samo glava', vse.sandbox.arhivirajStareDogodke(30).vrstic === 1 && vse.sheeti.Lokacije.vrstice.length === 1 && vse.get({ geslo: G, akcija: 'pridobiLokacije', dogodek: 'Edini' }).data.length === 1);
+}
+
 console.log('Strežnik: ' + ok + ' uspešnih, ' + fail + ' napak.');
 process.exit(fail ? 1 : 0);

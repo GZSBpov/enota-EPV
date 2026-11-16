@@ -21,6 +21,12 @@ Pozabljeno geslo: v tabeli meni **EPV → Nastavi geslo aplikacije** (dostopno s
 
 Stara različica v mapi `V1/` uporablja staro geslo in po zamenjavi gesla ne deluje več.
 
+## Arhiviranje pozicij starih dogodkov
+
+List `Lokacije` raste z vsako oddano pozicijo, strežnik pa ga bere ob vsakem osveževanju. V tabeli meni **EPV → Arhiviraj pozicije starih dogodkov** prestavi pozicije dogodkov brez dejavnosti zadnjih N dni (privzeto 30) v list `LokacijeArhiv`. Arhiviran dogodek ostane na seznamu v štabu in se odpre kot prej (pot, poročilo). Sporočila, točke in sektorji ostanejo na svojih listih.
+
+Pred prvim arhiviranjem naredi kopijo tabele (Datoteka → Ustvari kopijo). Arhiviraj, ko ni intervencije ali vaje. Stara stran `V1/` arhiviranih dogodkov ne vidi.
+
 ## Kaj še ostane (naslednji koraki)
 
 3. **Zaščita branja zaključenih dogodkov.** Geslo dogodka danes varuje sporočila in sektorje, ne pa pozicij in točk. Poenotiti.

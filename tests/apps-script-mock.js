@@ -31,6 +31,8 @@ function ustvari(opcije) {
     SheetObj.prototype.getLastRow = function () { return this.vrstice.length; };
     SheetObj.prototype.getMaxRows = function () { return Math.max(1000, this.vrstice.length); };
     SheetObj.prototype.deleteRow = function (n) { this.vrstice.splice(n - 1, 1); };
+    SheetObj.prototype.insertRowsAfter = function () {};
+    SheetObj.prototype.deleteRows = function (n, koliko) { this.vrstice.splice(n - 1, koliko); };
     SheetObj.prototype.getDataRange = function () {
         const self = this;
         return { getValues: function () { return self.vrstice.map(function (r) { return r.slice(); }); } };
