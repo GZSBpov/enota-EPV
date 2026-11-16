@@ -192,7 +192,7 @@
         return {
             vrsta: 'epv-nacrt', v: VERZIJA, naziv: naziv || 'Nov načrt',
             ustvarjeno: new Date().toISOString(), spremenjeno: new Date().toISOString(),
-            elaborat: privzetiElaborat(), obrazec: privzetiObrazec(), napisi: true,
+            elaborat: privzetiElaborat(), obrazec: privzetiObrazec(), napisi: true, sever: false,
             skice: [novaSkica('Lokacija', pogled), novaSkica('Evakuacija', pogled), novaSkica('Posredovanje', pogled)]
         };
     }
@@ -324,7 +324,7 @@
         if (o.obrazec && typeof o.obrazec === 'object') Object.keys(obrazec).forEach(function (k) { if (typeof o.obrazec[k] === 'string') obrazec[k] = o.obrazec[k]; });
         return {
             ok: true, izpusceno: izpusceno,
-            nacrt: { vrsta: 'epv-nacrt', v: VERZIJA, naziv: String(o.naziv || 'Načrt'), ustvarjeno: o.ustvarjeno || new Date().toISOString(), spremenjeno: o.spremenjeno || new Date().toISOString(), elaborat: elaborat, obrazec: obrazec, osnova: osnova, napisi: o.napisi !== false, skice: skice }
+            nacrt: { vrsta: 'epv-nacrt', v: VERZIJA, naziv: String(o.naziv || 'Načrt'), ustvarjeno: o.ustvarjeno || new Date().toISOString(), spremenjeno: o.spremenjeno || new Date().toISOString(), elaborat: elaborat, obrazec: obrazec, osnova: osnova, napisi: o.napisi !== false, sever: o.sever === true, skice: skice }
         };
     }
 

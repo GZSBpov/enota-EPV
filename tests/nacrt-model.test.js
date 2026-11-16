@@ -52,6 +52,7 @@ const zOsnovo = JSON.parse(JSON.stringify(n)); zOsnovo.osnova = os;
 pri('osnova potuje z datoteko načrta', M.uvozi(JSON.stringify(zOsnovo)).nacrt.osnova.tocke[0].naziv === 'PGD A' && M.uvozi(JSON.stringify(n)).nacrt.osnova === null);
 pri('barve črt vsebujejo belo in črno', M.BARVE_CRT.includes('#f8fafc') && M.BARVE_CRT.includes('#111827'));
 
+pri('smeri neba: privzeto izklopljene, vklop se ohrani v datoteki', n.sever === false && M.uvozi(JSON.stringify(Object.assign({}, n, { sever: true }))).nacrt.sever === true && M.uvozi(JSON.stringify(stari)).nacrt.sever === false);
 pri('napisi: privzeto vidni, izklop se ohrani v datoteki', n.napisi === true && M.uvozi(JSON.stringify(Object.assign({}, n, { napisi: false }))).nacrt.napisi === false && M.uvozi(JSON.stringify(stari)).nacrt.napisi === true);
 
 pri('kolesa: GVC-3 in GTVD 6, ostala 4', M.steviloKoles('GVC-3') === 6 && M.steviloKoles('GTVD') === 6 && M.TIPI_VOZIL.filter(v => !['GVC-3', 'GTVD'].includes(v.tip)).every(v => M.steviloKoles(v.tip) === 4) && M.steviloKoles('NMP') === 4 && M.steviloKoles('') === 4);

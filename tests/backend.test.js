@@ -265,5 +265,33 @@ pri('zasedeno ob zaklepu', m2.get({ enota: 'A:B:1:0', lat: '46', lon: '15', id: 
   pri('arhiv: ko se arhivira vse, ostane samo glava', vse.sandbox.arhivirajStareDogodke(30).vrstic === 1 && vse.sheeti.Lokacije.vrstice.length === 1 && vse.get({ geslo: G, akcija: 'pridobiLokacije', dogodek: 'Edini' }).data.length === 1);
 }
 
+// ---------------- načrti taktične table na spletu ----------------
+{
+  const z = ustvari(); z.pripravi();
+  const G = 'EPV2026';
+  const maly = JSON.stringify({ vrsta: 'epv-nacrt', v: 1, naziv: 'Vaja A', skice: [] });
+  pri('načrt: shranjevanje zahteva geslo', z.post({ akcija: 'shraniNacrt', naziv: 'Vaja A', vsebina: maly }).status === 'error' && z.get({ akcija: 'seznamNacrtov' }).status === 'error');
+  pri('načrt: brez naziva ali z neveljavno vsebino zavrnjen', z.post({ akcija: 'shraniNacrt', geslo: G, naziv: ' ', vsebina: maly }).status === 'error' && z.post({ akcija: 'shraniNacrt', geslo: G, naziv: 'X', vsebina: '{pokvarjeno' }).status === 'error' && z.sheeti.Nacrti.vrstice.length === 1);
+  const r1 = z.post({ akcija: 'shraniNacrt', geslo: G, naziv: 'Vaja A', vsebina: maly });
+  pri('načrt: shranjen', r1.status === 'success' && r1.zamenjan === false && z.sheeti.Nacrti.vrstice.length === 2, r1);
+  pri('načrt: prebran enak', z.get({ geslo: G, akcija: 'pridobiNacrt', naziv: 'Vaja A' }).vsebina === maly);
+  // velik načrt (več kosov), z znaki, ki bi jih Sheet lahko razumel kot formulo na začetku kosa
+  const velik = JSON.stringify({ vrsta: 'epv-nacrt', v: 1, naziv: '=Velik', polnilo: '=+-@čšž"\\n'.repeat(15000) });
+  const r2 = z.post({ akcija: 'shraniNacrt', geslo: G, naziv: '=Velik', vsebina: velik });
+  const kosov = z.sheeti.Nacrti.vrstice.filter(v => v[0] === '=Velik').length;
+  pri('načrt: velik se razdeli na kose pod 50.000 znakov', r2.status === 'success' && kosov === Math.ceil(velik.length / 40000) && kosov > 3 && z.sheeti.Nacrti.vrstice.every(v => String(v[4]).length <= 50000), kosov);
+  pri('načrt: velik prebran brez izgube', z.get({ geslo: G, akcija: 'pridobiNacrt', naziv: '=Velik' }).vsebina === velik);
+  pri('načrt: nič ni postalo formula', z.stanje.formuleVSheetu === 0);
+  const manjsi = JSON.stringify({ vrsta: 'epv-nacrt', v: 1, naziv: '=Velik', skice: [1] });
+  const r3 = z.post({ akcija: 'shraniNacrt', geslo: G, naziv: '=Velik', vsebina: manjsi });
+  pri('načrt: ponovno shranjevanje zamenja stare kose', r3.zamenjan === true && z.sheeti.Nacrti.vrstice.filter(v => v[0] === '=Velik').length === 1 && z.get({ geslo: G, akcija: 'pridobiNacrt', naziv: '=Velik' }).vsebina === manjsi);
+  const sez = z.get({ geslo: G, akcija: 'seznamNacrtov' }).data;
+  pri('načrt: seznam z nazivi in velikostjo', sez.length === 2 && sez.map(d => d.naziv).sort().join() === '=Velik,Vaja A' && sez.find(d => d.naziv === 'Vaja A').znakov === maly.length, sez);
+  pri('načrt: neobstoječ', z.get({ geslo: G, akcija: 'pridobiNacrt', naziv: 'Ni ga' }).status === 'error' && z.get({ geslo: G, akcija: 'izbrisiNacrt', naziv: 'Ni ga' }).status === 'error');
+  pri('načrt: brisanje', z.get({ geslo: G, akcija: 'izbrisiNacrt', naziv: 'Vaja A' }).status === 'success' && z.get({ geslo: G, akcija: 'seznamNacrtov' }).data.length === 1 && z.get({ geslo: G, akcija: 'pridobiNacrt', naziv: '=Velik' }).vsebina === manjsi);
+  pri('načrt: prevelik zavrnjen', z.post({ akcija: 'shraniNacrt', geslo: G, naziv: 'Ogromen', vsebina: JSON.stringify({ a: 'x'.repeat(3000001) }) }).status === 'error');
+  pri('načrt: žeton terena ne odpre načrtov', (() => { const zt = z.get({ geslo: G, akcija: 'zetonDogodka', dogodek: 'D' }).zeton; return z.get({ akcija: 'seznamNacrtov', dogodek: 'D', zeton: zt }).status === 'error'; })());
+}
+
 console.log('Strežnik: ' + ok + ' uspešnih, ' + fail + ' napak.');
 process.exit(fail ? 1 : 0);
