@@ -346,7 +346,7 @@
             '<circle cx="32" cy="34" r="22" fill="rgba(255,255,255,.92)" stroke="#111" stroke-width="1.5"/>' +
             '<path d="M32 13 L38 34 L32 31 L26 34 Z" fill="#dc2626" stroke="#111" stroke-width="1"/>' +
             '<path d="M32 55 L38 34 L32 37 L26 34 Z" fill="#fff" stroke="#111" stroke-width="1"/>' +
-            '<g font-family="Arial, sans-serif" font-weight="bold" fill="#111" text-anchor="middle">' +
+            '<g font-family="Arial, sans-serif" font-weight="bold" fill="#111" text-anchor="middle" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" paint-order="stroke">' +
             '<text x="32" y="10" font-size="12">S</text>' +
             '<text x="50" y="37" font-size="8">V</text><text x="14" y="37" font-size="8">Z</text><text x="32" y="63.5" font-size="8">J</text></g></svg>';
     }
