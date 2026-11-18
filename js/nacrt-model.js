@@ -32,7 +32,7 @@
 
     // Službe: barva telesa, barva proge (druga barva), barva napisa
     const SLUZBE = {
-        gasilci: { naziv: 'Gasilci', barva: '#dc2626', proga: '#fde047', napis: '#ffffff', lucke: true },
+        gasilci: { naziv: 'Gasilci', barva: '#dc2626', proga: '#fde047', napis: '#ffffff' },
         cz: { naziv: 'Civilna zaščita', barva: '#1d4ed8', proga: '#facc15', napis: '#ffffff' },
         policija: { naziv: 'Policija', barva: '#ffffff', proga: '#1d4ed8', napis: '#1e3a8a', lucke: true },
         resevalci: { naziv: 'Reševalci (NMP)', barva: '#facc15', proga: '#dc2626', napis: '#1f2937', lucke: true },
@@ -246,6 +246,13 @@
         return isNaN(n) ? 1 : Math.round(Math.max(0.6, Math.min(2.6, n)) * 10) / 10;
     }
 
+    /** Letev z modrima lučkama na strehi: policija, reševalci in mala gasilska vozila (PV, GVM). */
+    function imaLucke(e) {
+        const sluzba = (e && e.sluzba) || 'gasilci';
+        if (SLUZBE[sluzba] && SLUZBE[sluzba].lucke) return true;
+        return sluzba === 'gasilci' && /^(PV|GVM)(\b|-|\d|$)/i.test(String((e && e.tip) || '').trim());
+    }
+
     function steviloPosadke(e) {
         if (!e || e.posadka === undefined || e.posadka === null || String(e.posadka).trim() === '') return null;
         const n = parseInt(e.posadka, 10);
@@ -389,7 +396,7 @@
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
         BARVE_SEKTORJEV: BARVE_SEKTORJEV, BARVE_CRT: BARVE_CRT, ocistiOsnovo: ocistiOsnovo, kmlKoordinate: kmlKoordinate, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
-        privzetiObrazec: privzetiObrazec, omejiMerilo: omejiMerilo, omejiVelikostZnaka: omejiVelikostZnaka, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
+        privzetiObrazec: privzetiObrazec, imaLucke: imaLucke, omejiMerilo: omejiMerilo, omejiVelikostZnaka: omejiVelikostZnaka, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
         jeCisterna: jeCisterna, imaRoko: imaRoko, steviloKoles: steviloKoles, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,

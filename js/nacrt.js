@@ -56,13 +56,11 @@
         const s = M.SLUZBE[sluzba] || M.SLUZBE.gasilci;
         const r = 'stroke="#0f172a" stroke-width="1.5"';
         const steklo = '#1f2937';
-        // Modri luči na strehi kabine (gasilci, policija, reševalci): levo in desno tik za vetrobranskim steklom.
+        // Letev z modrima lučkama na strehi kabine, tik za vetrobranskim steklom (policija, reševalci, PV, GVM).
         const lucke = function (x, y, w, nos) {
-            const ly = y + nos + 2.2, sw = 4.6, sh = 3.6;
-            return [x + 1.8, x + w - 1.8 - sw].map(function (lx) {
-                return '<rect class="nv-lucka" x="' + lx + '" y="' + ly + '" width="' + sw + '" height="' + sh + '" rx="1.3" fill="#2563eb" stroke="#0f172a" stroke-width="0.8"/>' +
-                    '<rect x="' + (lx + 1) + '" y="' + (ly + 0.8) + '" width="1.6" height="1.2" rx="0.5" fill="#bfdbfe"/>';
-            }).join('');
+            const ly = y + nos + 2.2, sh = 3.6;
+            return '<rect class="nv-letev" x="' + (x + 1.6) + '" y="' + ly + '" width="' + (w - 3.2) + '" height="' + sh + '" rx="1.3" fill="#e5e7eb" stroke="#0f172a" stroke-width="0.8"/>' +
+                [x + 2.2, x + w - 7.2].map(function (lx) { return '<rect class="nv-lucka" x="' + lx + '" y="' + (ly + 0.5) + '" width="5" height="' + (sh - 1) + '" rx="1" fill="#2563eb"/>'; }).join('');
         };
         // Telo: spredaj zoženo v trapez, ob straneh rahlo vidna kolesa (4, pri triosnih vozilih 6).
         const telo = function (x, y, w, h) {
@@ -75,7 +73,7 @@
             t += '<polygon points="' + (x + zozitev) + ',' + y + ' ' + (x + w - zozitev) + ',' + y + ' ' + (x + w) + ',' + (y + nos) + ' ' + (x + w) + ',' + (y + h) + ' ' + x + ',' + (y + h) + ' ' + x + ',' + (y + nos) + '" fill="' + s.barva + '" ' + r + ' stroke-linejoin="round"/>' +
                 '<polygon points="' + (x + zozitev + 1.2) + ',' + (y + 3.5) + ' ' + (x + w - zozitev - 1.2) + ',' + (y + 3.5) + ' ' + (x + w - 2.2) + ',' + (y + nos + 1.5) + ' ' + (x + 2.2) + ',' + (y + nos + 1.5) + '" fill="' + steklo + '"/>' +
                 '<rect x="' + (x + 0.8) + '" y="' + crtaY + '" width="' + (w - 1.6) + '" height="3.5" fill="' + s.proga + '"/>';
-            if (s.lucke && o.lucke !== false) t += lucke(x, y, w, nos);
+            if (o.lucke === undefined ? s.lucke : o.lucke) t += lucke(x, y, w, nos);
             if (o.cisterna) {
                 const y1 = crtaY + 6, y2 = y + h - 3;
                 t += '<line x1="' + (x + 3) + '" y1="' + y1 + '" x2="' + (x + w - 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/><line x1="' + (x + w - 3) + '" y1="' + y1 + '" x2="' + (x + 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/>';
@@ -117,7 +115,7 @@
         const oblika = e.oblika || oblikaZaTip(e.tip, e.sluzba);
         const zasukRoke = (((e.roka === undefined ? (e.kot || 0) : e.roka) - (e.kot || 0)) % 360 + 360) % 360;
         const napis = brezNapisa ? '' : samoStevilka ? String(e.st === undefined || e.st === null ? '' : e.st) : (M.oznakaVozila(e) || '?');
-        const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(oblika, e.sluzba, { cisterna: M.jeCisterna(e), roka: zasukRoke, kolesa: M.steviloKoles(e.tip) }) + '</g></svg>' +
+        const html = '<div class="nv' + (izbran ? ' izbran' : '') + '"><svg viewBox="0 0 56 56"><g transform="rotate(' + (e.kot || 0) + ' 28 28)">' + svgVozila(oblika, e.sluzba, { lucke: M.imaLucke(e), cisterna: M.jeCisterna(e), roka: zasukRoke, kolesa: M.steviloKoles(e.tip) }) + '</g></svg>' +
             (napis ? '<span class="nv-napis">' + esc(napis) + '</span>' : '') + '</div>';
         return L.divIcon({ className: 'nacrt-ikona', html: html, iconSize: [60, 76], iconAnchor: [30, 28] });
     }
