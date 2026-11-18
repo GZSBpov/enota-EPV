@@ -42,6 +42,8 @@ Stara različica je prestavljena v `V1/` in še deluje z novo skripto (ista tabe
 - **Velikost ikon na skici**: drsnik pri »Napisi« pomanjša ali poveča vse ikone in napise ene skice (zaslon, izpis, slika).
 - **Slika skice**: gumb »🖼️ Slika« shrani trenutno skico z legendo kot JPG za vstavljanje v elaborat.
 - **Posadka iz EPV**: ko so vklopljene žive enote, se vozilo poveže z enoto s terena; število članov, ki ga enota vpiše na telefonu, se vpiše kot posadka.
+- **Modre lučke**: vozila gasilcev, policije in reševalcev imajo na strehi kabine dve modri lučki.
+- **Vozila v legendi**: v izpisu in na sliki skice je na koncu legende seznam vozil po številki prihoda – vrsta, društvo (oziroma služba) in posadka.
 - **Posadka in poročilo**: pri vozilu vpišeš posadko kot 1 + število gasilcev. Pod vsako skico v izpisu je poročilo o sodelujočih: enote, vozila in člani po enotah ter skupno število sodelujočih (enako v elaboratu za ves načrt). Vozila brez vpisane posadke so označena in niso všteta med člane.
 - **Izpis skic**: pod vozili so samo številke prihoda; enota, tip in naloga so v tabeli pod skico.
 - **Elaborat**: predloga z besedili (uvod, cilji, varnost, lokacija, scenarij, alarmiranje, časovnica …). Tabela sodelujočih vozil se sestavi iz skic, skice se dodajo na koncu. Izpis: Natisni ali »Shrani kot PDF«.

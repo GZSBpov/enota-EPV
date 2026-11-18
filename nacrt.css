@@ -219,3 +219,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 #tisk .tisk-slika .nacrt-legenda { margin-bottom: 0; }
 .vrh-gumbi button, .vrh-gumbi .gumb-povezava { padding-left: 8px; padding-right: 8px; }
 #naziv-nacrta { min-width: 120px; }
+
+/* Legenda izpisa in slike: seznam vozil po številki prihoda */
+#tisk .nl-vrsta .nl-vozila { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 4mm; row-gap: 0.6mm; margin-top: 1.2mm; padding-top: 1.2mm; border-top: 1px solid #999; }
+#tisk .nl-vozila .nl-podnaslov { grid-column: 1 / -1; font-weight: bold; }
+#tisk .nl-vozila .nl-vozilo { display: flex; align-items: center; min-height: 5.5mm; }
+#tisk .nl-vozila .nl-st { flex: 0 0 auto; min-width: 5mm; margin-right: 1.8mm; padding: 0 1mm; border: 1px solid #0f172a; border-radius: 1mm; background: #fff; font-weight: bold; text-align: center; }

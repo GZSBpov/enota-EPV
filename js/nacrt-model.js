@@ -32,10 +32,10 @@
 
     // Službe: barva telesa, barva proge (druga barva), barva napisa
     const SLUZBE = {
-        gasilci: { naziv: 'Gasilci', barva: '#dc2626', proga: '#fde047', napis: '#ffffff' },
+        gasilci: { naziv: 'Gasilci', barva: '#dc2626', proga: '#fde047', napis: '#ffffff', lucke: true },
         cz: { naziv: 'Civilna zaščita', barva: '#1d4ed8', proga: '#facc15', napis: '#ffffff' },
-        policija: { naziv: 'Policija', barva: '#ffffff', proga: '#1d4ed8', napis: '#1e3a8a' },
-        resevalci: { naziv: 'Reševalci (NMP)', barva: '#facc15', proga: '#dc2626', napis: '#1f2937' },
+        policija: { naziv: 'Policija', barva: '#ffffff', proga: '#1d4ed8', napis: '#1e3a8a', lucke: true },
+        resevalci: { naziv: 'Reševalci (NMP)', barva: '#facc15', proga: '#dc2626', napis: '#1f2937', lucke: true },
         vojska: { naziv: 'Vojska', barva: '#14532d', proga: '#365314', napis: '#ffffff' },
         drugo: { naziv: 'Drugo', barva: '#ec4899', proga: '#9d174d', napis: '#ffffff' }
     };

@@ -56,6 +56,14 @@
         const s = M.SLUZBE[sluzba] || M.SLUZBE.gasilci;
         const r = 'stroke="#0f172a" stroke-width="1.5"';
         const steklo = '#1f2937';
+        // Modri luči na strehi kabine (gasilci, policija, reševalci): levo in desno tik za vetrobranskim steklom.
+        const lucke = function (x, y, w, nos) {
+            const ly = y + nos + 2.2, sw = 4.6, sh = 3.6;
+            return [x + 1.8, x + w - 1.8 - sw].map(function (lx) {
+                return '<rect class="nv-lucka" x="' + lx + '" y="' + ly + '" width="' + sw + '" height="' + sh + '" rx="1.3" fill="#2563eb" stroke="#0f172a" stroke-width="0.8"/>' +
+                    '<rect x="' + (lx + 1) + '" y="' + (ly + 0.8) + '" width="1.6" height="1.2" rx="0.5" fill="#bfdbfe"/>';
+            }).join('');
+        };
         // Telo: spredaj zoženo v trapez, ob straneh rahlo vidna kolesa (4, pri triosnih vozilih 6).
         const telo = function (x, y, w, h) {
             const crtaY = y + Math.round(h * 0.52);
@@ -67,6 +75,7 @@
             t += '<polygon points="' + (x + zozitev) + ',' + y + ' ' + (x + w - zozitev) + ',' + y + ' ' + (x + w) + ',' + (y + nos) + ' ' + (x + w) + ',' + (y + h) + ' ' + x + ',' + (y + h) + ' ' + x + ',' + (y + nos) + '" fill="' + s.barva + '" ' + r + ' stroke-linejoin="round"/>' +
                 '<polygon points="' + (x + zozitev + 1.2) + ',' + (y + 3.5) + ' ' + (x + w - zozitev - 1.2) + ',' + (y + 3.5) + ' ' + (x + w - 2.2) + ',' + (y + nos + 1.5) + ' ' + (x + 2.2) + ',' + (y + nos + 1.5) + '" fill="' + steklo + '"/>' +
                 '<rect x="' + (x + 0.8) + '" y="' + crtaY + '" width="' + (w - 1.6) + '" height="3.5" fill="' + s.proga + '"/>';
+            if (s.lucke && o.lucke !== false) t += lucke(x, y, w, nos);
             if (o.cisterna) {
                 const y1 = crtaY + 6, y2 = y + h - 3;
                 t += '<line x1="' + (x + 3) + '" y1="' + y1 + '" x2="' + (x + w - 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/><line x1="' + (x + w - 3) + '" y1="' + y1 + '" x2="' + (x + 3) + '" y2="' + y2 + '" stroke="#fff" stroke-width="2.6"/>';
@@ -1151,7 +1160,7 @@
             dodaj(mini(svgVozila(k === 'policija' ? 'avto' : 'tovorno', k)), k === 'gasilci' ? 'Gasilsko vozilo' : 'Vozilo: ' + M.SLUZBE[k].naziv);
         });
         if (vozila.some(M.jeCisterna)) dodaj(mini(svgVozila('tovorno', 'gasilci', { cisterna: true })), 'Cisterna (X)');
-        if (vozila.length) dodaj('<b style="font-size:11px;">1, 2 …</b>', 'Vrstni red prihoda');
+        if (vozila.length && !vVrsti) dodaj('<b style="font-size:11px;">1, 2 …</b>', 'Vrstni red prihoda');
         const znaki = {};
         sk.elementi.forEach(function (e) {
             if (e.vrsta !== 'znak') return;
@@ -1178,7 +1187,17 @@
         if (osnovaVidna && osnova.tocke.length) dodaj('<span style="font-size:13px;">🏠</span>', 'Gasilski dom');
         if (osnovaVidna && osnova.obrisi.length) dodaj('<span style="display:inline-block;width:22px;border-top:3px dashed #f59e0b;vertical-align:middle;"></span>', 'Območje zveze');
         if (!sk.elementi.length) return '';
-        if (vVrsti) return '<div class="nacrt-legenda nl-vrsta"><span class="nl-naslov">Legenda:</span>' + vrstice.join('') + '</div>';
+        if (vVrsti) {
+            // na koncu legende (izpis in slika): za vsako številko vozila vrsta, društvo oziroma služba in posadka
+            const poVrsti = vozila.slice().sort(function (a, b) { return (parseInt(a.st, 10) || 999) - (parseInt(b.st, 10) || 999); });
+            const seznam = poVrsti.map(function (v) {
+                const enota = M.nazivDrustva(v.kratica) || v.kratica || ((v.sluzba || 'gasilci') !== 'gasilci' ? M.SLUZBE[v.sluzba].naziv : '');
+                const opis = [v.tip, enota, M.zapisPosadke(v)].filter(function (x) { return x !== undefined && x !== null && String(x).trim() !== ''; }).join(' · ');
+                return '<span class="nl-vozilo"><span class="nl-st">' + esc(v.st === undefined || v.st === null || v.st === '' ? '–' : v.st) + '</span>' + esc(opis || '–') + '</span>';
+            }).join('');
+            return '<div class="nacrt-legenda nl-vrsta"><span class="nl-naslov">Legenda:</span>' + vrstice.join('') +
+                (seznam ? '<div class="nl-vozila"><span class="nl-podnaslov">Vozila po vrstnem redu prihoda (vrsta · društvo · posadka):</span>' + seznam + '</div>' : '') + '</div>';
+        }
         return '<div class="nacrt-legenda"><div class="nl-naslov">Legenda</div><table>' + vrstice.join('') + '</table></div>';
     }
     function osveziLegendo() {
