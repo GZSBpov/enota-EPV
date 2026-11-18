@@ -32,10 +32,10 @@
 
     // Službe: barva telesa, barva proge (druga barva), barva napisa
     const SLUZBE = {
-        gasilci: { naziv: 'Gasilci', barva: '#dc2626', proga: '#fde047', napis: '#ffffff' },
+        gasilci: { naziv: 'Gasilci', barva: '#dc2626', proga: '#fde047', napis: '#ffffff', lucke: 'A' },
         cz: { naziv: 'Civilna zaščita', barva: '#1d4ed8', proga: '#facc15', napis: '#ffffff' },
-        policija: { naziv: 'Policija', barva: '#ffffff', proga: '#1d4ed8', napis: '#1e3a8a' },
-        resevalci: { naziv: 'Reševalci (NMP)', barva: '#facc15', proga: '#dc2626', napis: '#1f2937' },
+        policija: { naziv: 'Policija', barva: '#ffffff', proga: '#1d4ed8', napis: '#1e3a8a', lucke: 'B' },
+        resevalci: { naziv: 'Reševalci (NMP)', barva: '#facc15', proga: '#dc2626', napis: '#1f2937', lucke: 'B' },
         vojska: { naziv: 'Vojska', barva: '#14532d', proga: '#365314', napis: '#ffffff' },
         drugo: { naziv: 'Drugo', barva: '#ec4899', proga: '#9d174d', napis: '#ffffff' }
     };
@@ -246,6 +246,19 @@
         return isNaN(n) ? 1 : Math.round(Math.max(0.6, Math.min(2.6, n)) * 10) / 10;
     }
 
+    /**
+     * Modre luči na vozilu: 'A' dve lučki na strehi (gasilska vozila), 'B' letev z dvema lučkama (policija, reševalci,
+     * mala gasilska vozila PV in GVM), 'krog' ena okrogla luč (čoln), null brez (priklopnik, dron, CZ, vojska, drugo).
+     */
+    function vrstaLuck(e, oblika) {
+        const sluzba = (e && e.sluzba) || 'gasilci';
+        const osnovna = SLUZBE[sluzba] ? SLUZBE[sluzba].lucke : null;
+        if (!osnovna || oblika === 'priklopnik' || oblika === 'dron') return null;
+        if (oblika === 'coln') return 'krog';
+        if (sluzba === 'gasilci' && /^(PV|GVM)(-|\d|$)/i.test(String((e && e.tip) || '').trim())) return 'B';
+        return osnovna;
+    }
+
     function steviloPosadke(e) {
         if (!e || e.posadka === undefined || e.posadka === null || String(e.posadka).trim() === '') return null;
         const n = parseInt(e.posadka, 10);
@@ -389,7 +402,7 @@
     const API = {
         VERZIJA: VERZIJA, TIPI_VOZIL: TIPI_VOZIL, SLUZBE: SLUZBE, VOZILA_SLUZB: VOZILA_SLUZB, DRUSTVA: DRUSTVA, ZNAKI: ZNAKI, CRTE: CRTE,
         BARVE_SEKTORJEV: BARVE_SEKTORJEV, BARVE_CRT: BARVE_CRT, ocistiOsnovo: ocistiOsnovo, kmlKoordinate: kmlKoordinate, ELABORAT_POLJA: ELABORAT_POLJA, OBRAZEC_POLJA: OBRAZEC_POLJA,
-        privzetiObrazec: privzetiObrazec, omejiMerilo: omejiMerilo, omejiVelikostZnaka: omejiVelikostZnaka, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
+        privzetiObrazec: privzetiObrazec, vrstaLuck: vrstaLuck, omejiMerilo: omejiMerilo, omejiVelikostZnaka: omejiVelikostZnaka, steviloPosadke: steviloPosadke, zapisPosadke: zapisPosadke, povzetekSodelujocih: povzetekSodelujocih,
         jeCisterna: jeCisterna, imaRoko: imaRoko, steviloKoles: steviloKoles, drustvaVNacrtu: drustvaVNacrtu,
         privzetiElaborat: privzetiElaborat, novId: novId, novaSkica: novaSkica, novNacrt: novNacrt, podvojiSkico: podvojiSkico,
         naslednjaStevilka: naslednjaStevilka, oznakaVozila: oznakaVozila, seznamVozil: seznamVozil, nazivDrustva: nazivDrustva,

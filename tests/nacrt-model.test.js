@@ -63,6 +63,10 @@ pri('novi znaki: lestev, črpalka, elektrika, skupina', ['lestev', 'crpalka', 'e
   pri('podvojena skica obdrži velikost ikon', M.podvojiSkico(u.skice[0], 'K').merilo === 0.7);
 }
 pri('požar z dimom in veter sta prosti risbi, velikost znaka omejena', M.ZNAKI.pozar.prosto && M.ZNAKI.pozar.svg && M.ZNAKI.veter.prosto && M.ZNAKI.veter.vrti && M.omejiVelikostZnaka(9) === 2.6 && M.omejiVelikostZnaka(0.1) === 0.6 && M.omejiVelikostZnaka(undefined) === 1);
+pri('luči A: gasilska vozila', M.vrstaLuck({ tip: 'GVC-1' }, 'tovorno') === 'A' && M.vrstaLuck({ tip: 'ALK32' }, 'lestev') === 'A' && M.vrstaLuck({ tip: 'ZD28' }, 'roka') === 'A' && M.vrstaLuck({ tip: 'GVV-1' }, 'tovorno') === 'A' && M.vrstaLuck({ tip: 'GV-1' }, 'tovorno') === 'A' && M.vrstaLuck({ tip: 'PVX' }, 'avto') === 'A');
+pri('luči B: PV, GVM, policija, reševalci', M.vrstaLuck({ tip: 'PV-1' }, 'avto') === 'B' && M.vrstaLuck({ tip: 'gvm' }, 'avto') === 'B' && M.vrstaLuck({ tip: 'PV' }, 'avto') === 'B' && M.vrstaLuck({ sluzba: 'policija' }, 'avto') === 'B' && M.vrstaLuck({ sluzba: 'resevalci' }, 'tovorno') === 'B');
+pri('čoln ena okrogla luč, priklopnik in dron brez', M.vrstaLuck({ tip: 'GČ' }, 'coln') === 'krog' && M.vrstaLuck({ tip: 'GP' }, 'priklopnik') === null && M.vrstaLuck({ tip: 'UAV' }, 'dron') === null);
+pri('brez luči: CZ, vojska, drugo', M.vrstaLuck({ sluzba: 'cz', tip: 'PV-1' }, 'avto') === null && M.vrstaLuck({ sluzba: 'vojska' }, 'tovorno') === null && M.vrstaLuck({ sluzba: 'drugo' }, 'tovorno') === null);
 pri('smeri neba: privzeto izklopljene, vklop se ohrani v datoteki', n.sever === false && M.uvozi(JSON.stringify(Object.assign({}, n, { sever: true }))).nacrt.sever === true && M.uvozi(JSON.stringify(stari)).nacrt.sever === false);
 pri('napisi: privzeto vidni, izklop se ohrani v datoteki', n.napisi === true && M.uvozi(JSON.stringify(Object.assign({}, n, { napisi: false }))).nacrt.napisi === false && M.uvozi(JSON.stringify(stari)).nacrt.napisi === true);
 
